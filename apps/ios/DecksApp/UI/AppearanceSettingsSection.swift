@@ -25,7 +25,7 @@ struct AppearanceSettingsSection: View {
                     .tag(name)
                 }
             }
-            Picker("appearance.layout", selection: Binding(get: { appearance.currentLayout?.id ?? "classic" }, set: { appearance.setLayout($0) })) {
+            Picker("appearance.layout", selection: Binding(get: { appearance.currentLayout?.id ?? LayoutHostDefaults.fallbackLayoutId }, set: { appearance.setLayout($0) })) {
                 ForEach(appearance.layouts) { l in
                     Text(verbatim: PanelNames.layout(l)).tag(l.id)
                 }

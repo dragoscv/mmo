@@ -1,0 +1,429 @@
+/* Decks 1.5 look: styles owned by this area (see src/look/look.css for the shared vocabulary). */
+
+/* ── title bar (shell/TitleBar.tsx): one flat row, 1 px line under it (look.css) ── */
+.mixai-titlebar.tb {
+	gap: 4px;
+}
+.tb-brand {
+	font-family: var(--font-heading, var(--font-sans));
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--foreground);
+	padding: 0 6px 0 2px;
+}
+/* Browser preview marker (text + outline, not colour alone). */
+.tb-chip {
+	padding: 2px 6px;
+	border: 1px solid var(--warning);
+	border-radius: var(--ctl-radius, 3px);
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--warning);
+}
+.mixai-titlebar.tb .tb-drag {
+	flex: 1 1 0;
+	min-width: 16px;
+	align-self: stretch;
+}
+.tb-rule {
+	width: 1px;
+	height: 16px;
+	margin: 0 2px;
+	background: var(--line, var(--border));
+}
+/* Window buttons end exactly at the window edge: the shell padding differs per look (styles.css
+   assumes 0.5rem, which cut 4 px off the close button in the signature look). */
+.mixai-titlebar.tb .mixai-winbtns {
+	margin-right: calc(-1 * var(--shell-pad, 0.5rem));
+}
+/* Touch mode asks 44 px of every button; in this row they take the full bar height instead of
+   sticking out of it (they stay 44 px wide). */
+:root[data-touch="on"] .mixai-titlebar.tb :where(button, [role="button"]) {
+	min-height: min(44px, var(--titlebar-h, 40px));
+}
+/* Chrome buttons: quiet until hovered or ON. */
+.dk-btn.tb-btn {
+	background: transparent;
+	border-color: transparent;
+	color: var(--muted-foreground);
+}
+.dk-btn.tb-btn:hover:not(:disabled) {
+	background: var(--secondary);
+	border-color: var(--line, var(--border));
+	color: var(--foreground);
+}
+.dk-btn.tb-btn[aria-pressed="true"] {
+	background: var(--on, var(--primary));
+	border-color: var(--on, var(--primary));
+	color: var(--on-fg, var(--primary-foreground));
+}
+.dk-btn.tb-btn svg {
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+}
+.tb-text-clip {
+	max-width: 7rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* Profile switcher (settings/ProfileSwitcher.tsx, a shared Button): same height and voice. */
+.mixai-titlebar.tb .tb-profile {
+	height: var(--ctl-h, 24px);
+	min-height: var(--ctl-h, 24px);
+	padding: 0 8px;
+	border-radius: var(--ctl-radius, 3px);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted-foreground);
+}
+@media (max-width: 1180px) {
+	.tb-text {
+		display: none;
+	}
+	.dk-btn.tb-btn:has(> .tb-text) {
+		padding: 0;
+		width: var(--ctl-h, 24px);
+	}
+}
+/* Record: red dot at rest; ON = alert fill, elapsed time, pulsing dot. */
+.dk-btn.tb-rec .tb-rec-dot {
+	width: 9px;
+	height: 9px;
+	fill: currentColor;
+	color: var(--alert, var(--destructive));
+}
+.dk-btn.tb-rec[aria-pressed="true"] {
+	background: var(--alert, var(--destructive));
+	border-color: var(--alert, var(--destructive));
+	color: var(--destructive-foreground, var(--foreground));
+}
+.dk-btn.tb-rec[aria-pressed="true"] .tb-rec-dot {
+	color: currentColor;
+	animation: mixai-rec-pulse 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.dk-btn.tb-rec[aria-pressed="true"] .tb-rec-dot {
+		animation: none;
+	}
+}
+/* Settings → reduced motion (the app's own switch), not only the OS setting. */
+:root[data-motion="reduced"] .dk-btn.tb-rec[aria-pressed="true"] .tb-rec-dot {
+	animation: none;
+}
+/* Performance HUD (shell/PerfHud.tsx): fps; warning tone + triangle while animations are reduced. */
+.tb-hud {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: var(--ctl-h, 24px);
+	padding: 0 6px;
+	border: 1px solid transparent;
+	border-radius: var(--ctl-radius, 3px);
+	color: var(--muted-foreground);
+}
+.tb-hud svg {
+	width: 12px;
+	height: 12px;
+}
+.tb-hud[data-reduced="true"] {
+	border-color: var(--warning);
+	color: var(--warning);
+}
+
+/* ── announcements (shell/StatusRegion.tsx): flat chip above the status bar ── */
+:root[data-look="signature"] .mixai-toast {
+	bottom: calc(var(--statusbar-h, 22px) + 10px);
+	padding: 6px 10px;
+	border-radius: var(--ctl-radius, 3px);
+	border: 1px solid var(--line, var(--border));
+	border-left: 2px solid var(--on, var(--primary));
+	background: var(--popover);
+	color: var(--popover-foreground);
+	box-shadow: none;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+	max-width: calc(100vw - 32px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ── status bar (shell/StatusBar.tsx): one row of flat cells, never wraps ── */
+.mixai-statusbar.sb {
+	gap: 0;
+	align-items: stretch;
+	font-size: 11px;
+	line-height: 1;
+}
+/* Parts hidden by the fit (see useFit) must stay hidden whatever their display is. */
+.mixai-statusbar.sb [hidden] {
+	display: none;
+}
+.mixai-statusbar.sb .sb-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	flex-shrink: 0;
+	/* Touch mode asks 44 px of every button; this row is a fixed 22 px strip. */
+	min-height: 0;
+	min-width: 0;
+	padding: 0 8px;
+	border-left: 1px solid var(--line, var(--border));
+	color: var(--muted-foreground);
+	white-space: nowrap;
+}
+.mixai-statusbar.sb .sb-item:first-child {
+	border-left: 0;
+	padding-left: 0;
+}
+.mixai-statusbar.sb button.sb-item {
+	cursor: pointer;
+	transition:
+		background-color var(--dur-fast, 120ms) var(--ease-out),
+		color var(--dur-fast, 120ms) var(--ease-out);
+}
+.mixai-statusbar.sb button.sb-item:hover {
+	background: color-mix(in oklab, var(--foreground) 8%, transparent);
+	color: var(--foreground);
+}
+.mixai-statusbar.sb button.sb-item:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: -2px;
+}
+.sb-spacer {
+	flex: 1 1 0;
+	min-width: 0;
+}
+/* State dot: filled = ok, ring = not connected, half = needs pairing (never colour alone). */
+.sb-dot {
+	width: 7px;
+	height: 7px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	border: 1.5px solid var(--fg-faint, var(--muted-foreground));
+}
+.sb-dot[data-state="online"] {
+	border-color: var(--on, var(--primary));
+	background: var(--on, var(--primary));
+}
+.sb-dot[data-state="unpaired"] {
+	border-color: var(--warning);
+	background: linear-gradient(90deg, var(--warning) 50%, transparent 50%);
+}
+/* Segmented meters. */
+.sb-cells {
+	display: inline-flex;
+	align-items: center;
+	gap: 1px;
+	flex-shrink: 0;
+}
+.sb-cells > i {
+	width: 4px;
+	height: 10px;
+	border-radius: 1px;
+	background: var(--secondary, var(--muted));
+}
+/* Lit cells: the first `data-lit` ones (one attribute on the container = one DOM change). */
+.sb-cells[data-lit="1"] > i:nth-child(-n + 1),
+.sb-cells[data-lit="2"] > i:nth-child(-n + 2),
+.sb-cells[data-lit="3"] > i:nth-child(-n + 3),
+.sb-cells[data-lit="4"] > i:nth-child(-n + 4),
+.sb-cells[data-lit="5"] > i:nth-child(-n + 5),
+.sb-cells[data-lit="6"] > i:nth-child(-n + 6),
+.sb-cells[data-lit="7"] > i:nth-child(-n + 7),
+.sb-cells[data-lit="8"] > i:nth-child(-n + 8),
+.sb-cells[data-lit="9"] > i:nth-child(-n + 9),
+.sb-cells[data-lit="10"] > i:nth-child(-n + 10),
+.sb-cells[data-lit="11"] > i:nth-child(-n + 11),
+.sb-cells[data-lit="12"] > i:nth-child(-n + 12),
+.sb-cells[data-lit="13"] > i:nth-child(-n + 13),
+.sb-cells[data-lit="14"] > i:nth-child(-n + 14),
+.sb-cells[data-lit="15"] > i:nth-child(-n + 15),
+.sb-cells[data-lit="16"] > i:nth-child(-n + 16) {
+	background: var(--cell-on, var(--on, var(--primary)));
+}
+.sb-cells > i[data-zone="warn"],
+.sb-load[data-level="warn"] .sb-cells > i {
+	--cell-on: var(--warning);
+}
+.sb-cells > i[data-zone="alert"],
+.sb-load[data-level="alert"] .sb-cells > i {
+	--cell-on: var(--alert, var(--destructive));
+}
+.sb-cells-load > i {
+	width: 6px;
+}
+.sb-pct {
+	min-width: 4ch;
+	text-align: right;
+	color: var(--foreground);
+}
+.sb-word {
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.sb-load[data-level="warn"] .sb-word,
+.sb-load[data-level="warn"] .sb-pct {
+	color: var(--warning);
+}
+.sb-load[data-level="alert"] .sb-word,
+.sb-load[data-level="alert"] .sb-pct {
+	color: var(--alert, var(--destructive));
+}
+/* A count since the engine started: a standing warning, not an alarm. */
+.sb-xruns {
+	color: var(--warning);
+}
+.sb-device,
+.sb-ellipsis {
+	max-width: 11rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.sb-device {
+	padding-left: 6px;
+	border-left: 1px solid var(--line, var(--border));
+}
+.sb-sep {
+	width: 1px;
+	height: 8px;
+	background: var(--fg-faint, var(--muted-foreground));
+}
+.sb-clock {
+	color: var(--foreground);
+}
+
+/* ── first-run tour (shell/Onboarding.tsx): flat tiles, one accent for the chosen one ── */
+.ob-steps {
+	display: flex;
+	gap: 2px;
+}
+.ob-steps > i {
+	flex: 1 1 0;
+	height: 3px;
+	border-radius: 1px;
+	background: var(--secondary, var(--muted));
+}
+.ob-steps > i[data-on="true"] {
+	background: var(--on, var(--primary));
+}
+/* Same height on every step, so the dialog does not jump. */
+.ob-body {
+	display: grid;
+	align-content: start;
+	gap: 8px;
+	min-height: 300px;
+}
+.ob-title {
+	font-family: var(--font-heading, var(--font-sans));
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 1.2;
+}
+.ob-detail {
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--muted-foreground);
+}
+.ob-note {
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--fg-faint, var(--muted-foreground));
+}
+.ob-choices {
+	display: grid;
+	gap: 2px;
+	margin-top: 4px;
+}
+.ob-choice {
+	position: relative;
+	display: grid;
+	align-content: start;
+	gap: 3px;
+	min-height: 44px;
+	padding: 9px 30px 9px 10px;
+	border: 1px solid var(--line, var(--border));
+	border-radius: var(--ctl-radius, 6px);
+	background: var(--well, var(--muted));
+	text-align: left;
+	transition:
+		background-color var(--dur-fast, 120ms) var(--ease-out),
+		border-color var(--dur-fast, 120ms) var(--ease-out);
+}
+.ob-choice:hover:not([aria-disabled="true"]) {
+	background: var(--secondary, var(--muted));
+}
+.ob-choice:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 1px;
+}
+.ob-choice[aria-checked="true"] {
+	border-color: var(--on, var(--primary));
+	background: color-mix(in oklab, var(--on, var(--primary)) 12%, var(--well, var(--muted)));
+}
+.ob-choice[aria-disabled="true"] {
+	cursor: not-allowed;
+	border-style: dashed;
+}
+.ob-choice[aria-disabled="true"] .ob-choice-title {
+	color: var(--muted-foreground);
+}
+.ob-choice-title {
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--foreground);
+}
+.ob-choice-detail {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+	font-size: 11px;
+	line-height: 1.35;
+	color: var(--muted-foreground);
+}
+.ob-choice-check {
+	position: absolute;
+	top: 9px;
+	right: 9px;
+	width: 14px;
+	height: 14px;
+	color: var(--on, var(--primary));
+	visibility: hidden;
+}
+.ob-choice[aria-checked="true"] .ob-choice-check {
+	visibility: visible;
+}
+
+/* ── Settings → Appearance: hot cue colour preview (AppearanceExtras.tsx) ── */
+.appearance-cues {
+	display: inline-flex;
+	gap: 2px;
+}
+.appearance-cues > span {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 16px;
+	border-radius: var(--pad-radius, 3px);
+	font-size: 10px;
+	font-weight: 700;
+	/* Dark ink on every cue colour (all are light enough: L >= 0.56). */
+	color: var(--background);
+}
+:root:where(.light) .appearance-cues > span {
+	color: var(--foreground);
+}

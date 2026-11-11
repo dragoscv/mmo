@@ -78,6 +78,18 @@ class LayoutFixturesTest {
         assertEquals(DemoPacks.presets, layouts)
     }
 
+    /** The contract default (not the layout the Compose apps open on: `DecksSkin.DEFAULT_LAYOUT`) equals TS and Rust. */
+    @Test fun contractDefaultLayoutEqualsTheTsSourceAndRust() {
+        val ts = File(repo, "apps/mixai/src/layout/presets.ts").readText()
+        val const = assertNotNull(Regex("""export const DEFAULT_LAYOUT = (\w+);""").find(ts), "DEFAULT_LAYOUT in presets.ts").groupValues[1]
+        val id = assertNotNull(
+            Regex("""export const $const: LayoutDoc = \{\s*v: 1,\s*id: "([a-z0-9-]+)"""").find(ts), "id of $const in presets.ts",
+        ).groupValues[1]
+        assertEquals(id, DemoPacks.DEFAULT_LAYOUT_ID, "Kotlin constant == presets.ts")
+        ensureFfiLibrary()
+        assertEquals(id, ro.mixai.decks.ffi.layoutDefaultId(), "decks-ffi layout_default_id == presets.ts")
+    }
+
     @Test fun demoSolverMatchesTheGoldenCases() = check(DemoPacks, "demo")
 
     /**

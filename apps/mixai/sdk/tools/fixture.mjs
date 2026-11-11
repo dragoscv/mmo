@@ -36,3 +36,29 @@ export function sampleFiles() {
         ["assets/preview.png", renderPreview(colors, layout, 160, 90)],
     ]);
 }
+
+/** Every `style` field a manifest-v2 skin may set (one value per colour and size key). */
+export const SAMPLE_STYLE = {
+    look: "classic",
+    platter: true,
+    layout: "pro-vertical",
+    waves: "overlay",
+    colors: {
+        well: "#0b0d0f", waveBg: "#000000", line: "#ffffff22", faint: "#888888", on: "#00d37f", onFg: "#001b08",
+        play: "#00ff88", playFg: "#000000", cue: "#ff8800", alert: "#ff2b2b",
+        waveLow: "oklch(0.6 0.2 250)", waveMid: "#33cc88", waveHigh: "#ffffffcc", waveGrid: "#ffffff33",
+        waveDownbeat: "#ffffff88", wavePlayhead: "#ffffff", wavePlayheadCap: "#ff0000",
+        cue1: "#ff0000", cue2: "#ff8800", cue3: "#ffff00", cue4: "#00ff00", cue5: "#00ffff", cue6: "#0000ff", cue7: "#ff00ff", cue8: "#ffffff",
+    },
+    sizes: { panelGap: 6, panelRadius: 0, panelPad: 16, controlRadius: 2.5, padRadius: 12, controlHeight: 24, titlebarHeight: 28, wavePlayedAlpha: 0.45 },
+};
+
+/** A manifest-v2 skin with a full `style` block (fixture for the Rust cross-check). */
+export function styleSampleFiles() {
+    const colors = { background: "oklch(0.14 0.01 150)", foreground: "oklch(0.96 0.01 150)", primary: "#00d37f", "primary-foreground": "#001b08" };
+    return new Map([
+        ["manifest.json", json({ v: 2, id: "com.example.test.style", name: "Style sample", version: "1.0.0", kind: "skin", author: "MixAI SDK tests", description: "Manifest v2 fixture for the Rust cross-check", pro: false, tokens: "tokens.json", preview: "assets/preview.png" })],
+        ["tokens.json", json({ mode: "dark", surface: "solid", colors, style: SAMPLE_STYLE })],
+        ["assets/preview.png", renderPreview(colors, null, 160, 90)],
+    ]);
+}

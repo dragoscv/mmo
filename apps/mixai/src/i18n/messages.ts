@@ -301,7 +301,7 @@ export const appMessages = {
         "routing.fourChHint": "Ieșirile 1/2 master, 3/4 căști",
         "routing.fourChUnavailable": "Modul pe 4 canale cere o ieșire cu cel puțin 4 canale (aceasta are {n})",
 
-        "fx.color.title": "COLOUR FX",
+        "fx.color.title": "FX CULOARE",
         "fx.color.selectAria": "Efect de culoare, deck {id}",
         "fx.color.knobAria": "Intensitate efect de culoare, deck {id}",
         "fx.color.none": "Oprit",

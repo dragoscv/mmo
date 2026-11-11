@@ -53,9 +53,9 @@ class WaveRenderer(
             RenderFrameState(
                 decks = frame.decks.map { d ->
                     val markers = buildList {
-                        if (d.loaded) add(RenderMarker(RenderMarkerKind.Cue, d.cuePointSec, d.cuePointSec, DecksColors.rgb(DecksColors.warning)))
+                        if (d.loaded) add(RenderMarker(RenderMarkerKind.Cue, d.cuePointSec, d.cuePointSec, DecksColors.rgb(DecksColors.cueButton)))
                         d.hotCues.forEachIndexed { i, h ->
-                            if (h != null) add(RenderMarker(RenderMarkerKind.HotCue(i.toUByte()), h, h, DecksColors.rgb(DecksColors.deck(i % 4))))
+                            if (h != null) add(RenderMarker(RenderMarkerKind.HotCue(i.toUByte()), h, h, DecksColors.rgb(DecksColors.cue(i))))
                         }
                         if (d.loopActive) {
                             add(RenderMarker(RenderMarkerKind.Loop, d.loopStartSec, d.loopEndSec, DecksColors.rgb(DecksColors.success)))

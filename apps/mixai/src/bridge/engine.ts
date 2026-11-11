@@ -35,7 +35,6 @@ import type {
 } from "./types";
 // Relative + explicit extension so `node --test` can load this module without the Vite alias.
 import { resetDeckGrid, setGridBridge } from "../grid/grid-store.ts";
-import { gridFromDeck } from "../grid/markers.ts";
 
 type InvokeFn = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -97,9 +96,15 @@ export const engine = {
     },
 
     /** Loads a track and returns its downsampled waveform peaks (0..1). */
-    loadTrack(req: LoadTrackRequest): Promise<number[] | null> {
-        resetDeckGrid(req.deck, req.trackId ?? null, gridFromDeck(req.bpm && req.bpm > 0 ? req.bpm : 0, 0));
-        return call<number[]>("load_track", { req });
+    async loadTrack(req: LoadTrackRequest): Promise<number[] | null> {
+        const peaks = await call<number[]>("load_track", { req });
+        // Only after the engine took the track: a failed load leaves the previous track, and its
+        // edited grid, in place. No seed: the engine analysed the file (detected BPM when the
+        // request has none, and the first beat), so until the user edits the grid everything
+        // reads `bpm` / `firstBeat` from the deck snapshot. A seed built from the request
+        // (first beat 0, 20 BPM without a library BPM) drew the beat lines in the wrong place.
+        resetDeckGrid(req.deck, req.trackId ?? null);
+        return peaks;
     },
 
     /**
@@ -107,15 +112,33 @@ export const engine = {
      * the companion runs on another machine (LAN / tunnel) so the file isn't on
      * local disk. Returns waveform peaks like {@link loadTrack}.
      */
-    loadTrackStream(req: {
+    async loadTrackStream(req: {
         deck: DeckId;
         trackId: number;
         title?: string | null;
         artist?: string | null;
         bpm?: number | null;
     }): Promise<number[] | null> {
-        resetDeckGrid(req.deck, String(req.trackId), gridFromDeck(req.bpm && req.bpm > 0 ? req.bpm : 0, 0));
-        return call<number[]>("load_track_stream", { req });
+        const peaks = await call<number[]>("load_track_stream", { req });
+        // See `loadTrack`.
+        resetDeckGrid(req.deck, String(req.trackId));
+        return peaks;
+    },
+
+    /**
+     * Three-band waveform of the track on `deck` (raw bytes, see `state/wave-store.ts` for the
+     * layout). Empty buffer = nothing loaded; null = no engine (browser preview).
+     */
+    waveformBands(deck: DeckId): Promise<ArrayBuffer | null> {
+        return call<ArrayBuffer>("deck_waveform_bands", { deck });
+    },
+
+    /**
+     * Peak lanes of the separated stems on `deck` (raw bytes, see `parseStemLanes` in
+     * `state/wave-store.ts`). Empty buffer = no stems loaded; null = no engine.
+     */
+    stemLanes(deck: DeckId): Promise<ArrayBuffer | null> {
+        return call<ArrayBuffer>("deck_stem_lanes", { deck });
     },
 
     play(deck: DeckId): Promise<null> {
@@ -135,7 +158,9 @@ export const engine = {
     },
 
     setTempo(deck: DeckId, tempo: number): Promise<null> {
-        return call<null>("deck_set_tempo", { deck, tempo });
+        // The Rust command is `deck_set_tempo(deck, value)`: sending `tempo` was refused with
+        // "missing required key value" (every tempo path was dead in the native app).
+        return call<null>("deck_set_tempo", { deck, value: tempo });
     },
 
     setKeyLock(deck: DeckId, enabled: boolean): Promise<null> {
@@ -156,6 +181,16 @@ export const engine = {
 
     setCrossfader(value: number): Promise<null> {
         return call<null>("set_crossfader", { value });
+    },
+
+    /** Crossfader gain law. Rejects on an engine that predates the command (Decks < 1.5). */
+    setCrossfaderCurve(curve: MixerState["crossfaderCurve"]): Promise<null> {
+        return call<null>("set_crossfader_curve", { curve });
+    },
+
+    /** Crossfader side of a deck (`"thru"` bypasses the crossfader). Rejects on an older engine. */
+    setCrossfaderAssign(deck: DeckId, assign: MixerState["decks"][number]["crossfaderAssign"]): Promise<null> {
+        return call<null>("deck_set_crossfader_assign", { deck, assign });
     },
 
     setMasterVolume(value: number): Promise<null> {
@@ -435,6 +470,15 @@ export const engine = {
         order?: string;
     }): Promise<LibraryPage | null> {
         return call<LibraryPage>("companion_tracks", opts ?? {});
+    },
+
+    /**
+     * Overview peaks of a library track (the analyzer sidecar: Int16 LE, interleaved
+     * `[min, max]` pairs; decode with `parseOverviewPeaks` in `state/wave-store.ts`).
+     * Empty buffer = not analysed yet; null = no engine.
+     */
+    companionTrackPeaks(id: number): Promise<ArrayBuffer | null> {
+        return call<ArrayBuffer>("companion_track_peaks", { id });
     },
 
     /** Toggle a companion track's favorite flag; returns the new value. */

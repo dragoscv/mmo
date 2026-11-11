@@ -1,14 +1,18 @@
-// Regenerate fixtures/sample-signed.mixaipack (community trust, PUBLIC test key from helpers.mjs).
-// Used by the Rust cross-check test: it must inspect as trust=community, id com.example.test.sample.
+// Regenerate the fixtures (community trust, PUBLIC test key from fixture.mjs) used by the Rust
+// cross-check tests:
+//   fixtures/sample-signed.mixaipack  manifest v1 bundle, id com.example.test.sample
+//   fixtures/sample-style.mixaipack   manifest v2 skin with a full `style` block, id com.example.test.style
 //   node apps/mixai/sdk/tools/make-fixture.mjs
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { buildPack } from "../lib/pack.mjs";
 import { sha256Hex } from "../lib/sign.mjs";
-import { TEST_KEY_ID, TEST_SEED, sampleFiles } from "./fixture.mjs";
+import { TEST_KEY_ID, TEST_SEED, sampleFiles, styleSampleFiles } from "./fixture.mjs";
 
-const out = new URL("../fixtures/sample-signed.mixaipack", import.meta.url);
 mkdirSync(new URL("../fixtures/", import.meta.url), { recursive: true });
-const { bytes } = buildPack(sampleFiles(), { seed: TEST_SEED, keyId: TEST_KEY_ID, embedPubkey: true });
-writeFileSync(out, bytes);
-console.log(`${fileURLToPath(out)} ${bytes.length} B sha256 ${sha256Hex(bytes)}`);
+for (const [name, files] of [["sample-signed", sampleFiles()], ["sample-style", styleSampleFiles()]]) {
+	const out = new URL(`../fixtures/${name}.mixaipack`, import.meta.url);
+	const { bytes } = buildPack(files, { seed: TEST_SEED, keyId: TEST_KEY_ID, embedPubkey: true });
+	writeFileSync(out, bytes);
+	console.log(`${fileURLToPath(out)} ${bytes.length} B sha256 ${sha256Hex(bytes)}`);
+}

@@ -100,6 +100,157 @@ impl TrackBuffer {
         }
         peaks
     }
+
+    /// One peak lane for a stem display: per point, the peak amplitude (0..255) of the mono
+    /// mix. Same point grid as [`TrackBuffer::compute_band_peaks`], so stem lanes line up
+    /// with the track's band waveform (and, like it, empty below [`MIN_WAVE_SAMPLE_RATE`]).
+    pub fn compute_peak_lane(&self, points_per_second: u32) -> Vec<u8> {
+        let frames = self.frames();
+        let sr = self.sample_rate;
+        if frames == 0 || !wave_grid_ok(sr, points_per_second) {
+            return Vec::new();
+        }
+        let len = (frames as u64 * points_per_second as u64).div_ceil(sr as u64) as usize;
+        let mut out = Vec::with_capacity(len);
+        let boundary = |p: u64| (p * sr as u64) / points_per_second as u64;
+        let mut point = 0u64;
+        let mut next = boundary(1);
+        let mut peak = 0.0f32;
+        for i in 0..frames {
+            peak = peak.max(((self.left[i] + self.right[i]) * 0.5).abs());
+            if i as u64 + 1 == next {
+                out.push((peak.min(1.0) * 255.0).round() as u8);
+                peak = 0.0;
+                point += 1;
+                next = boundary(point + 1);
+            }
+        }
+        if out.len() < len {
+            out.push((peak.min(1.0) * 255.0).round() as u8);
+        }
+        out
+    }
+
+    /// Three-band waveform for the scrolling / overview displays: per point, the peak
+    /// amplitude (0..255) of the mono mix below 250 Hz, between 250 Hz and 4 kHz, and above
+    /// 4 kHz (4th-order crossovers). Point `i` covers source frames
+    /// `[floor(i·sr/pps), floor((i+1)·sr/pps))`, so points never drift against the audio clock.
+    /// A file that declares a rate below [`MIN_WAVE_SAMPLE_RATE`] gets no waveform (empty).
+    pub fn compute_band_peaks(&self, points_per_second: u32) -> BandWave {
+        let frames = self.frames();
+        let sr = self.sample_rate;
+        if frames == 0 || !wave_grid_ok(sr, points_per_second) {
+            return BandWave {
+                points_per_second,
+                ..BandWave::default()
+            };
+        }
+        let len = (frames as u64 * points_per_second as u64).div_ceil(sr as u64) as usize;
+        let srf = sr as f32;
+        let q = std::f32::consts::FRAC_1_SQRT_2;
+        let stage = |low_pass: bool, freq: f32| {
+            let mut b = Biquad::identity();
+            if low_pass {
+                b.low_pass(freq, q, srf);
+            } else {
+                b.high_pass(freq, q, srf);
+            }
+            [b, b]
+        };
+        let mut low_f = stage(true, BAND_LOW_HZ);
+        let mut mid_hp = stage(false, BAND_LOW_HZ);
+        let mut mid_lp = stage(true, BAND_HIGH_HZ);
+        let mut high_f = stage(false, BAND_HIGH_HZ);
+        // Two statements: a nested `f[1].process(f[0].process(x))` borrows `f` mutably twice.
+        let run = |f: &mut [Biquad; 2], x: f32| {
+            let y = f[0].process(x);
+            f[1].process(y)
+        };
+        let mut out = BandWave {
+            points_per_second,
+            low: Vec::with_capacity(len),
+            mid: Vec::with_capacity(len),
+            high: Vec::with_capacity(len),
+        };
+        let quant = |v: f32| (v.min(1.0) * 255.0).round() as u8;
+        let boundary = |p: u64| (p * sr as u64) / points_per_second as u64;
+        let mut point = 0u64;
+        let mut next = boundary(1);
+        let (mut pl, mut pm, mut ph) = (0.0f32, 0.0f32, 0.0f32);
+        for i in 0..frames {
+            let x = (self.left[i] + self.right[i]) * 0.5;
+            // One NaN / infinity would stay in the filter state and flatten the rest of the track.
+            let x = if x.is_finite() { x } else { 0.0 };
+            pl = pl.max(run(&mut low_f, x).abs());
+            let m = run(&mut mid_hp, x);
+            pm = pm.max(run(&mut mid_lp, m).abs());
+            ph = ph.max(run(&mut high_f, x).abs());
+            if i as u64 + 1 == next {
+                out.low.push(quant(pl));
+                out.mid.push(quant(pm));
+                out.high.push(quant(ph));
+                (pl, pm, ph) = (0.0, 0.0, 0.0);
+                point += 1;
+                next = boundary(point + 1);
+            }
+        }
+        // Trailing partial point.
+        if out.low.len() < len {
+            out.low.push(quant(pl));
+            out.mid.push(quant(pm));
+            out.high.push(quant(ph));
+        }
+        out
+    }
+}
+
+/// Crossover between the low and mid waveform bands.
+pub const BAND_LOW_HZ: f32 = 250.0;
+/// Crossover between the mid and high waveform bands.
+pub const BAND_HIGH_HZ: f32 = 4000.0;
+/// Lowest file sample rate that gets a waveform. The rate comes from the file header, so it
+/// can be anything: far below audio rates the crossovers have no room under Nyquist, and with
+/// fewer frames than points per second the point grid collapses.
+pub const MIN_WAVE_SAMPLE_RATE: u32 = 1_000;
+
+/// True when a waveform can be built: a usable rate and at least one frame per point (with
+/// more points than frames per second the first point boundary is frame 0 and every frame
+/// would fall into one trailing point).
+fn wave_grid_ok(sample_rate: u32, points_per_second: u32) -> bool {
+    sample_rate >= MIN_WAVE_SAMPLE_RATE && points_per_second > 0 && points_per_second <= sample_rate
+}
+
+/// Three-band waveform peaks (see [`TrackBuffer::compute_band_peaks`]).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BandWave {
+    pub points_per_second: u32,
+    pub low: Vec<u8>,
+    pub mid: Vec<u8>,
+    pub high: Vec<u8>,
+}
+
+impl BandWave {
+    /// Number of points in every lane.
+    pub fn len(&self) -> usize {
+        self.low.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.low.is_empty()
+    }
+
+    /// Wire form for the UI: `[u32 LE points_per_second][u32 LE len]` then the `low`, `mid`
+    /// and `high` lanes (`len` bytes each).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let n = self.len();
+        let mut out = Vec::with_capacity(8 + 3 * n);
+        out.extend_from_slice(&self.points_per_second.to_le_bytes());
+        out.extend_from_slice(&(n as u32).to_le_bytes());
+        out.extend_from_slice(&self.low);
+        out.extend_from_slice(&self.mid);
+        out.extend_from_slice(&self.high);
+        out
+    }
 }
 
 pub struct Deck {
@@ -1134,6 +1285,184 @@ pub(crate) mod tests {
             "{}",
             d.position_secs()
         );
+    }
+
+    fn tone(freq: f32, secs: f32, sr: u32) -> TrackBuffer {
+        let n = (secs * sr as f32) as usize;
+        let s: Vec<f32> = (0..n)
+            .map(|i| 0.8 * (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin())
+            .collect();
+        TrackBuffer {
+            left: s.clone(),
+            right: s,
+            sample_rate: sr,
+        }
+    }
+
+    #[test]
+    fn band_peaks_put_each_tone_in_its_band() {
+        // Skip the first points: the crossover filters ring in.
+        let settled = |v: &[u8]| *v[20..].iter().max().unwrap();
+        for (freq, want) in [(60.0, 0usize), (1000.0, 1), (10_000.0, 2)] {
+            let w = tone(freq, 1.0, 48_000).compute_band_peaks(150);
+            let lanes = [settled(&w.low), settled(&w.mid), settled(&w.high)];
+            for (i, v) in lanes.iter().enumerate() {
+                if i == want {
+                    assert!(*v > 170, "{freq} Hz: band {i} = {v}, want the tone here");
+                } else {
+                    assert!(*v < 40, "{freq} Hz: band {i} = {v}, want it quiet");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn band_peaks_length_follows_the_audio_clock() {
+        // 1.5 s at 44.1 kHz, 150 points per second: ceil(66150 * 150 / 44100) = 225.
+        let w = tone(440.0, 1.5, 44_100).compute_band_peaks(150);
+        assert_eq!((w.len(), w.mid.len(), w.high.len()), (225, 225, 225));
+        // A length that is not a whole number of points gets one trailing partial point.
+        let w = tone(440.0, 1.003, 48_000).compute_band_peaks(150);
+        assert_eq!(w.len(), 151);
+        // Empty / degenerate input never panics.
+        let empty = TrackBuffer {
+            left: vec![],
+            right: vec![],
+            sample_rate: 48_000,
+        };
+        assert!(empty.compute_band_peaks(150).is_empty());
+        assert!(tone(440.0, 0.1, 48_000).compute_band_peaks(0).is_empty());
+    }
+
+    #[test]
+    fn waveforms_survive_a_tiny_sample_rate() {
+        // The rate is whatever the file header says. Under 240 Hz the crossover cutoff clamp
+        // used to panic (release aborts on panic); under 150 Hz the lane collapsed to one point.
+        for sr in [1u32, 8, 100, 239, 240, 999] {
+            let buf = TrackBuffer {
+                left: vec![0.5; 2_000],
+                right: vec![0.5; 2_000],
+                sample_rate: sr,
+            };
+            let w = buf.compute_band_peaks(150);
+            assert!(w.is_empty(), "{sr} Hz: {} points", w.len());
+            assert_eq!(w.points_per_second, 150);
+            assert!(buf.compute_peak_lane(150).is_empty(), "{sr} Hz lane");
+        }
+        // The lowest rate that gets a waveform: 2 s at 1 kHz = 300 points, in both forms.
+        let buf = TrackBuffer {
+            left: vec![0.5; 2_000],
+            right: vec![0.5; 2_000],
+            sample_rate: MIN_WAVE_SAMPLE_RATE,
+        };
+        assert_eq!(buf.compute_band_peaks(150).len(), 300);
+        assert_eq!(buf.compute_peak_lane(150).len(), 300);
+        // More points than frames per second is refused too, one point per frame is not.
+        assert!(buf.compute_peak_lane(1_001).is_empty());
+        assert!(buf.compute_band_peaks(1_001).is_empty());
+        assert_eq!(buf.compute_peak_lane(1_000).len(), 2_000);
+    }
+
+    /// One full-scale sample at `frame`, silence elsewhere.
+    fn impulse(frame: usize, frames: usize, sr: u32) -> TrackBuffer {
+        let mut s = vec![0.0f32; frames];
+        s[frame] = 1.0;
+        TrackBuffer {
+            left: s.clone(),
+            right: s,
+            sample_rate: sr,
+        }
+    }
+
+    #[test]
+    fn impulse_at_32k_lands_on_its_point_index() {
+        // 32 kHz / 150 points per second = 213.33 frames per point, so the point boundaries
+        // are floored: point 57 covers frames 12160..12373 and point 58 starts at 12373.
+        // (44.1 k and 48 k divide evenly and never exercise the floor.)
+        for (frame, want) in [
+            (0usize, 0usize),
+            (212, 0),
+            (213, 1),
+            (12_160, 57),
+            (12_372, 57),
+            (12_373, 58),
+        ] {
+            let buf = impulse(frame, 32_000, 32_000);
+            let lane = buf.compute_peak_lane(150);
+            assert_eq!(lane.len(), 150);
+            let hits: Vec<usize> = (0..lane.len()).filter(|&i| lane[i] > 0).collect();
+            assert_eq!(hits, [want], "lane, impulse at frame {frame}");
+            assert_eq!(lane[want], 255);
+            // Band waveform: the filters are causal, so nothing shows before the impulse's
+            // point, and the high band reacts on the impulse's own frame.
+            let w = buf.compute_band_peaks(150);
+            assert_eq!(w.len(), 150);
+            assert_eq!(
+                w.high.iter().position(|v| *v > 0),
+                Some(want),
+                "high band, impulse at frame {frame}"
+            );
+            assert!(w.low[..want].iter().all(|v| *v == 0));
+            assert!(w.mid[..want].iter().all(|v| *v == 0));
+        }
+    }
+
+    #[test]
+    fn band_peaks_recover_after_a_non_finite_sample() {
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut buf = tone(1_000.0, 1.0, 48_000);
+            buf.left[4_800] = bad;
+            let w = buf.compute_band_peaks(150);
+            // 0.1 s in = point 15. The tone is still there half a second later.
+            assert_eq!(w.len(), 150);
+            let after = *w.mid[75..].iter().min().unwrap();
+            assert!(
+                after > 170,
+                "{bad}: mid band after the bad sample = {after}"
+            );
+        }
+    }
+
+    #[test]
+    fn band_wave_wire_form_is_header_plus_three_lanes() {
+        let w = BandWave {
+            points_per_second: 150,
+            low: vec![1, 2],
+            mid: vec![3, 4],
+            high: vec![5, 6],
+        };
+        assert_eq!(
+            w.to_bytes(),
+            vec![150, 0, 0, 0, 2, 0, 0, 0, 1, 2, 3, 4, 5, 6]
+        );
+    }
+
+    #[test]
+    fn band_grid_peak_lane_lines_up_with_the_band_wave() {
+        // Same point count as the band waveform for the same audio, at both common rates.
+        for (secs, sr) in [(1.5, 44_100u32), (1.003, 48_000)] {
+            let buf = tone(440.0, secs, sr);
+            let lane = buf.compute_peak_lane(150);
+            assert_eq!(lane.len(), buf.compute_band_peaks(150).len());
+            // A steady tone: every full point holds (nearly) the same peak, and it is not silent.
+            let body = &lane[1..lane.len() - 1];
+            let (lo, hi) = (*body.iter().min().unwrap(), *body.iter().max().unwrap());
+            assert!(lo > 20 && hi - lo <= 2, "lane {lo}..{hi}");
+        }
+        // Silence stays zero; degenerate input never panics.
+        let silent = TrackBuffer {
+            left: vec![0.0; 4_800],
+            right: vec![0.0; 4_800],
+            sample_rate: 48_000,
+        };
+        assert!(silent.compute_peak_lane(150).iter().all(|v| *v == 0));
+        assert!(silent.compute_peak_lane(0).is_empty());
+        let empty = TrackBuffer {
+            left: vec![],
+            right: vec![],
+            sample_rate: 48_000,
+        };
+        assert!(empty.compute_peak_lane(150).is_empty());
     }
 
     #[test]

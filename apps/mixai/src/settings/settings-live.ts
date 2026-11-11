@@ -13,7 +13,7 @@ import { useKeybindStore } from "@/state/keybind-store";
 import { usePerfStore } from "@/state/perf-store";
 import { usePluginStore } from "@/plugins/plugin-store";
 import { useLayoutStore, parseLayoutState } from "@/layout/layout-store";
-import { CLASSIC } from "@/layout/presets";
+import { DEFAULT_LAYOUT } from "@/layout/presets";
 import { importPreset } from "@/lib/midi-preset";
 import { emptyHidPreset, importHidPreset } from "@/lib/hid-mapping";
 import { DEFAULT_ROUTING, applyRouting } from "@/lib/perf";
@@ -168,7 +168,7 @@ export async function apply(sections: Sections): Promise<void> {
 export function defaultSections(ids: readonly SectionId[]): Sections {
     const all: Record<SectionId, JsonValue> = {
         appearance: joinAppearance({ prefs: normalizePrefs({}), shell: SHELL_DEFAULTS, skin: null }),
-        layout: toJson({ state: { activeId: CLASSIC.id, user: useLayoutStore.getState().user, snapshots: {}, controllerLayouts: {} } }) ?? {},
+        layout: toJson({ state: { activeId: DEFAULT_LAYOUT.id, user: useLayoutStore.getState().user, snapshots: {}, controllerLayouts: {} } }) ?? {},
         audio: toJson({ routing: DEFAULT_ROUTING }) ?? {},
         midi: null,
         hid: null,

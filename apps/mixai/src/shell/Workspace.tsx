@@ -5,7 +5,7 @@
  * (preset switch, snapshot, stage mode, resize across a tier boundary) morph
  * with Motion; under reduced motion / governor they snap.
  */
-import { Suspense, lazy, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, lazy, useLayoutEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { LayoutGroup, motion } from "motion/react";
 import { ExternalLink } from "lucide-react";
 import { Skeleton, SkeletonText } from "@mmo/ui";
@@ -15,12 +15,14 @@ import { Crossfader } from "@/components/Crossfader";
 import { MasterClock } from "@/components/MasterClock";
 import { useMixerStore } from "@/state/mixer-store";
 import { useUiStore } from "@/state/ui-store";
-import { solve } from "@/layout/solver";
+import { DEFAULT_GAP, solve } from "@/layout/solver";
 import { PANEL_SPECS, STAGE } from "@/layout/presets";
 import { useAllLayouts, useLayoutStore } from "@/layout/layout-store";
 import { PanelTierProvider } from "@/layout/panel-tier";
+import { usePanelLab } from "@/layout/panel-lab";
 import type { LayoutDoc, PanelId, Placement, Rect } from "@/layout/types";
 import { windowCtl, platform } from "@/bridge/window";
+import { useLookNumber } from "@/look/look";
 import { useMotionOK } from "./motion";
 import { useT } from "@/i18n";
 
@@ -28,20 +30,36 @@ const Library = lazy(() => import("@/components/Library").then((m) => ({ default
 const SamplerPanel = lazy(() => import("@/components/SamplerPanel").then((m) => ({ default: m.SamplerPanel })));
 const AutoMixPanel = lazy(() => import("@/components/AutoMixPanel").then((m) => ({ default: m.AutoMixPanel })));
 const PluginDock = lazy(() => import("@/plugins/host").then((m) => ({ default: m.PluginDock })));
+const WavesPanel = lazy(() => import("@/components/WavesPanel").then((m) => ({ default: m.WavesPanel })));
 
 const DECK_OF: Partial<Record<PanelId, "a" | "b" | "c" | "d">> = { deckA: "a", deckB: "b", deckC: "c", deckD: "d" };
 
 /** Panels whose deck is not part of the layout's mixer get filtered from the channel list. */
-function mixerDecks(layout: LayoutDoc): ("a" | "b" | "c" | "d")[] {
+export function mixerDecks(layout: LayoutDoc): ("a" | "b" | "c" | "d")[] {
     const has = new Set(layout.areas.map((a) => a.panel));
     const order: ["deckC", "deckA", "deckB", "deckD"] = ["deckC", "deckA", "deckB", "deckD"];
     return order.filter((p) => has.has(p)).map((p) => DECK_OF[p]!);
+}
+
+/**
+ * Gap between panels for a layout: its own `gap` when it sets one, else the look's
+ * `--panel-gap` (Signature = 2 px hairlines, classic = the solver default of 12 px).
+ */
+export function useEffectiveLayout(layout: LayoutDoc): LayoutDoc {
+    const lookGap = useLookNumber("--panel-gap", DEFAULT_GAP);
+    return useMemo(() => (layout.gap === undefined ? { ...layout, gap: lookGap } : layout), [layout, lookGap]);
 }
 
 export function renderPanel(id: PanelId, layout: LayoutDoc, hydrated: boolean): ReactNode {
     const deck = DECK_OF[id];
     if (deck) return hydrated ? <Deck deckId={deck} /> : <DeckSkeleton />;
     switch (id) {
+        case "waves":
+            return (
+                <Suspense fallback={<PanelSkeleton />}>
+                    <WavesPanel decks={mixerDecks(layout)} />
+                </Suspense>
+            );
         case "clock":
             return <MasterClock deckCount={mixerDecks(layout).length > 2 ? 4 : 2} />;
         case "mixer":
@@ -101,7 +119,7 @@ export function Workspace() {
     const motionOK = useMotionOK();
     const [ref, size] = useBoxSize<HTMLDivElement>();
 
-    const layout = stage ? STAGE : (all.find((l) => l.id === activeId) ?? all[0]!);
+    const layout = useEffectiveLayout(stage ? STAGE : (all.find((l) => l.id === activeId) ?? all[0]!));
     const sol = useMemo(() => (size.w > 0 && size.h > 0 ? solve(layout, size, PANEL_SPECS) : null), [layout, size]);
 
     // Dock: docked panels become tabs in the host slot (the host itself is the first tab).
@@ -133,7 +151,47 @@ export function Workspace() {
     );
 }
 
+/**
+ * One panel crashing must not take the other panels (or the audio) down: the panel shows a
+ * small error tile with Retry, the rest of the workspace keeps working.
+ */
+class PanelBoundary extends Component<{ panel: PanelId; children: ReactNode }, { error: Error | null }> {
+    state: { error: Error | null } = { error: null };
+
+    static getDerivedStateFromError(error: Error) {
+        return { error };
+    }
+
+    componentDidCatch(error: Error, info: ErrorInfo): void {
+        console.error(`[mixai] panel ${this.props.panel} crashed`, error, info.componentStack);
+    }
+
+    render() {
+        if (this.state.error) return <PanelCrash panel={this.props.panel} error={this.state.error} retry={() => this.setState({ error: null })} />;
+        return this.props.children;
+    }
+}
+
+function PanelCrash({ panel, error, retry }: { panel: PanelId; error: Error; retry: () => void }) {
+    const t = useT();
+    return (
+        <div role="alert" data-panel-crash={panel} className="panel grid h-full w-full min-h-0 place-content-center gap-1 overflow-hidden p-2 text-center">
+            <span className="dk-label">{t(`shell.panel.${panel}` as const)}</span>
+            <span className="truncate text-[11px] text-[var(--muted-foreground)]" title={error.message}>
+                {t("shell.panelCrashed")}
+            </span>
+            <button type="button" className="dk-btn justify-self-center" onClick={retry}>
+                {t("shell.panelRetry")}
+            </button>
+        </div>
+    );
+}
+
 function PanelBox({ p, transition, children }: { p: Placement; transition: object; children: ReactNode }) {
+    // Panel lab (dev / QA): this panel at a chosen size and tier, same top-left corner.
+    const lab = usePanelLab((s) => s.boxes[p.panel]);
+    const rect = lab ? { ...p.rect, w: lab.w, h: lab.h } : p.rect;
+    const tier = lab?.tier ?? p.tier;
     return (
         <motion.div
             layout
@@ -141,10 +199,13 @@ function PanelBox({ p, transition, children }: { p: Placement; transition: objec
             transition={transition}
             className="mixai-panel-box"
             data-panel={p.panel}
-            data-tier={p.tier}
-            style={rectStyle(p.rect)}
+            data-tier={tier}
+            data-lab={lab ? "on" : undefined}
+            style={lab ? { ...rectStyle(rect), zIndex: 30, outline: "1px dashed var(--warning)" } : rectStyle(rect)}
         >
-            <PanelTierProvider tier={p.tier}>{children}</PanelTierProvider>
+            <PanelTierProvider tier={tier}>
+                <PanelBoundary panel={p.panel}>{children}</PanelBoundary>
+            </PanelTierProvider>
         </motion.div>
     );
 }
@@ -214,7 +275,11 @@ function DockSlot({
                 )}
             </div>
             <div role="tabpanel" id="dock-panel" aria-labelledby={`dock-tab-${current}`} className="absolute inset-x-0 bottom-0" style={{ top: inner.y }}>
-                <PanelTierProvider tier={tier}>{renderPanel(current, layout, hydrated)}</PanelTierProvider>
+                <PanelTierProvider tier={tier}>
+                    <PanelBoundary key={current} panel={current}>
+                        {renderPanel(current, layout, hydrated)}
+                    </PanelBoundary>
+                </PanelTierProvider>
             </div>
         </motion.div>
     );

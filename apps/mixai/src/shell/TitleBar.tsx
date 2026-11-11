@@ -11,11 +11,13 @@
  * Drag: every non-interactive part of the bar carries `data-tauri-drag-region`
  * (Tauri only drags on the element itself, not its children); double-click
  * toggles maximize (Tauri handles it on drag regions).
+ *
+ * Decks 1.5 look: one flat 36 px row, controls are `dk-btn` (styles: shell.css `.tb-*`). The
+ * engine state and the "kHz · ms" readout live in the status bar (StatusBar.tsx).
  */
 import { useEffect, useRef, useState } from "react";
-import { Circle, Command, Expand, Keyboard, LayoutGrid, Minimize2, Minus, Settings, Shrink, Square, Theater, X } from "lucide-react";
+import { Circle, Command, Expand, Keyboard, LayoutGrid, Minimize2, Minus, Settings, Shrink, Square, Theater, X, ZoomIn } from "lucide-react";
 import {
-    Button,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -35,50 +37,44 @@ import { useUiStore } from "@/state/ui-store";
 import { useRecordingStore } from "@/state/recording-store";
 import { useAllLayouts, useLayoutStore } from "@/layout/layout-store";
 import { openLayoutEditor } from "@/layout/editor-bridge";
+import { layoutName } from "@/layout/presets";
 import { ProfileSwitcher } from "@/settings/ProfileSwitcher";
 import { useT } from "@/i18n";
 import { PerfHud } from "./PerfHud";
+import { useShellPrefs } from "./shell-prefs";
+import { recTime } from "./status-math";
 
 const os = platform();
 
 export function TitleBar() {
     const t = useT();
     const native = useMixerStore((s) => s.native);
-    const latencyMs = useMixerStore((s) => s.latencyMs);
-    const sampleRate = useMixerStore((s) => s.sampleRate);
     const stage = useUiStore((s) => s.stage);
     const setStage = useUiStore((s) => s.setStage);
     const openSettings = useUiStore((s) => s.openSettings);
     const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen);
     const setCommandOpen = useUiStore((s) => s.setCommandOpen);
+    const booth = useShellPrefs((s) => s.booth);
 
     return (
         <header
-            className="mixai-titlebar"
+            className="mixai-titlebar tb"
             data-tauri-drag-region
             data-os={os}
             // macOS traffic lights sit over the left edge.
             style={os === "macos" ? { paddingLeft: 78 } : undefined}
         >
-            <strong data-tauri-drag-region className="text-gradient-brand font-heading text-base tracking-[0.18em]">
-                {t("app.name")}
+            <strong data-tauri-drag-region className="tb-brand">
+                {t("shell.appName")}
             </strong>
-            <span
-                data-tauri-drag-region
-                className={"rounded-full px-2 py-0.5 text-[10px] font-bold " + (native ? "bg-success" : "bg-warning")}
-                // Dark ink in both modes: success/warning chips are light hues.
-                style={{ color: "oklch(0.14 0.02 285)" }}
-            >
-                {native ? t("app.audioCore") : t("app.uiPreview")}
-            </span>
-            {native && (
-                <span data-tauri-drag-region className="mono text-[11px] text-muted-foreground">
-                    {(sampleRate / 1000).toFixed(1)} kHz · {latencyMs.toFixed(1)} ms
+            {!native && (
+                <span data-tauri-drag-region className="tb-chip">
+                    {t("app.uiPreview")}
                 </span>
             )}
             <PerfHud />
 
-            <div data-tauri-drag-region className="min-w-4 flex-1 self-stretch" />
+            <div data-tauri-drag-region className="tb-drag" />
 
             {native && <RecordButton />}
 
@@ -87,16 +83,16 @@ export function TitleBar() {
             <Tooltip>
                 <TooltipTrigger
                     render={
-                        <Button
-                            variant={stage ? "default" : "ghost"}
-                            size="sm"
+                        <button
+                            type="button"
+                            className="dk-btn tb-btn"
                             aria-pressed={stage}
                             onClick={() => setStage(!stage)}
                             aria-label={stage ? t("shell.stageOff") : t("shell.stageOn")}
                         >
                             <Theater aria-hidden />
-                            <span className="max-[1180px]:hidden">{t("shell.stage")}</span>
-                        </Button>
+                            <span className="tb-text">{t("shell.stage")}</span>
+                        </button>
                     }
                 />
                 <TooltipContent>
@@ -104,14 +100,34 @@ export function TitleBar() {
                 </TooltipContent>
             </Tooltip>
 
-            <ProfileSwitcher className="max-[1100px]:hidden" />
+            <Tooltip>
+                <TooltipTrigger
+                    render={
+                        <button
+                            type="button"
+                            className="dk-btn tb-btn"
+                            aria-pressed={booth}
+                            onClick={() => useShellPrefs.getState().set({ booth: !booth })}
+                            aria-label={booth ? t("shell.boothOff") : t("shell.boothOn")}
+                        >
+                            <ZoomIn aria-hidden />
+                            <span className="tb-text">{t("shell.booth")}</span>
+                        </button>
+                    }
+                />
+                <TooltipContent>{booth ? t("shell.boothOff") : t("shell.boothOn")}</TooltipContent>
+            </Tooltip>
+
+            <ProfileSwitcher className="tb-profile max-[1100px]:hidden" />
+
+            <span className="tb-rule" aria-hidden />
 
             <Tooltip>
                 <TooltipTrigger
                     render={
-                        <Button variant="ghost" size="icon-sm" onClick={() => setCommandOpen(true)} aria-label={t("topbar.commands")}>
+                        <button type="button" className="dk-btn dk-btn-icon tb-btn" onClick={() => setCommandOpen(true)} aria-label={t("topbar.commands")}>
                             <Command aria-hidden />
-                        </Button>
+                        </button>
                     }
                 />
                 <TooltipContent>
@@ -121,9 +137,9 @@ export function TitleBar() {
             <Tooltip>
                 <TooltipTrigger
                     render={
-                        <Button variant="ghost" size="icon-sm" onClick={() => setShortcutsOpen(true)} aria-label={t("topbar.keys")}>
+                        <button type="button" className="dk-btn dk-btn-icon tb-btn" onClick={() => setShortcutsOpen(true)} aria-label={t("topbar.keys")}>
                             <Keyboard aria-hidden />
-                        </Button>
+                        </button>
                     }
                 />
                 <TooltipContent>{t("topbar.keysHint")}</TooltipContent>
@@ -131,9 +147,9 @@ export function TitleBar() {
             <Tooltip>
                 <TooltipTrigger
                     render={
-                        <Button variant="ghost" size="icon-sm" onClick={() => openSettings()} aria-label={t("topbar.settings")}>
+                        <button type="button" className="dk-btn dk-btn-icon tb-btn" data-settings-button="" onClick={() => openSettings()} aria-label={t("topbar.settings")}>
                             <Settings aria-hidden />
-                        </Button>
+                        </button>
                     }
                 />
                 <TooltipContent>
@@ -153,14 +169,15 @@ function LayoutMenu() {
     const setActive = useLayoutStore((s) => s.setActive);
     const layouts = useAllLayouts();
     const active = layouts.find((l) => l.id === activeId);
+    const activeName = active ? layoutName(t, active) : null;
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
                 render={
-                    <Button variant="ghost" size="sm" aria-label={t("shell.layoutPick")}>
+                    <button type="button" className="dk-btn tb-btn" aria-label={activeName ? `${t("shell.layoutPick")}. ${t("shell.layoutCurrent", { name: activeName })}` : t("shell.layoutPick")}>
                         <LayoutGrid aria-hidden />
-                        <span className="max-w-28 truncate max-[1180px]:hidden">{active?.name ?? t("shell.layout")}</span>
-                    </Button>
+                        <span className="tb-text tb-text-clip">{activeName ?? t("shell.layout")}</span>
+                    </button>
                 }
             />
             <DropdownMenuContent align="end" className="min-w-56">
@@ -168,7 +185,7 @@ function LayoutMenu() {
                 <DropdownMenuRadioGroup value={activeId} onValueChange={(v) => setActive(String(v))}>
                     {layouts.map((l, i) => (
                         <DropdownMenuRadioItem key={l.id} value={l.id}>
-                            <span className="flex-1">{l.name}</span>
+                            <span className="flex-1">{layoutName(t, l)}</span>
                             {i < 8 && <KbdCombo combo={`alt+${i + 1}`} className="ms-3 opacity-70" />}
                         </DropdownMenuRadioItem>
                     ))}
@@ -236,9 +253,10 @@ function FullscreenButton() {
     const t = useT();
     const [fs, setFs] = useState(false);
     return (
-        <Button
-            variant="ghost"
-            size="icon-sm"
+        <button
+            type="button"
+            className="dk-btn dk-btn-icon tb-btn"
+            aria-pressed={fs}
             aria-label={fs ? t("shell.exitFullscreen") : t("shell.fullscreen")}
             onClick={async () => {
                 await windowCtl.setFullscreen(!fs);
@@ -246,7 +264,7 @@ function FullscreenButton() {
             }}
         >
             {fs ? <Shrink aria-hidden /> : <Expand aria-hidden />}
-        </Button>
+        </button>
     );
 }
 
@@ -267,28 +285,20 @@ function RecordButton() {
         };
     }, [recording, startedAt]);
 
-    const mm = Math.floor(elapsed / 60).toString().padStart(2, "0");
-    const ss = Math.floor(elapsed % 60).toString().padStart(2, "0");
-
     return (
         <Tooltip>
             <TooltipTrigger
                 render={
-                    <Button
-                        variant={recording ? "destructive" : "ghost"}
-                        size="sm"
+                    <button
+                        type="button"
+                        className="dk-btn tb-btn tb-rec"
                         onClick={() => void toggle()}
                         disabled={busy}
                         aria-pressed={recording}
-                        className={recording ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "text-muted-foreground"}
                     >
-                        <Circle
-                            aria-hidden
-                            className={"size-2.5 fill-current " + (recording ? "text-destructive-foreground" : "text-destructive")}
-                            style={{ animation: recording ? "mixai-rec-pulse 1s ease-in-out infinite" : undefined }}
-                        />
-                        {recording ? <span className="mono">{`${mm}:${ss}`}</span> : <span>{t("topbar.rec")}</span>}
-                    </Button>
+                        <Circle aria-hidden className="tb-rec-dot" />
+                        {recording ? <span className="dk-num">{recTime(elapsed)}</span> : <span>{t("topbar.rec")}</span>}
+                    </button>
                 }
             />
             <TooltipContent>{recording ? t("topbar.recStop") : t("topbar.recStart")}</TooltipContent>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Settings2 } from "lucide-react";
 import type { ClockSource } from "@/bridge/types";
@@ -12,17 +12,6 @@ import { cn } from "@mmo/ui";
 import { MorePopover, tierLayout, useMotionOK } from "./panel-ui";
 
 const SOURCES: readonly ClockSource[] = ["auto", "internal", "a", "b", "c", "d"];
-
-const field: React.CSSProperties = {
-    background: "var(--bg-elev-2)",
-    color: "var(--fg)",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
-    padding: "0 6px",
-    minHeight: 24,
-    fontSize: 11,
-    fontWeight: 700,
-};
 
 /** Source select + internal BPM field (inline in full tier, in a popover otherwise). */
 function ClockSourceControls({ deckCount }: { deckCount: 2 | 4 }) {
@@ -45,7 +34,7 @@ function ClockSourceControls({ deckCount }: { deckCount: 2 | 4 }) {
         <>
             <label className="inline-flex min-w-0 items-center gap-1 text-[10px]">
                 <span className="sr-only">{t("clock.source")}</span>
-                <select value={source} onChange={(e) => setClockSource(e.target.value as ClockSource)} style={field} className="min-w-0">
+                <select value={source} onChange={(e) => setClockSource(e.target.value as ClockSource)} className="mx-select">
                     {sources.map((s) => (
                         <option key={s} value={s}>
                             {s === "auto" ? t("clock.auto") : s === "internal" ? t("clock.internal") : t("clock.deck", { id: s.toUpperCase() })}
@@ -68,13 +57,42 @@ function ClockSourceControls({ deckCount }: { deckCount: 2 | 4 }) {
                         onKeyDown={(e) => {
                             if (e.key === "Enter") commitBpm();
                         }}
-                        className="mono w-16"
-                        style={{ ...field, fontWeight: 400 }}
+                        className="mx-select dk-num w-16"
                     />
-                    <span aria-hidden className="text-[var(--fg-dim)] @max-[340px]:hidden">BPM</span>
+                    <span aria-hidden className="dk-label @max-[340px]:hidden">
+                        {t("mix.bpm")}
+                    </span>
                 </label>
             )}
         </>
+    );
+}
+
+/**
+ * Beat-phase sweep (decorative; hidden under reduced motion by `.mixai-phase`). The phase changes
+ * with every clock poll, so it is written straight to its own node instead of re-rendering the
+ * panel ~25 times a second.
+ */
+function PhaseSweep() {
+    const bar = useRef<HTMLSpanElement>(null);
+    const motionOK = useMotionOK();
+    useEffect(() => {
+        const el = bar.current;
+        if (!el || !motionOK) return;
+        let last = -1;
+        const apply = (phase: number | undefined) => {
+            const p = phase === undefined || !Number.isFinite(phase) ? 0 : Math.round(Math.max(0, Math.min(1, phase)) * 1000) / 1000;
+            if (p === last) return;
+            last = p;
+            el.style.transform = `scaleX(${p})`;
+        };
+        apply(usePerfStore.getState().clock?.beatPhase);
+        return usePerfStore.subscribe((s) => apply(s.clock?.beatPhase));
+    }, [motionOK]);
+    return (
+        <div className="mixai-phase" aria-hidden>
+            <span ref={bar} style={{ transform: "scaleX(0)" }} />
+        </div>
     );
 }
 
@@ -83,6 +101,8 @@ function ClockSourceControls({ deckCount }: { deckCount: 2 | 4 }) {
  * and a beat/bar phase indicator. Owns the ≤30 Hz `engine_clock_state` poll
  * in every tier. The phase sweep is decorative and disappears under reduced
  * motion (the discrete beat cells still show the position) — see `.mixai-phase`.
+ * It selects only what it shows (BPM text, beat in the bar, bar length, source), so it renders
+ * when a beat passes or the tempo text changes, not on every poll.
  *  - full: title, source select (+ internal BPM), live BPM, beat cells, phase
  *  - compact: live BPM + beat cells; source in a popover
  *  - icon: live BPM text; source in a popover
@@ -93,19 +113,18 @@ export function MasterClock({ deckCount }: { deckCount: 2 | 4 }) {
     const tier = usePanelTier();
     const lay = tierLayout(useMotionOK(), tier, "clock");
     const native = useMixerStore((s) => s.native);
-    const clock = usePerfStore((s) => s.clock);
+    const bpb = usePerfStore((s) => (s.clock?.beatsPerBar && s.clock.beatsPerBar > 0 ? s.clock.beatsPerBar : 4));
+    const beat = usePerfStore((s) => beatInBar(s.clock));
+    const liveBpm = usePerfStore((s) => (s.clock && s.clock.bpm > 0 ? s.clock.bpm.toFixed(1) : "--"));
+    const source = usePerfStore((s) => s.clock?.source ?? null);
 
-    const bpb = clock?.beatsPerBar && clock.beatsPerBar > 0 ? clock.beatsPerBar : 4;
-    const beat = beatInBar(clock);
-    const phase = clock ? Math.max(0, Math.min(1, clock.beatPhase)) : 0;
-    const liveBpm = clock && clock.bpm > 0 ? clock.bpm.toFixed(1) : "--";
-    const drivenBy = clock?.source ? (clock.source === "internal" ? t("clock.internal") : clock.source.toUpperCase()) : "—";
+    const drivenBy = source ? (source === "internal" ? t("clock.internal") : source.toUpperCase()) : "—";
     const phaseLabel = native && beat !== null ? t("clock.phaseAria", { beat: beat + 1, bar: bpb }) : t("clock.offline");
 
     const bpmText = (big: boolean) => (
-        <span className={cn("mono shrink-0 font-extrabold", big ? "text-[16px]" : "text-[13px]")} title={t("clock.liveHint", { source: drivenBy })}>
+        <span className={cn("dk-num shrink-0", big ? "dk-num-lg" : "dk-num-md")} title={t("clock.liveHint", { source: drivenBy })}>
             {liveBpm}
-            <span className="ml-0.5 text-[9px] font-normal text-[var(--fg-dim)] @max-[340px]:hidden">{tier === "full" ? `BPM · ${drivenBy}` : "BPM"}</span>
+            <span className="dk-label ml-1 @max-[340px]:hidden">{tier === "full" ? `${t("mix.bpm")} · ${drivenBy}` : t("mix.bpm")}</span>
         </span>
     );
 
@@ -116,11 +135,7 @@ export function MasterClock({ deckCount }: { deckCount: 2 | 4 }) {
                     <span key={i} data-on={beat === i ? "true" : "false"} data-downbeat={i === 0 ? "true" : "false"} className="mixai-beat-cell" />
                 ))}
             </div>
-            {tier === "full" && (
-                <div className="mixai-phase" aria-hidden>
-                    <span style={{ transform: `scaleX(${phase})` }} />
-                </div>
-            )}
+            {tier === "full" && <PhaseSweep />}
         </div>
     );
 
@@ -143,7 +158,7 @@ export function MasterClock({ deckCount }: { deckCount: 2 | 4 }) {
             {tier === "full" && (
                 <div className="grid h-full min-h-0 content-center gap-1">
                     <motion.div {...lay("top")} className="flex min-w-0 items-center gap-2">
-                        <span className="hidden shrink-0 text-[10px] tracking-[0.12em] text-[var(--fg-dim)] @min-[420px]:inline">{t("clock.title")}</span>
+                        <span className="dk-label hidden shrink-0 @min-[420px]:inline">{t("clock.title")}</span>
                         <ClockSourceControls deckCount={deckCount} />
                         <span className="ml-auto" />
                         {bpmText(true)}
@@ -164,7 +179,9 @@ export function MasterClock({ deckCount }: { deckCount: 2 | 4 }) {
             {tier === "icon" && (
                 <motion.div {...lay("top")} className="flex h-full min-h-0 min-w-0 items-center">
                     <MorePopover
-                        label={`${t("clock.title")}: ${liveBpm} BPM · ${phaseLabel}`}
+                        // No beat in the name: it renamed the focused trigger on every beat. The BPM stays
+                        // (it is the visible text of the trigger) and only changes with the tempo.
+                        label={`${t("clock.title")}: ${liveBpm} ${t("mix.bpm")}`}
                         title={t("clock.title")}
                         contentClassName="w-auto"
                         triggerClassName="mono flex h-full min-h-6 w-full min-w-0 items-center justify-center rounded-md text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-[var(--ring)]"

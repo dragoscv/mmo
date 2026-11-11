@@ -7,6 +7,7 @@
  * that does not match is dropped, so a bug on either side can never inject CSS.
  */
 import type { PackTokens } from "../bridge/packs.ts";
+import { styleDecls, styleLayout, styleLook, styleWaves } from "../look/style-vars.ts";
 
 export const COLOR_KEYS = [
     "background", "foreground", "card", "card-foreground", "popover", "popover-foreground",
@@ -15,7 +16,10 @@ export const COLOR_KEYS = [
     "deck-a", "deck-b", "deck-c", "deck-d", "success", "warning",
 ] as const;
 
-const COLOR_RE = /^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|oklch\(\s*[0-9.]+%?\s+[0-9.]+\s+[0-9.]+(\s*\/\s*[0-9.]+%?)?\s*\))$/;
+// A number is digits with an optional fraction: a dot needs a digit after it (CSS drops `5.`),
+// same rule as `parse_num` in crates/decks-packs and `parseNum` in the Skin SDK.
+const NUM = "(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)";
+const COLOR_RE = new RegExp(`^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|oklch\\(\\s*${NUM}%?\\s+${NUM}\\s+${NUM}(\\s*\\/\\s*${NUM}%?)?\\s*\\))$`);
 const FONT_RE = /^[A-Za-z0-9 -]{1,40}$/;
 const DATA_URL_RE = /^data:(image\/(png|jpeg|webp|avif)|font\/woff2);base64,[A-Za-z0-9+/=]+$/;
 
@@ -26,8 +30,19 @@ export function isSafeColor(v: unknown): v is string {
 export interface SkinCss {
     css: string;
     /** Theme dimensions to hand to the shared ThemeProvider. */
-    prefs: Partial<{ mode: "dark" | "light"; surface: "glass" | "solid" | "flat"; density: "comfortable" | "compact"; radius: "sm" | "md" | "lg" }>;
+    prefs: Partial<{ mode: "dark" | "light"; surface: "glass" | "solid" | "flat"; density: "comfortable" | "compact"; radius: "sm" | "md" | "lg"; accent: string }>;
+    /** Base look of the skin (`data-look` on <html>). */
+    look: "signature" | "classic";
+    /** The skin asks for the virtual platter. */
+    platter: boolean;
+    /** Waveform arrangement in the waves panel. */
+    waves: "stacked" | "overlay";
+    /** Layout the skin selects when the user picks it (null = keep the current one). */
+    layout: string | null;
 }
+
+/** Named accents of the design system a skin may select (anything else is ignored here). */
+const ACCENT_NAMES = ["violet", "magenta", "cyan", "emerald", "amber", "rose"];
 
 export function tokensToCss(tokens: PackTokens, assets: Record<string, string> = {}, fonts: { family: string; file: string; weight?: number; style?: string }[] = []): SkinCss {
     const decls: string[] = [];
@@ -37,6 +52,7 @@ export function tokensToCss(tokens: PackTokens, assets: Record<string, string> =
     for (const [d, v] of Object.entries(tokens.decks ?? {})) {
         if (["a", "b", "c", "d"].includes(d) && isSafeColor(v)) decls.push(`--deck-${d}: ${v.trim()};`);
     }
+    decls.push(...styleDecls(tokens.style));
     if (tokens.fontHeading && FONT_RE.test(tokens.fontHeading)) decls.push(`--font-heading: "${tokens.fontHeading}", var(--font-sans-fallback, system-ui);`);
     if (tokens.fontBody && FONT_RE.test(tokens.fontBody)) decls.push(`--font-sans: "${tokens.fontBody}", system-ui, sans-serif;`);
 
@@ -59,7 +75,15 @@ export function tokensToCss(tokens: PackTokens, assets: Record<string, string> =
     if (tokens.surface === "glass" || tokens.surface === "solid" || tokens.surface === "flat") prefs.surface = tokens.surface;
     if (tokens.density === "comfortable" || tokens.density === "compact") prefs.density = tokens.density;
     if (tokens.radius === "sm" || tokens.radius === "md" || tokens.radius === "lg") prefs.radius = tokens.radius;
-    return { css: blocks.join("\n"), prefs };
+    if (tokens.accent && ACCENT_NAMES.includes(tokens.accent)) prefs.accent = tokens.accent;
+    return {
+        css: blocks.join("\n"),
+        prefs,
+        look: styleLook(tokens.style),
+        platter: tokens.style?.platter === true,
+        waves: styleWaves(tokens.style),
+        layout: styleLayout(tokens.style),
+    };
 }
 
 // ── WCAG contrast check for a skin (install-time gate) ─────────────────────

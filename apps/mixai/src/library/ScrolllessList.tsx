@@ -5,11 +5,12 @@
  * `overflow: hidden`; the indicator thumb is a plain element (not a scrollbar).
  *
  * a11y: `role="listbox"` with `aria-activedescendant`; options carry
- * `aria-setsize` / `aria-posinset` for their virtual position. The range text
- * is announced politely only after the user pauses.
+ * `aria-setsize` / `aria-posinset` for their virtual position and an explicit
+ * name (`getLabel`). The range text is announced politely only after the user
+ * pauses. With no rows the listbox is replaced by the placeholder (which may
+ * hold a button), so a listbox never contains anything but options.
  */
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
-import { cn } from "@mmo/ui";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from "react";
 import { visibleRange } from "./window-state.ts";
 import { keyAction, motionAllowed, useSettledValue, useWheelRows, type WindowedList } from "./useWindowedList.ts";
 
@@ -23,38 +24,47 @@ export interface ScrolllessListProps<T> {
     items: readonly T[];
     getKey: (item: T) => string | number;
     renderRow: (item: T, ctx: RowContext) => ReactNode;
+    /** Accessible name of a row (its content also holds buttons, which must not end up in the name). */
+    getLabel?: (item: T) => string;
     /** Enter / double-click on a row. `shift` = Shift held. */
     onActivate?: (index: number, opts: { shift: boolean }) => void;
+    /** Shift+F10 / the Menu key on the list. */
+    onMenuKey?: () => void;
     list: WindowedList;
     /** Accessible name of the listbox. */
     label: string;
+    /** Tooltip of the listbox (keyboard hint). */
+    hint?: string;
     /** Column header, rendered above the rows and aligned with them. */
     header?: ReactNode;
     /** Shown in place of the rows when there are none (loading, empty, error). */
     placeholder?: ReactNode;
-    /** Short visual indicator text, e.g. "312–330 / 4 812". */
-    formatPosition: (from: number, to: number, total: number) => string;
-    /** Longer text for the polite live region. */
+    /** Text for the polite live region. */
     formatLive: (from: number, to: number, total: number) => string;
     listRef?: Ref<HTMLDivElement>;
-    className?: string;
 }
 
 const LIVE_DELAY_MS = 700;
+
+/** True when the event started inside `el` in the DOM (React also bubbles events out of portals). */
+function fromInside(e: { target: EventTarget; currentTarget: EventTarget }): boolean {
+    return e.target instanceof Node && (e.currentTarget as Node).contains(e.target);
+}
 
 export function ScrolllessList<T>({
     items,
     getKey,
     renderRow,
+    getLabel,
     onActivate,
+    onMenuKey,
     list,
     label,
+    hint,
     header,
     placeholder,
-    formatPosition,
     formatLive,
     listRef,
-    className,
 }: ScrolllessListProps<T>) {
     const id = useId();
     const { state, dispatch, viewportRef, rowHeight } = list;
@@ -89,15 +99,28 @@ export function ScrolllessList<T>({
         if (touch.current?.id === e.pointerId) touch.current = null;
     };
 
+    // Keys act only while the list itself has the focus: a row button or the portalled row menu
+    // must keep its own Enter / arrow keys.
     const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter") {
             e.preventDefault();
+            e.stopPropagation();
             if (total > 0) onActivate?.(state.cursor, { shift: e.shiftKey });
+            return;
+        }
+        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+            if (!onMenuKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            onMenuKey();
             return;
         }
         const a = keyAction(e.key);
         if (!a) return;
+        // The arrows are also global shortcuts (crossfader): here they belong to the list.
         e.preventDefault();
+        e.stopPropagation();
         dispatch(a);
     };
 
@@ -127,28 +150,28 @@ export function ScrolllessList<T>({
     const optionId = (i: number) => `${id}-o${i}`;
 
     return (
-        <div className={cn("grid min-h-0 min-w-0 overflow-hidden", className)} style={{ gridTemplateRows: header ? "auto minmax(0, 1fr) auto" : "minmax(0, 1fr) auto" }}>
-            {header && <div className="min-w-0 overflow-hidden pr-3.5">{header}</div>}
-            <div className="relative flex min-h-0 min-w-0 overflow-hidden">
-                <div ref={viewportRef} className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-                    <div
-                        ref={setListNode}
-                        role="listbox"
-                        tabIndex={0}
-                        aria-label={label}
-                        aria-activedescendant={total > 0 ? optionId(state.cursor) : undefined}
-                        onKeyDown={onKeyDown}
-                        onPointerDown={onPointerDown}
-                        onPointerMove={onPointerMove}
-                        onPointerUp={endTouch}
-                        onPointerCancel={endTouch}
-                        className="absolute inset-0 overflow-hidden rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                        style={{ touchAction: "none" }}
-                    >
-                        {total === 0 ? (
-                            <div className="flex h-full min-h-0 items-center justify-center overflow-hidden p-1">{placeholder}</div>
-                        ) : (
-                            <div ref={stackEl} style={{ willChange: "transform" }}>
+        <div className="lib-list" style={{ ["--lib-row-h" as string]: `${rowHeight}px` } as CSSProperties}>
+            {header && <div className="lib-list-head">{header}</div>}
+            <div className="lib-list-body">
+                <div ref={viewportRef} className="lib-viewport">
+                    {total === 0 ? (
+                        <div className="lib-placeholder">{placeholder}</div>
+                    ) : (
+                        <div
+                            ref={setListNode}
+                            role="listbox"
+                            tabIndex={0}
+                            aria-label={label}
+                            title={hint}
+                            aria-activedescendant={optionId(state.cursor)}
+                            onKeyDown={onKeyDown}
+                            onPointerDown={onPointerDown}
+                            onPointerMove={onPointerMove}
+                            onPointerUp={endTouch}
+                            onPointerCancel={endTouch}
+                            className="lib-listbox"
+                        >
+                            <div ref={stackEl}>
                                 {rows.map((item, k) => {
                                     const index = state.offset + k;
                                     const selected = index === state.cursor;
@@ -157,46 +180,44 @@ export function ScrolllessList<T>({
                                             key={getKey(item)}
                                             id={optionId(index)}
                                             role="option"
+                                            aria-label={getLabel?.(item)}
                                             aria-selected={selected}
                                             aria-setsize={total}
                                             aria-posinset={index + 1}
-                                            onClick={() => {
+                                            onClick={(e: MouseEvent) => {
+                                                if (!fromInside(e)) return;
                                                 dispatch({ type: "jumpTo", index });
                                                 listEl.current?.focus({ preventScroll: true });
                                             }}
-                                            onDoubleClick={(e) => onActivate?.(index, { shift: e.shiftKey })}
-                                            className="overflow-hidden rounded-md"
-                                            style={{
-                                                height: rowHeight,
-                                                background: selected ? "color-mix(in oklch, var(--accent) 22%, var(--bg-elev))" : k % 2 ? "var(--bg-elev)" : "transparent",
-                                                boxShadow: selected ? "inset 2px 0 0 var(--accent)" : undefined,
+                                            onDoubleClick={(e: MouseEvent) => {
+                                                if (fromInside(e)) onActivate?.(index, { shift: e.shiftKey });
                                             }}
+                                            className="lib-opt"
+                                            data-selected={selected || undefined}
+                                            data-odd={index % 2 === 1 || undefined}
+                                            style={{ height: rowHeight }}
                                         >
                                             {renderRow(item, { index, selected, rowHeight })}
                                         </div>
                                     );
                                 })}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
                 <PositionThumb list={list} />
             </div>
-            <div className="flex min-w-0 items-center justify-end overflow-hidden pt-1 pr-3.5">
-                <span className="mono truncate text-[10px] tabular-nums" style={{ color: "var(--fg-dim)" }} aria-hidden>
-                    {formatPosition(range.from, range.to, range.total)}
-                </span>
-                <span className="sr-only" aria-live="polite" aria-atomic="true">
-                    {live}
-                </span>
-            </div>
+            <span className="sr-only" aria-live="polite" aria-atomic="true">
+                {live}
+            </span>
         </div>
     );
 }
 
 /**
  * Thin position track with a draggable thumb (pointer only; keyboard users have
- * PageUp/PageDown/Home/End on the list). Not a native scrollbar.
+ * PageUp/PageDown/Home/End on the list). Not a native scrollbar. The slot keeps its
+ * width when everything fits, so the columns never shift.
  */
 function PositionThumb({ list }: { list: WindowedList }) {
     const { state, dispatch } = list;
@@ -233,7 +254,8 @@ function PositionThumb({ list }: { list: WindowedList }) {
         <div
             ref={trackEl}
             aria-hidden
-            className="relative ml-1.5 w-2 shrink-0 cursor-pointer touch-none"
+            className="lib-thumb"
+            data-on={scrollable || undefined}
             onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 seek(e.clientY);
@@ -242,13 +264,7 @@ function PositionThumb({ list }: { list: WindowedList }) {
                 if (e.currentTarget.hasPointerCapture(e.pointerId)) seek(e.clientY);
             }}
         >
-            <div className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full" style={{ background: "var(--border)" }} />
-            {scrollable && (
-                <div
-                    className="absolute left-0 w-2 rounded-full"
-                    style={{ top, height: thumbH, background: "color-mix(in oklch, var(--accent) 70%, transparent)" }}
-                />
-            )}
+            {scrollable && <i style={{ top, height: thumbH }} />}
         </div>
     );
 }

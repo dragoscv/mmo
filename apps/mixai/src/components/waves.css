@@ -1,0 +1,389 @@
+/* Decks 1.5 look: styles owned by this area (see src/look/look.css for the shared vocabulary). */
+
+/* ── waves panel: lanes (canvas + seek surface + header chip) and the beat / phase strip ── */
+.waves {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    --waves-strip-h: 24px;
+}
+.waves[data-tier="compact"] {
+    --waves-strip-h: 10px;
+}
+.waves-probe {
+    position: absolute;
+    width: 0;
+    height: 0;
+    background: none;
+    pointer-events: none;
+}
+.waves-lanes {
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.waves[data-vertical="true"] .waves-lanes {
+    flex-direction: row;
+    gap: 2px;
+}
+.waves-lane {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+.waves-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+.waves-slot {
+    position: absolute;
+    inset: 0;
+}
+.waves-hit {
+    position: absolute;
+    inset: 0;
+    cursor: grab;
+    touch-action: none;
+}
+.waves-hit:active {
+    cursor: grabbing;
+}
+.waves-hit[aria-disabled="true"] {
+    cursor: default;
+}
+.waves-hit:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+
+/* Lane header chip: letter block in the deck colour, BPM, bars to the next cue, time left. */
+.waves-chip {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    max-width: calc(100% - 8px);
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 6px;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: var(--ctl-radius, 3px);
+    background: color-mix(in oklab, var(--wave-bg, var(--background)) 80%, transparent);
+    color: var(--foreground);
+}
+.waves[data-vertical="false"] .waves-slot[data-edge="end"] .waves-chip {
+    top: auto;
+    bottom: 4px;
+}
+.waves-letter {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--ctl-radius, 3px);
+    background: var(--deck);
+    color: var(--background);
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 800;
+}
+.waves-bpm {
+    color: var(--deck);
+}
+.waves-bars .dk-label {
+    margin-left: 1px;
+}
+.waves-remain {
+    color: var(--muted-foreground);
+}
+.waves[data-tier="compact"] .waves-chip {
+    left: 2px;
+    top: 2px;
+    height: 14px;
+    gap: 5px;
+    padding-right: 4px;
+}
+.waves[data-tier="compact"][data-vertical="false"] .waves-slot[data-edge="end"] .waves-chip {
+    top: auto;
+    bottom: 2px;
+}
+.waves[data-tier="compact"] .waves-letter {
+    width: 14px;
+    height: 14px;
+}
+/* Booth mode (--readout-scale 1.3): the chip readouts grow like the other readouts. Only with
+   two horizontal lanes at the full tier: thinner lanes and narrow columns have no room for it. */
+.waves[data-tier="full"][data-many="false"][data-vertical="false"] .waves-chip {
+    height: calc(16px * var(--readout-scale, 1));
+}
+.waves[data-tier="full"][data-many="false"][data-vertical="false"] .waves-letter {
+    width: calc(16px * var(--readout-scale, 1));
+    height: calc(16px * var(--readout-scale, 1));
+    font-size: calc(10px * var(--readout-scale, 1));
+}
+.waves[data-tier="full"][data-many="false"][data-vertical="false"] .waves-chip .dk-num-sm {
+    font-size: calc(11px * var(--readout-scale, 1));
+}
+
+/* ── strip: beat keepers at the sides, phase meter in the middle, zoom at the end ── */
+.waves-strip {
+    flex: 0 0 var(--waves-strip-h);
+    height: var(--waves-strip-h);
+    min-width: 0;
+    display: grid;
+    /* Equal side columns keep the meter's centre tick on the playhead of the lanes. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 34%) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 0 6px;
+    background: var(--card);
+    overflow: hidden;
+}
+.waves[data-dense="true"] .waves-strip {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 20%) minmax(0, 1fr);
+    gap: 6px;
+}
+.waves-strip-side {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.waves-strip-mid {
+    align-self: stretch;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.waves-strip-mid .waves-phase {
+    flex: 1 1 0;
+}
+.waves-strip-side[data-side="end"] {
+    justify-content: flex-end;
+}
+.waves-keepers {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.waves-keeper {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+/* More than two decks: the keepers of a side stack into a narrow column of thin rows. */
+.waves[data-tier="full"][data-many="true"][data-vertical="false"] .waves-keepers {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+}
+.waves[data-tier="full"][data-many="true"][data-vertical="false"] .waves-cell {
+    height: 4px;
+}
+.waves[data-tier="full"][data-many="true"][data-vertical="false"] .waves-keeper-id {
+    width: 8px;
+    font-size: 8px;
+}
+/* Four thin lanes: the chip hugs the lane edge so it stays inside it. */
+.waves[data-many="true"][data-vertical="false"] .waves-chip {
+    top: 2px;
+}
+.waves[data-many="true"][data-vertical="false"] .waves-slot[data-edge="end"] .waves-chip {
+    top: auto;
+    bottom: 2px;
+}
+/* Four lanes in a compact box are ~13 px each: the chip is as tall as its lane. */
+.waves[data-many="true"][data-tier="compact"][data-vertical="false"] .waves-chip,
+.waves[data-many="true"][data-tier="compact"][data-vertical="false"] .waves-slot[data-edge="end"] .waves-chip {
+    top: 0;
+    bottom: auto;
+    height: 100%;
+    max-height: 14px;
+}
+.waves[data-many="true"][data-tier="compact"][data-vertical="false"] .waves-letter {
+    height: 100%;
+}
+.waves-keeper-id {
+    margin-right: 2px;
+    color: var(--deck);
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 800;
+}
+.waves-cell {
+    width: 12px;
+    height: 6px;
+}
+/* The downbeat cell is wider and lights in the alert colour: shape and position, not colour only. */
+.waves-cell[data-downbeat="true"] {
+    width: 18px;
+    --led: var(--alert, var(--destructive));
+}
+.waves[data-tier="compact"] .waves-strip {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.waves[data-tier="compact"] .waves-cell,
+.waves[data-dense="true"] .waves-cell {
+    width: 8px;
+}
+.waves[data-tier="compact"] .waves-cell {
+    height: 4px;
+}
+.waves[data-tier="compact"] .waves-cell[data-downbeat="true"],
+.waves[data-dense="true"] .waves-cell[data-downbeat="true"] {
+    width: 12px;
+}
+.waves[data-tier="compact"] .waves-keeper-id {
+    font-size: 8px;
+}
+
+.waves-phase {
+    position: relative;
+    align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+}
+/* Centre tick = in phase. */
+.waves-phase::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 2px;
+    bottom: 2px;
+    width: 1px;
+    background: var(--foreground);
+}
+.waves-phase-row {
+    position: relative;
+    flex: 0 1 8px;
+    min-height: 3px;
+    background: var(--secondary);
+    border-radius: 1px;
+    --phase: 0;
+}
+.waves-phase-row[data-state="none"] {
+    opacity: 0.45;
+}
+/* Three or four rows share the strip: thinner rows, 1 px apart. */
+.waves-phase[data-rows="3"],
+.waves-phase[data-rows="4"] {
+    gap: 1px;
+}
+/* The master's row is the reference: a block on the tick, never a bar. */
+.waves-phase-row[data-state="master"]::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 9px;
+    margin-left: -4.5px;
+    border-radius: 1px;
+    background: var(--deck);
+    z-index: 1;
+}
+.waves-phase-bar {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    background: var(--deck);
+    transform-origin: left center;
+    transform: scaleX(var(--phase));
+}
+/* In phase: no bar, a diamond on the tick (a shape, so it does not rely on colour). */
+.waves-phase-row[data-state="locked"]::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    transform: rotate(45deg);
+    background: var(--on, var(--primary));
+    z-index: 1;
+}
+
+.waves-zoom {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+.waves-zoom .dk-btn {
+    min-height: 24px;
+    height: 24px;
+    width: 24px;
+    border: 0;
+    background: none;
+}
+.waves-zoom .dk-btn:hover:not(:disabled) {
+    background: var(--secondary);
+}
+.waves-window {
+    min-width: 28px;
+    text-align: center;
+    color: var(--muted-foreground);
+}
+
+/* Columns (box taller than wide): the strip goes under the lanes, in two rows. */
+.waves[data-vertical="true"] .waves-strip {
+    flex-basis: auto;
+    height: auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: 14px 24px;
+    row-gap: 0;
+}
+.waves[data-vertical="true"] .waves-strip-side {
+    grid-row: 1;
+}
+.waves[data-vertical="true"] .waves-strip-mid {
+    grid-column: 1 / -1;
+    grid-row: 2;
+}
+.waves[data-vertical="true"][data-tier="compact"] .waves-strip {
+    grid-template-rows: 10px;
+}
+/* Columns are narrow: the chip stacks its readouts (letter + BPM, bars, time left). */
+.waves[data-vertical="true"] .waves-chip {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    padding: 0 4px 2px 0;
+}
+.waves[data-vertical="true"] .waves-bars,
+.waves[data-vertical="true"] .waves-remain {
+    flex: 0 0 100%;
+    padding-left: 4px;
+}
+/* A narrow column: "no track" wraps onto two lines instead of being cut. */
+.waves[data-vertical="true"] .waves-chip > .dk-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-left: 4px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}

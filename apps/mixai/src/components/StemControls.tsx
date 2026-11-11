@@ -1,9 +1,15 @@
-import { useMemo, useState } from "react";
+import { memo } from "react";
+import { AlertTriangle, SlidersHorizontal, VolumeX } from "lucide-react";
 import { engine } from "@/bridge/engine";
 import type { DeckId, DeckState } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@mmo/ui";
+import { MorePopover } from "./panel-ui";
+import { soft } from "./deck-tabs/soft-disabled";
+import { separateStems, useStemJobs } from "./deck-tabs/stem-jobs";
+import { deckPropsEqual, isLibraryTrackId, soloIndex, stemGains, stemMuted } from "./deck-tabs/tab-math";
+import { useFitLevel } from "./deck-tabs/use-fit";
 
 /** Stem layer order matches the Rust engine: vocals, drums, bass, melody. */
 const STEMS: readonly { idx: number; label: MessageKey; title: MessageKey }[] = [
@@ -13,136 +19,193 @@ const STEMS: readonly { idx: number; label: MessageKey; title: MessageKey }[] = 
     { idx: 3, label: "deckui.stemMelShort", title: "deckui.stemMel" },
 ];
 
-const small =
-    "inline-flex min-h-6 min-w-6 items-center justify-center rounded-md text-[9px] font-bold focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:opacity-40";
+/** Highest stem gain the level control reaches (1 = unity). */
+const GAIN_MAX = 1.2;
+
+interface StemControlsProps {
+    deckId: DeckId;
+    deck: DeckState;
+    /** Deck colour; the look takes it from `--deck`, kept for callers. */
+    accent: string;
+    className?: string;
+}
 
 /**
- * Live per-stem control: mute/solo/blend vocals, drums, bass and melody on the
- * fly. Gains are smoothed in the audio engine so toggles are click-free. The
- * vertical gain sliders stretch to the height they get (the deck's Stems tab).
- * Without separated stems it shows a short hint instead of nothing, so the tab
- * never looks broken.
+ * Live per-stem control: mute / solo / level for vocals, drums, bass and melody, and stems
+ * on/off. Gains are smoothed in the audio engine, so toggles are click-free. Solo is derived
+ * from the gains (one audible stem), so it survives a tab switch.
+ *
+ * The mute button carries the stem's name; a muted stem is dimmed, struck through and gets a
+ * "muted" icon (never the ON accent, which only "stems on" uses). The body takes the roomiest
+ * form that fits: 0 = mute + solo over the level; 1 = mute, solo and level stacked (narrow and
+ * tall); 2 = one row of mute + solo, levels in a popover; 3 = one row of mute, solo and levels
+ * in the popover.
+ * Without separated stems the tab offers to separate the track and shows the job's progress.
  */
-export function StemControls({ deckId, deck, accent, className }: { deckId: DeckId; deck: DeckState; accent: string; className?: string }) {
+function StemControlsImpl(props: StemControlsProps) {
+    if (!props.deck.hasStems) return <StemsEmpty deckId={props.deckId} deck={props.deck} className={props.className} />;
+    return <StemsLive {...props} />;
+}
+
+function StemsLive({ deckId, deck, className }: StemControlsProps) {
     const t = useT();
     const patchDeck = useMixerStore((s) => s.patchDeck);
-    const [solo, setSolo] = useState<number | null>(null);
+    const [ref, level] = useFitLevel<HTMLDivElement>(3);
 
-    const gains = useMemo(() => {
-        const g = deck.stemGains ?? [1, 1, 1, 1];
-        return [g[0] ?? 1, g[1] ?? 1, g[2] ?? 1, g[3] ?? 1];
-    }, [deck.stemGains]);
+    const gains = stemGains(deck.stemGains);
+    const solo = soloIndex(gains);
 
-    if (!deck.hasStems) {
-        return (
-            <p className={cn("m-0 grid min-h-0 place-items-center text-center text-[11px] text-[var(--fg-dim)]", className)}>
-                {t("deckui.noStems")}
-            </p>
-        );
-    }
-
-    const apply = (next: number[], nextSolo: number | null) => {
+    const apply = (next: number[]) => {
         patchDeck(deckId, { stemGains: next });
-        setSolo(nextSolo);
         for (const { idx } of STEMS) void engine.setStemGain(deckId, idx, next[idx] ?? 1);
     };
-
     const toggleMute = (idx: number) => {
-        const muted = (gains[idx] ?? 1) <= 0.001;
-        const next = gains.slice();
-        next[idx] = muted ? 1 : 0;
-        apply(next, null);
+        const next: number[] = [...gains];
+        next[idx] = stemMuted(gains[idx] ?? 1) ? 1 : 0;
+        apply(next);
     };
-
     const toggleSolo = (idx: number) => {
         if (solo === idx) {
-            apply([1, 1, 1, 1], null);
-        } else {
-            const next = [0, 0, 0, 0];
-            next[idx] = 1;
-            apply(next, idx);
+            apply([1, 1, 1, 1]);
+            return;
         }
+        const next = [0, 0, 0, 0];
+        next[idx] = 1;
+        apply(next);
     };
-
     const setGain = (idx: number, v: number) => {
-        const next = gains.slice();
+        const next: number[] = [...gains];
         next[idx] = v;
         patchDeck(deckId, { stemGains: next });
         void engine.setStemGain(deckId, idx, v);
     };
-
     const toggleActive = () => {
         const next = !deck.stemsActive;
         patchDeck(deckId, { stemsActive: next });
         void engine.setStemsActive(deckId, next);
     };
 
+    const soloBtn = (idx: number, name: string) => (
+        <button
+            type="button"
+            className="dk-btn dk-btn-xs dt-stem-s"
+            data-tone="deck"
+            onClick={() => toggleSolo(idx)}
+            disabled={!deck.stemsActive}
+            aria-pressed={solo === idx}
+            aria-label={t("deckui.stemSolo", { stem: name })}
+            title={t("deckui.stemSolo", { stem: name })}
+        >
+            {t("decktabs.stemSoloShort")}
+        </button>
+    );
+    const levelRange = (idx: number, name: string, g: number) => (
+        <input
+            type="range"
+            className="dt-range"
+            min={0}
+            max={GAIN_MAX}
+            step={0.01}
+            value={g}
+            aria-label={t("deckui.stemGain", { stem: name })}
+            aria-valuetext={`${Math.round(g * 100)} %`}
+            disabled={!deck.stemsActive}
+            onChange={(e) => setGain(idx, Number(e.target.value))}
+            style={{ ["--v" as string]: `${Math.min(100, (g / GAIN_MAX) * 100)}%` }}
+        />
+    );
+
     return (
-        <div className={cn("grid min-h-0 gap-1.5", className)} style={{ gridTemplateRows: "auto minmax(0, 1fr)" }}>
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] tracking-[0.12em] text-[var(--fg-dim)]">{t("deckui.stems")}</span>
-                <button
-                    type="button"
-                    onClick={toggleActive}
-                    aria-pressed={deck.stemsActive}
-                    title={t("deckui.stemsToggleHint")}
-                    className={cn(small, "px-2.5 text-[10px]")}
-                    style={{
-                        background: deck.stemsActive ? accent : "var(--bg-elev-2)",
-                        color: deck.stemsActive ? "var(--accent-fg)" : "var(--fg)",
-                    }}
-                >
-                    {deck.stemsActive ? t("deckui.on") : t("deckui.off")}
-                </button>
-            </div>
-            <div className="grid min-h-0 grid-cols-4 gap-1.5" style={{ opacity: deck.stemsActive ? 1 : 0.4 }}>
+        <div ref={ref} className={cn("dt-stems", className)} data-level={level}>
+            <div className="dt-stems-grid" data-on={deck.stemsActive}>
                 {STEMS.map(({ idx, label, title }) => {
                     const g = gains[idx] ?? 1;
-                    const muted = g <= 0.001;
-                    const isSolo = solo === idx;
+                    const muted = stemMuted(g);
                     const name = t(title);
                     return (
-                        <div key={idx} className="grid min-h-0 justify-items-center gap-1" style={{ gridTemplateRows: "minmax(24px, 1fr) auto auto" }}>
-                            <input
-                                type="range"
-                                min={0}
-                                max={1.2}
-                                step={0.01}
-                                value={g}
-                                aria-label={t("deckui.stemGain", { stem: name })}
+                        <div key={idx} role="group" aria-label={name} className="dt-stem" data-muted={muted}>
+                            <button
+                                type="button"
+                                className="dk-btn dk-btn-xs dt-stem-m"
+                                onClick={() => toggleMute(idx)}
                                 disabled={!deck.stemsActive}
-                                onChange={(e) => setGain(idx, Number(e.target.value))}
-                                style={{ writingMode: "vertical-lr", direction: "rtl", width: 24, height: "100%", minHeight: 0, accentColor: accent }}
-                            />
-                            <span className="mono text-[9px] text-[var(--fg-dim)]">{t(label)}</span>
-                            <div className="flex gap-0.5">
-                                <button
-                                    type="button"
-                                    onClick={() => toggleMute(idx)}
-                                    disabled={!deck.stemsActive}
-                                    aria-pressed={muted}
-                                    aria-label={t("deckui.stemMute", { stem: name })}
-                                    className={small}
-                                    style={{ background: muted ? "var(--danger)" : "var(--bg-elev-2)", color: muted ? "var(--destructive-foreground)" : "var(--fg-dim)" }}
-                                >
-                                    M
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => toggleSolo(idx)}
-                                    disabled={!deck.stemsActive}
-                                    aria-pressed={isSolo}
-                                    aria-label={t("deckui.stemSolo", { stem: name })}
-                                    className={small}
-                                    style={{ background: isSolo ? accent : "var(--bg-elev-2)", color: isSolo ? "var(--accent-fg)" : "var(--fg-dim)" }}
-                                >
-                                    S
-                                </button>
-                            </div>
+                                aria-pressed={muted}
+                                aria-label={t("deckui.stemMute", { stem: name })}
+                                title={t("deckui.stemMute", { stem: name })}
+                            >
+                                {muted && <VolumeX size={11} aria-hidden />}
+                                <span className="dt-stem-name">{t(label)}</span>
+                            </button>
+                            {level < 3 && soloBtn(idx, name)}
+                            {level < 2 && levelRange(idx, name, g)}
                         </div>
                     );
                 })}
+                <button type="button" className="dk-btn dk-btn-xs dt-stems-toggle" onClick={toggleActive} aria-pressed={deck.stemsActive} title={t("deckui.stemsToggleHint")}>
+                    <span>{t("deckui.stems")}</span>
+                    <span>{deck.stemsActive ? t("deckui.on") : t("deckui.off")}</span>
+                </button>
+                {level >= 2 && (
+                    <MorePopover label={t(level === 3 ? "decktabs.stemSoloLevels" : "decktabs.stemLevels")} icon={<SlidersHorizontal size={13} aria-hidden />} side="top">
+                        <div className="dt-stems-pop" data-deck-scope="" style={{ ["--deck" as string]: `var(--deck-${deckId})` }}>
+                            {STEMS.map(({ idx, label, title }) => {
+                                const g = gains[idx] ?? 1;
+                                const name = t(title);
+                                return (
+                                    <div key={idx} role="group" aria-label={name} className="dt-stems-pop-row" data-muted={stemMuted(g)}>
+                                        <span className="dk-label dt-stem-name" title={name}>
+                                            {t(label)}
+                                        </span>
+                                        {level === 3 && soloBtn(idx, name)}
+                                        {levelRange(idx, name, g)}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </MorePopover>
+                )}
             </div>
+        </div>
+    );
+}
+export const StemControls = memo(StemControlsImpl, deckPropsEqual<DeckState, StemControlsProps>(["trackId", "loaded", "hasStems", "stemsActive", "stemGains"]));
+
+/**
+ * No stems on the deck: a short note, the "separate" action and its progress. Separation is a
+ * companion job on a LIBRARY track, so a local file or a dev-loaded track only gets the note.
+ */
+function StemsEmpty({ deckId, deck, className }: { deckId: DeckId; deck: DeckState; className?: string }) {
+    const t = useT();
+    const job = useStemJobs((s) => (deck.trackId ? s.jobs[deck.trackId] : undefined));
+    const inLibrary = isLibraryTrackId(deck.trackId);
+    const running = job?.state === "running";
+    const failed = job?.state === "error";
+    const pct = Math.round((job?.progress ?? 0) * 100);
+    if (deck.loaded && !inLibrary)
+        return (
+            <div className={cn("dt-stems-empty", className)}>
+                <p className="dt-stems-msg">{t("decktabs.stemsNotLibrary")}</p>
+            </div>
+        );
+    return (
+        <div className={cn("dt-stems-empty", className)}>
+            {running ? (
+                <div className="dt-stems-job">
+                    <span className="dk-label">{t("decktabs.stemsSeparating")}</span>
+                    <span className="dk-num dk-num-sm">{pct} %</span>
+                    <div role="progressbar" aria-label={t("decktabs.stemsProgressAria")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="dt-progress">
+                        <span style={{ width: `${pct}%` }} />
+                    </div>
+                </div>
+            ) : (
+                <p className="dt-stems-msg" role={failed ? "alert" : undefined}>
+                    {failed && <AlertTriangle size={12} aria-hidden className="dt-stems-warn" />}
+                    {failed ? t(job?.reason === "notLibrary" ? "decktabs.stemsNotLibrary" : "decktabs.stemsFailed") : t("decktabs.stemsNone")}
+                </p>
+            )}
+            <button type="button" className="dk-btn" title={t("decktabs.stemsSeparateAria")} {...soft(!deck.loaded || running, () => separateStems(deckId, deck.trackId))}>
+                {t(failed ? "decktabs.stemsRetry" : "decktabs.stemsSeparate")}
+            </button>
         </div>
     );
 }

@@ -1,0 +1,824 @@
+/*
+ * Deck panel, "MixAI Signature" (Decks 1.5). Tokens and the shared `dk-*` vocabulary live in
+ * src/look/look.css; this file only lays out the deck's own blocks (`deck-*`).
+ *
+ * Zero scroll: every row has a fixed height and only the tab body flexes. The root is a size
+ * container (`.deck-tier`, src/styles.css), so the row heights tighten with @container rules
+ * instead of JavaScript. Budget of the full tier (8 px padding):
+ *   normal  (>= 296 px high): header 52 + overview 44 + transport 32 + jump/key/tempo 24 + tabs 24, gaps 4
+ *   short   (<  296 px high): header 44 + overview 40 + transport 28 + jump/key/tempo 24 + tabs 24, gaps 3
+ *   => the tab body gets 107 px at 610x319 and 59 px at the 480x250 minimum.
+ *
+ * `--deck` (the deck colour) is set inline on the deck root, on the overview strip and on
+ * popover bodies (`data-deck-scope`): variables derived from it are declared on those elements,
+ * because a custom property resolves `var()` where it is declared.
+ */
+
+/* ── root ─────────────────────────────────────────────────────────────── */
+.deck-card.deck-tier {
+    padding: var(--panel-pad, 8px);
+}
+/* Row heights. Declared on the tier grids (not on the root): the @container rules below
+   override them there, and a container query never applies to the container itself.
+   Container sizes are the CONTENT box: the panel box minus 2 x 8 px padding. */
+.deck-full,
+.deck-compact,
+.deck-icon {
+    --deck-gap: 4px;
+    --deck-row1: 22px;
+    --deck-row2: calc(28px * var(--readout-scale, 1));
+    --deck-head-h: calc(var(--deck-row1) + var(--deck-row2) + 2px);
+    --deck-wave-h: 44px;
+    --deck-tp-h: 32px;
+    --deck-ctl-row: max(24px, var(--ctl-h, 24px));
+    --deck-tabs-h: 24px;
+}
+/* Tall decks (box >= 380 px): a slightly taller overview. */
+@container (min-height: 364px) {
+    .deck-full {
+        --deck-wave-h: 48px;
+    }
+}
+/* Short decks (box < 296 px, down to the 250 px minimum): tighter rows. */
+@container (max-height: 279px) {
+    .deck-full {
+        --deck-gap: 3px;
+        --deck-row1: 18px;
+        --deck-row2: calc(24px * var(--readout-scale, 1));
+        --deck-wave-h: 40px;
+        --deck-tp-h: 28px;
+    }
+    .deck-full .dk-num-xl {
+        font-size: calc(24px * var(--readout-scale, 1));
+    }
+    .deck-full .dk-num-lg {
+        font-size: calc(18px * var(--readout-scale, 1));
+    }
+    .deck-full .deck-title {
+        font-size: 13px;
+    }
+    .deck-full .deck-badge {
+        width: 18px;
+        height: 18px;
+        font-size: 12px;
+    }
+}
+/* Booth mode makes the readouts 30 % bigger: a short deck gives the height back elsewhere. */
+@container (max-height: 279px) {
+    :root[data-booth="on"] .deck-full {
+        --deck-gap: 2px;
+        --deck-wave-h: 36px;
+    }
+}
+/* Touch mode (44 px targets): the control rows grow, the overview and the gaps give way.
+   The panel minimums are not touch-aware, so Deck.tsx picks the ARRANGEMENT by box height
+   (`deckArrangement`, deck/format.ts): full from 319 px, compact from 250 px, else "bare"
+   compact (every tab body in a popover). Nothing is removed: what leaves a row is in the More
+   popover or behind a tab button. */
+:root[data-touch="on"] .deck-card,
+:root[data-touch="on"] [data-deck-scope] {
+    /* Control size the tab bodies lay out with (their fixed columns follow it). */
+    --ctl-h: 44px;
+}
+:root[data-touch="on"] :where(.deck-full, .deck-compact, .deck-icon) {
+    --deck-gap: 3px;
+    --deck-wave-h: 32px;
+    --deck-tp-h: 44px;
+    --deck-ctl-row: 44px;
+    --deck-tabs-h: 44px;
+}
+/* Compact arrangement in touch mode. Tight budget (box 250 px = the full tier's minimum):
+   16 pad + header 22 + overview 24 + transport 44 + tab buttons 44 + body 92 (two 44 px rows)
+   + 4 gaps of 2. Taller boxes get the normal header, wider gaps and a taller overview. */
+:root[data-touch="on"] .deck-compact {
+    --deck-wave-h: 24px;
+    row-gap: 2px;
+    grid-template-rows: 22px var(--deck-wave-h) 44px 44px minmax(0, 1fr);
+}
+@container (min-height: 242px) {
+    :root[data-touch="on"] .deck-compact {
+        --deck-wave-h: 26px;
+        row-gap: 3px;
+        grid-template-rows: 24px var(--deck-wave-h) 44px 44px minmax(0, 1fr);
+    }
+}
+@container (min-height: 290px) {
+    :root[data-touch="on"] .deck-compact {
+        --deck-wave-h: 40px;
+    }
+}
+/* "Bare" compact (touch mode, box under 250 px): no inline tab body, the overview flexes.
+   At the compact minimum (340x190): header 24 + overview 53 + 44 + 44 + 3 gaps of 3. */
+:root[data-touch="on"] .deck-compact[data-bare="true"] {
+    row-gap: 3px;
+    grid-template-rows: 24px minmax(24px, 1fr) 44px 44px;
+}
+/* Compact tier in touch mode: three 44 px tempo cells do not fit next to CUE / PLAY / SYNC, so
+   the tempo stepper leaves the row (the More popover right there has the tempo fader). A wide
+   deck (box from 456 px) has the room and keeps it. */
+:root[data-touch="on"] .deck-compact .deck-transport > .deck-group {
+    display: none;
+}
+@container (min-width: 440px) {
+    :root[data-touch="on"] .deck-compact .deck-transport > .deck-group {
+        display: flex;
+    }
+}
+/* Icon tier in touch mode (minimum 220x110): title + readouts 22, then ONE 44 px row with
+   CUE, PLAY and More, then the progress line. */
+:root[data-touch="on"] .deck-icon {
+    grid-template-rows: 22px minmax(44px, 1fr) 3px;
+}
+/* Full tier in touch mode: three 44 px control rows leave little for the tab body, so the
+   header always uses its short form (as on a short deck) and the gaps close to 2 px. */
+:root[data-touch="on"] .deck-full {
+    --deck-gap: 2px;
+    --deck-row1: 18px;
+    --deck-row2: calc(24px * var(--readout-scale, 1));
+    /* 26 px: two 44 px pad rows (91 px with their gap) fit the 610x319 layout box. */
+    --deck-wave-h: 26px;
+}
+:root[data-touch="on"] .deck-full .dk-num-xl {
+    font-size: calc(24px * var(--readout-scale, 1));
+}
+:root[data-touch="on"] .deck-full .dk-num-lg {
+    font-size: calc(18px * var(--readout-scale, 1));
+}
+:root[data-touch="on"] .deck-full .deck-title {
+    font-size: 13px;
+}
+:root[data-touch="on"] .deck-full .deck-badge {
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+}
+:root[data-touch="on"] .deck-tempo-track {
+    height: 44px;
+}
+:root[data-touch="on"] .deck-select {
+    width: 56px;
+    height: 44px;
+}
+
+/* End-of-track alert: a 2 px frame in the alert colour (the time readout also gets an icon
+   and the word, so it is never colour only). "now" blinks at 2 Hz unless motion is reduced. */
+.deck-card[data-warn]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--alert, var(--destructive));
+    border-radius: inherit;
+    pointer-events: none;
+}
+.deck-card[data-warn="now"]::after {
+    animation: dk-blink 0.5s steps(2, jump-none) infinite;
+}
+:root[data-motion="reduced"] .deck-card[data-warn="now"]::after {
+    animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .deck-card[data-warn="now"]::after {
+        animation: none;
+    }
+}
+
+/* ── tier grids ───────────────────────────────────────────────────────── */
+.deck-full,
+.deck-compact,
+.deck-icon {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+}
+.deck-full {
+    row-gap: var(--deck-gap);
+    grid-template-rows: var(--deck-head-h) var(--deck-wave-h) var(--deck-tp-h) var(--deck-ctl-row) var(--deck-tabs-h) minmax(0, 1fr);
+}
+/* Compact (minimum 340x190): header 24, overview 30, transport 28, tab buttons 24, gaps 3
+   => the tab body gets 56 px. */
+.deck-compact {
+    --deck-wave-h: 30px;
+    row-gap: 3px;
+    grid-template-rows: 24px var(--deck-wave-h) 28px var(--deck-ctl-row) minmax(0, 1fr);
+}
+:root[data-booth="on"] .deck-compact {
+    --deck-wave-h: 26px;
+}
+@container (min-height: 214px) {
+    .deck-compact {
+        --deck-wave-h: 40px;
+        row-gap: 4px;
+    }
+}
+/* Icon (minimum 220x110): header 24, readouts 22, transport >= 28, progress 3. */
+.deck-icon {
+    row-gap: 3px;
+    grid-template-rows: var(--deck-ctl-row) 22px minmax(28px, 1fr) 3px;
+}
+.deck-row {
+    min-height: 0;
+    min-width: 0;
+}
+
+/* ── header ───────────────────────────────────────────────────────────── */
+.deck-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--deck-row1) var(--deck-row2);
+    row-gap: 2px;
+    min-width: 0;
+}
+.deck-head[data-platter="true"] {
+    grid-template-columns: var(--deck-head-h) minmax(0, 1fr);
+    column-gap: 8px;
+}
+.deck-head-top,
+.deck-chead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.deck-badge {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--deck);
+    color: var(--play-fg, var(--background));
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+}
+.deck-title,
+.deck-artist {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.deck-title {
+    flex: 0 1 auto;
+    font-size: 14px;
+    line-height: 1.3;
+    font-weight: 700;
+    color: var(--foreground);
+}
+.deck-title[data-empty="true"] {
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+.deck-artist {
+    flex: 1 1 0;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--muted-foreground);
+}
+.deck-chead .deck-title {
+    flex: 1 1 0;
+    font-size: 12px;
+}
+
+/* MASTER: a status, not a control. Filled = this deck drives the clock, dashed = it does not. */
+.deck-master {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: var(--ctl-radius, 6px);
+    border: 1px dashed var(--line, var(--border));
+    color: var(--fg-faint, var(--muted-foreground));
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.deck-master[data-on="true"] {
+    border: 1px solid var(--on, var(--primary));
+    background: var(--on, var(--primary));
+    color: var(--on-fg, var(--primary-foreground));
+}
+
+/* Readouts: right-aligned, on one baseline, caption (9 px caps) before each number. */
+.deck-readouts {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 14px;
+    min-width: 0;
+    white-space: nowrap;
+}
+.deck-readout {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    flex: none;
+}
+.deck-bpm {
+    color: var(--deck);
+}
+.deck-dim {
+    color: var(--muted-foreground);
+}
+/* End-of-track chip (icon + word) in the title row: the artist name gives way to it, so the
+   readouts never shift when the warning starts. */
+.deck-ending {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    gap: 4px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--ctl-radius, 6px);
+    border: 1px solid var(--alert, var(--destructive));
+    color: var(--foreground);
+}
+.deck-ending > svg,
+.deck-warn-icon {
+    flex: none;
+    color: var(--alert, var(--destructive));
+}
+/* Narrow decks (box < 556 px) drop the captions. */
+@container (max-width: 539px) {
+    .deck-readout > .dk-label {
+        display: none;
+    }
+    .deck-readouts {
+        gap: 12px;
+    }
+}
+/* Booth mode: the readouts are 30 % bigger, so the captions need a wider deck. */
+@container (max-width: 589px) {
+    :root[data-booth="on"] .deck-readout > .dk-label {
+        display: none;
+    }
+}
+/* The platter takes 60 px of the header: captions only when the deck is wide enough. */
+@container (max-width: 619px) {
+    .deck-head[data-platter="true"] .deck-readout > .dk-label {
+        display: none;
+    }
+}
+/* One-line readouts of the compact and icon tiers. */
+.deck-num-c {
+    font-size: calc(15px * var(--readout-scale, 1));
+    line-height: 1;
+    font-weight: 700;
+}
+.deck-mini {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: none;
+    white-space: nowrap;
+}
+.deck-mini > .deck-warn-icon {
+    align-self: center;
+}
+.deck-icon-read {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+/* ── virtual platter (optional, full tier) ────────────────────────────── */
+.deck-platter {
+    position: relative;
+    grid-row: 1 / span 2;
+    width: var(--deck-head-h);
+    height: var(--deck-head-h);
+    border-radius: 50%;
+    background: var(--well, var(--secondary));
+}
+.deck-platter > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.deck-platter-rim,
+.deck-platter-arc {
+    fill: none;
+    stroke-width: 2;
+}
+.deck-platter-rim {
+    stroke: var(--line, var(--border));
+}
+.deck-platter-arc {
+    stroke: color-mix(in oklab, var(--deck) 55%, transparent);
+}
+.deck-platter-arm {
+    position: absolute;
+    left: calc(50% - 1px);
+    top: 3px;
+    width: 2px;
+    height: calc(50% - 3px);
+    border-radius: 1px;
+    background: var(--deck);
+    transform-origin: 50% 100%;
+}
+.deck-platter[data-spin="true"] > .deck-platter-arm {
+    transition: transform 34ms linear;
+}
+.deck-platter-hub {
+    position: absolute;
+    left: calc(50% - 3px);
+    top: calc(50% - 3px);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--foreground);
+}
+
+/* ── overview waveform (also the seek control) ────────────────────────── */
+.deck-overview {
+    --phrase-intro: color-mix(in oklab, var(--foreground) 42%, var(--wave-bg, var(--background)));
+    --phrase-outro: color-mix(in oklab, var(--foreground) 26%, var(--wave-bg, var(--background)));
+    --phrase-break: color-mix(in oklab, var(--deck, var(--primary)) 42%, var(--wave-bg, var(--background)));
+    --phrase-build: var(--warning);
+    --phrase-main: var(--deck, var(--primary));
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border-radius: var(--ctl-radius, 6px);
+    overflow: hidden;
+    cursor: pointer;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.deck-overview[data-seekable="false"] {
+    cursor: default;
+}
+.deck-overview:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+.deck-overview-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.deck-overview-tags {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    display: flex;
+    gap: 4px;
+    pointer-events: none;
+}
+.deck-overview-tags > .dk-label {
+    padding: 0 3px;
+    border-radius: 2px;
+    background: color-mix(in oklab, var(--wave-bg, var(--background)) 82%, transparent);
+    color: var(--foreground);
+}
+.deck-overview-tags > .deck-overview-fixed {
+    color: var(--warning);
+}
+
+/* ── transport row ────────────────────────────────────────────────────── */
+.deck-transport {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+}
+/* Every control takes the row height (the row is 32 / 28 px; never under 24). */
+.deck-transport .dk-btn,
+.deck-transport .dk-cell {
+    min-height: 0;
+}
+.deck-transport .deck-cue {
+    flex: none;
+    width: 56px;
+    padding: 0;
+}
+.deck-transport .deck-play {
+    flex: 0 1 88px;
+    min-width: 60px;
+    padding: 0 6px;
+}
+.dk-btn-cue.deck-cue:active:not(:disabled) {
+    background: var(--cue-btn, var(--warning));
+    border-color: var(--cue-btn, var(--warning));
+    color: var(--background);
+}
+.deck-spacer {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.deck-transport .deck-group {
+    align-items: stretch;
+    margin-left: 4px;
+}
+.deck-transport .deck-group .deck-cell-btn {
+    height: auto;
+}
+.deck-sync-lock {
+    font-size: 0.85em;
+}
+/* Compact tier: PLAY keeps only its icon when the deck is narrow. */
+.deck-compact .deck-transport .deck-play,
+.deck-icon .deck-transport .deck-play {
+    flex: 1 1 0;
+    min-width: 32px;
+}
+.deck-compact .deck-transport .deck-cue {
+    width: 46px;
+}
+/* The More button takes the row height like its neighbours (never under 24 px). */
+.deck-compact .deck-transport .deck-more-btn,
+.deck-icon .deck-transport .deck-more-btn {
+    align-self: stretch;
+    height: auto;
+}
+@container (max-width: 371px) {
+    .deck-compact .deck-play-label {
+        display: none;
+    }
+}
+.deck-icon .deck-transport .deck-cue {
+    width: 64px;
+}
+
+/* ── groups of cells (beat jump, key shift, tempo nudge) ──────────────── */
+.deck-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+    min-width: 0;
+}
+.deck-group > .dk-label {
+    margin-right: 3px;
+}
+.deck-cell-btn {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    cursor: pointer;
+}
+.deck-cell-btn:hover:not(:disabled) {
+    color: var(--foreground);
+    background: color-mix(in oklab, var(--well, var(--secondary)) 80%, var(--foreground));
+}
+.deck-cell-value {
+    width: 30px;
+}
+.deck-cell-value[data-on="true"] {
+    color: var(--foreground);
+}
+.deck-cell-tempo {
+    width: 52px;
+    font-size: 11px;
+}
+.deck-group .deck-match {
+    min-height: 24px;
+    margin-left: 2px;
+}
+.deck-select {
+    flex: none;
+    width: 44px;
+    height: 24px;
+    padding: 0 2px;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+}
+.deck-select:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+
+/* ── jump / key / tempo row ───────────────────────────────────────────── */
+.deck-util {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.deck-tempo {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+.deck-tempo > .dk-label {
+    margin-right: 3px;
+}
+/* Flat fader: a groove, a centre detent, the deviation from the centre in the deck colour. */
+.deck-tempo-track {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 48px;
+    height: 24px;
+}
+.deck-tempo-track::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: calc(50% - 1px);
+    height: 2px;
+    background: var(--line, var(--border));
+}
+.deck-tempo-track::after {
+    content: "";
+    position: absolute;
+    left: calc(50% - 1px);
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--fg-faint, var(--muted-foreground));
+}
+.deck-tempo-fill {
+    position: absolute;
+    top: calc(50% - 1px);
+    height: 2px;
+    /* `--p` = fader position 0..1; the 8 px thumb travels between the two 4 px insets. */
+    left: min(50%, calc(4px + var(--p, 0.5) * (100% - 8px)));
+    right: min(50%, calc(100% - 4px - var(--p, 0.5) * (100% - 8px)));
+    background: var(--deck, var(--primary));
+}
+.deck-tempo .deck-tempo-range {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: ew-resize;
+    border-radius: var(--ctl-radius, 6px);
+}
+.deck-tempo-range::-webkit-slider-runnable-track {
+    height: 24px;
+    background: transparent;
+}
+.deck-tempo-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 8px;
+    height: 18px;
+    margin-top: 3px;
+    border: 0;
+    border-radius: 1px;
+    background: var(--foreground);
+}
+.deck-tempo-range::-moz-range-track {
+    height: 24px;
+    background: transparent;
+}
+.deck-tempo-range::-moz-range-thumb {
+    width: 8px;
+    height: 18px;
+    border: 0;
+    border-radius: 1px;
+    background: var(--foreground);
+}
+.deck-tempo-range:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+
+/* ── tabs + tab body ──────────────────────────────────────────────────── */
+.deck-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    min-width: 0;
+    border-bottom: 1px solid var(--line, var(--border));
+}
+.deck-tabs > .dk-tab {
+    min-height: 0;
+    /* A two-letter tab ("FX") is still a 24 px wide target. */
+    min-width: 24px;
+    justify-content: center;
+    margin-bottom: -1px;
+    cursor: pointer;
+}
+.deck-tabbody {
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+.deck-ctabs {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+}
+.deck-ctab-name {
+    margin-left: auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── icon tier ────────────────────────────────────────────────────────── */
+.deck-progress {
+    height: 3px;
+    border-radius: 1px;
+    background: var(--secondary);
+    overflow: hidden;
+}
+.deck-progress > span {
+    display: block;
+    height: 100%;
+    background: var(--deck);
+    transform-origin: left center;
+}
+.deck-card[data-warn] .deck-progress > span {
+    background: var(--alert, var(--destructive));
+}
+
+/* ── popover bodies (rendered outside the deck: they carry `--deck` themselves) ── */
+.deck-more {
+    display: grid;
+    gap: 8px;
+    width: min(88vw, 22rem);
+    min-width: 0;
+}
+.deck-more-wave {
+    height: 40px;
+}
+.deck-more-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.deck-more-tabs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 24px 12rem;
+    row-gap: 6px;
+    min-width: 0;
+}
+/* Touch mode: the tab row of the popover is 44 px high like every other target. */
+:root[data-touch="on"] .deck-more-tabs {
+    grid-template-rows: 44px 13rem;
+}
+/* Touch mode: eight 44 px beat-jump cells are wider than the popover, so the group wraps onto
+   a second line (a popover has no fixed height); the overview strip is a 44 px target. */
+:root[data-touch="on"] .deck-perf > .deck-group {
+    flex-wrap: wrap;
+    row-gap: 2px;
+}
+:root[data-touch="on"] .deck-more-wave {
+    height: 44px;
+}
+.deck-perf {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+.deck-perf-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+.deck-pop {
+    min-width: 0;
+}
+.deck-pop[data-tab="fx"] {
+    width: min(88vw, 20rem);
+}
+/* Hot cues and loops open as popovers only in touch mode on a low deck ("bare" compact). */
+.deck-pop[data-tab="cues"],
+.deck-pop[data-tab="loops"] {
+    width: min(88vw, 22rem);
+}
+.deck-pop[data-tab="stems"] {
+    width: min(88vw, 18rem);
+    height: 11rem;
+}
+.deck-pop[data-tab="grid"] {
+    width: min(88vw, 22rem);
+    height: 14rem;
+}
+.deck-pop > .deck-tabbody {
+    height: 100%;
+}

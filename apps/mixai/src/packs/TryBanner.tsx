@@ -10,6 +10,7 @@ import { Button } from "@mmo/ui";
 import { useT } from "@/i18n";
 import { useMotionOK } from "@/shell/motion";
 import { TRY_MS, usePackStore } from "./pack-store";
+import { skinName } from "./skin-text";
 
 export function TryBanner() {
     const t = useT();
@@ -29,7 +30,7 @@ export function TryBanner() {
         wasTrying.current = trying.pack.manifest.id;
         announced10.current = false;
         setNow(Date.now());
-        setAnnounce(t("pack.tryAnnounce", { name: trying.pack.manifest.name, s: Math.round(TRY_MS / 1000) }));
+        setAnnounce(t("pack.tryAnnounce", { name: skinName(t, trying.pack), s: Math.round(TRY_MS / 1000) }));
         const id = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(id);
     }, [trying, t]);
@@ -66,7 +67,7 @@ export function TryBanner() {
                 >
                     <div className="flex items-center gap-3 px-3 py-2">
                         <p className="min-w-0 flex-1 truncate text-sm">
-                            <span className="font-medium">{t("pack.trying", { name: trying.pack.manifest.name })}</span>
+                            <span className="font-medium">{t("pack.trying", { name: skinName(t, trying.pack) })}</span>
                             <span className="mono ml-2 text-muted-foreground tabular-nums">{t("pack.seconds", { s: left })}</span>
                         </p>
                         <Button size="sm" onClick={keep}>

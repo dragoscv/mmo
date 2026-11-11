@@ -84,6 +84,10 @@ export interface MixerState {
     sampleRate: number;
     /** Estimated output latency in milliseconds. */
     latencyMs: number;
+    /** Audio callback time / buffer period (0..4; 1 = the whole period was used). Absent before 1.5. */
+    dspLoad?: number;
+    /** Audio callbacks that overran their buffer period since the engine started. */
+    overruns?: number;
 }
 
 export interface LoadTrackRequest {
@@ -123,6 +127,12 @@ export interface LibraryTrack {
     rating: number | null;
     /** Stem separation status: "queued" | "processing" | "ready" | "error" | null. */
     stemsStatus: string | null;
+    /** Analysed energy 1..10 (null = not analysed). */
+    energy?: number | null;
+    album?: string | null;
+    year?: number | null;
+    /** ISO timestamp the track entered the library. */
+    addedAt?: string | null;
 }
 
 export interface LibraryPage {

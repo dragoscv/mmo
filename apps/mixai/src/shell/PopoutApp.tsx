@@ -10,9 +10,10 @@ import { engine } from "@/bridge/engine";
 import { subscribeMixerState } from "@/bridge/events";
 import { platform, windowCtl } from "@/bridge/window";
 import { useMixerStore } from "@/state/mixer-store";
+import { startWaveSync } from "@/state/wave-store";
 import { usePackSync } from "@/packs/pack-store";
 import { renderPanel } from "./Workspace";
-import { CLASSIC, FOUR_DECK } from "@/layout/presets";
+import { DEFAULT_LAYOUT, FOUR_DECK } from "@/layout/presets";
 import { PANEL_SPECS } from "@/layout/presets";
 import { PanelTierProvider } from "@/layout/panel-tier";
 import { PANEL_IDS, type PanelId, type Tier } from "@/layout/types";
@@ -28,6 +29,8 @@ export function PopoutApp({ panel }: { panel: PanelId }) {
     const hydrated = useMixerStore((s) => s.hydrated);
     const [tier, setTier] = useState<Tier>("full");
     usePackSync();
+
+    useEffect(() => startWaveSync(), []);
 
     useEffect(() => {
         let cancelled = false;
@@ -60,7 +63,7 @@ export function PopoutApp({ panel }: { panel: PanelId }) {
         return () => removeEventListener("resize", read);
     }, [panel]);
 
-    const layout = panel === "deckC" || panel === "deckD" ? FOUR_DECK : CLASSIC;
+    const layout = panel === "deckC" || panel === "deckD" ? FOUR_DECK : DEFAULT_LAYOUT;
     const native = platform() !== "browser" && platform() !== "macos";
 
     return (

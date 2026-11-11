@@ -18,9 +18,13 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 mod colors;
+mod export;
 mod store;
+mod style;
 pub use colors::*;
+pub use export::*;
 pub use store::*;
+pub use style::*;
 
 // ---- limits -------------------------------------------------------------------
 
@@ -53,6 +57,9 @@ const ALLOWED_EXT: &[&str] = &["json", "png", "jpg", "jpeg", "webp", "avif", "wo
 const IMAGE_EXT: &[&str] = &["png", "jpg", "jpeg", "webp", "avif"];
 pub const SIGNATURE_FILE: &str = "signature.json";
 pub const MANIFEST_FILE: &str = "manifest.json";
+/// Manifest schema versions this build reads. 2 = the tokens may carry a `style` block
+/// ([`STYLE_MANIFEST_VERSION`], Decks >= 1.5); everything else is the same as 1.
+pub const MANIFEST_VERSIONS: std::ops::RangeInclusive<u32> = 1..=2;
 
 /// CSS custom property names a pack may override.
 pub const COLOR_KEYS: &[&str] = &[
@@ -152,6 +159,7 @@ pub struct PackFont {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PackManifest {
+    /// Schema version, one of [`MANIFEST_VERSIONS`].
     pub v: u32,
     pub id: String,
     pub name: String,
@@ -197,6 +205,9 @@ pub struct PackTokens {
     pub font_body: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
+    /// Look, shapes, waveform and cue colours (manifest v2 only; see [`PackStyle`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<PackStyle>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -333,13 +344,15 @@ fn valid_font_family(f: &str) -> bool {
 }
 
 /// Plain decimal number (optionally signed / fractional); no exponents, no units.
+/// A dot needs a digit after it: CSS reads `5.` as the number 5 followed by a stray `.` and
+/// drops the whole declaration, so a colour written that way would validate and never apply.
 fn parse_num(s: &str) -> Option<f64> {
     let body = s.strip_prefix('-').unwrap_or(s);
     if body.is_empty()
         || body.len() > 12
         || !body.bytes().all(|b| b.is_ascii_digit() || b == b'.')
         || body.bytes().filter(|b| *b == b'.').count() > 1
-        || body == "."
+        || body.ends_with('.')
     {
         return None;
     }
@@ -585,15 +598,38 @@ fn require_file(archive: &Archive, field: &str, path: &str, exts: &[&str]) -> Re
     Ok(())
 }
 
+fn newer_manifest_error(v: u64) -> String {
+    format!(
+        "manifest version {v} is not supported: this pack needs a newer MixAI Decks (this version reads 1 and 2)"
+    )
+}
+
 fn validate_manifest(archive: &Archive) -> Result<PackManifest, String> {
     let raw = archive
         .files
         .get(MANIFEST_FILE)
         .ok_or("manifest.json is missing")?;
+    // The version is read on its own first: a newer manifest may carry fields this version has
+    // never heard of, and the strict parse below would answer "unknown field" instead of
+    // telling the user to update. Anything that is not JSON falls through to the strict parse.
+    let declared = serde_json::from_slice::<Value>(raw)
+        .ok()
+        .and_then(|j| j.get("v").and_then(Value::as_u64));
+    if let Some(v) = declared
+        && v > u64::from(*MANIFEST_VERSIONS.end())
+    {
+        return Err(newer_manifest_error(v));
+    }
     let m: PackManifest =
         serde_json::from_slice(raw).map_err(|e| format!("manifest.json is invalid: {e}"))?;
-    if m.v != 1 {
-        return Err(format!("unsupported manifest version {} (expected 1)", m.v));
+    if m.v > *MANIFEST_VERSIONS.end() {
+        return Err(newer_manifest_error(u64::from(m.v)));
+    }
+    if !MANIFEST_VERSIONS.contains(&m.v) {
+        return Err(format!(
+            "unsupported manifest version {} (expected 1 or 2)",
+            m.v
+        ));
     }
     if !valid_pack_id(&m.id) {
         return Err(format!(
@@ -670,7 +706,9 @@ fn put_color(colors: &mut BTreeMap<String, String>, key: &str, value: &str) -> R
 }
 
 /// Accept the flat `PackTokens` shape and/or a DTCG `color` group (`{ "$value": ... }` leaves).
-fn validate_tokens(archive: &Archive, path: &str) -> Result<PackTokens, String> {
+/// `manifest_v` = the manifest's schema version: a `style` block is only allowed from
+/// [`STYLE_MANIFEST_VERSION`] on, so an older Decks never silently drops half of a skin.
+fn validate_tokens(archive: &Archive, path: &str, manifest_v: u32) -> Result<PackTokens, String> {
     let raw = &archive.files[path];
     let v: Value =
         serde_json::from_slice(raw).map_err(|e| format!("{path} is not valid JSON: {e}"))?;
@@ -689,6 +727,7 @@ fn validate_tokens(archive: &Archive, path: &str) -> Result<PackTokens, String> 
         "fontBody",
         "background",
         "color",
+        "style",
     ];
     for k in obj.keys() {
         if !k.starts_with('$') && !KNOWN.contains(&k.as_str()) {
@@ -789,6 +828,15 @@ fn validate_tokens(archive: &Archive, path: &str) -> Result<PackTokens, String> 
         require_file(archive, "tokens.background", &bg, IMAGE_EXT)?;
         t.background = Some(bg);
     }
+    match obj.get("style") {
+        None | Some(Value::Null) => {}
+        Some(_) if manifest_v < STYLE_MANIFEST_VERSION => {
+            return Err(format!(
+                "tokens.style needs manifest version {STYLE_MANIFEST_VERSION} (this pack declares \"v\": {manifest_v})"
+            ));
+        }
+        Some(style) => t.style = parse_style(style)?,
+    }
     Ok(t)
 }
 
@@ -829,7 +877,7 @@ pub fn inspect_with(bytes: &[u8], keys: &KeyTables<'_>) -> Result<PackInfo, Stri
     let tokens = manifest
         .tokens
         .as_deref()
-        .map(|p| validate_tokens(&archive, p))
+        .map(|p| validate_tokens(&archive, p, manifest.v))
         .transpose()?;
     let layouts = manifest
         .layouts
@@ -1151,10 +1199,203 @@ mod tests {
     }
 
     #[test]
+    fn a_number_needs_a_digit_after_its_dot() {
+        // CSS drops a declaration whose number ends in a dot, so these never validate.
+        for bad in ["5.", "-5.", "0.", ".", "-.", "1.2.", "", "-"] {
+            assert_eq!(parse_num(bad), None, "{bad:?}");
+        }
+        for (good, want) in [("5", 5.0), ("5.0", 5.0), (".5", 0.5), ("-0.25", -0.25)] {
+            assert_eq!(parse_num(good), Some(want), "{good:?}");
+        }
+        for bad in [
+            "oklch(0.5 0.1 30.)",
+            "oklch(0.5 0. 30)",
+            "oklch(1. 0.1 30)",
+            "oklch(50.% 0.1 30)",
+            "oklch(0.5 0.1 30 / 1.)",
+        ] {
+            assert!(!valid_color(bad), "{bad}");
+        }
+        assert!(valid_color("oklch(.5 .1 30.5 / .5)"));
+    }
+
+    #[test]
     fn unknown_colour_key_is_rejected() {
         let t = TOKENS.replace("\"border\"", "\"--evil\"");
         let err = err_of(&build(&with("tokens.json", t.as_bytes())));
         assert!(err.contains("not allowed"), "{err}");
+    }
+
+    const STYLE: &str = r##"{"look":"classic","platter":true,"layout":"pro-vertical","waves":"overlay",
+        "colors":{"well":"#0b0d0f","waveBg":"#000000","line":"#ffffff22","faint":"#888888","on":"#00d37f",
+        "onFg":"#001b08","play":"#00ff88","playFg":"#000000","cue":"#ff8800","alert":"#ff2b2b",
+        "waveLow":"oklch(0.6 0.2 250)","waveMid":"#33cc88","waveHigh":"#ffffffcc","waveGrid":"#ffffff33",
+        "waveDownbeat":"#ffffff88","wavePlayhead":"#ffffff","wavePlayheadCap":"#ff0000",
+        "cue1":"#ff0000","cue2":"#ff8800","cue3":"#ffff00","cue4":"#00ff00","cue5":"#00ffff",
+        "cue6":"#0000ff","cue7":"#ff00ff","cue8":"#ffffff"},
+        "sizes":{"panelGap":6.0,"panelRadius":0.0,"panelPad":16.0,"controlRadius":2.5,"padRadius":12.0,
+        "controlHeight":24.0,"titlebarHeight":28.0,"wavePlayedAlpha":0.45}}"##;
+
+    /// `skin_entries` with the manifest at version `v` and `style` appended to the tokens.
+    fn styled_entries(v: u32, style: &str) -> Vec<(&'static str, Vec<u8>)> {
+        let manifest = MANIFEST.replacen("\"v\":1", &format!("\"v\":{v}"), 1);
+        let tokens = format!(
+            "{},\"style\":{style}}}",
+            TOKENS.trim_end().trim_end_matches('}')
+        );
+        let mut e = skin_entries();
+        e.retain(|(n, _)| *n != "manifest.json" && *n != "tokens.json");
+        e.push(("manifest.json", manifest.into_bytes()));
+        e.push(("tokens.json", tokens.into_bytes()));
+        e
+    }
+
+    #[test]
+    fn v2_skin_with_every_style_field_is_accepted() {
+        let info = inspect_with(&build(&styled_entries(2, STYLE)), &NO_KEYS).unwrap();
+        assert_eq!(info.manifest.v, 2);
+        let t = info.tokens.unwrap();
+        // The v1 tokens are untouched by the style block …
+        assert_eq!(t.accent.as_deref(), Some("violet"));
+        assert_eq!(t.colors.as_ref().unwrap()["deck-a"], "#00e5ff");
+        // … and the style block comes back as the TS `PackStyle` (camelCase, every key).
+        let style = t.style.clone().unwrap();
+        assert_eq!(style.look.as_deref(), Some("classic"));
+        assert_eq!(style.platter, Some(true));
+        assert_eq!(style.layout.as_deref(), Some("pro-vertical"));
+        assert_eq!(style.waves.as_deref(), Some("overlay"));
+        assert_eq!(style.colors.as_ref().unwrap().len(), STYLE_COLOR_KEYS.len());
+        assert_eq!(style.sizes.as_ref().unwrap().len(), STYLE_SIZES.len());
+        let json = serde_json::to_value(&t).unwrap();
+        assert_eq!(json["style"], serde_json::from_str::<Value>(STYLE).unwrap());
+        assert_eq!(json["style"]["colors"]["wavePlayheadCap"], "#ff0000");
+        assert_eq!(json["style"]["sizes"]["wavePlayedAlpha"], 0.45);
+        // A v2 pack without a style block is a plain skin.
+        let m = MANIFEST.replacen("\"v\":1", "\"v\":2", 1);
+        let plain = inspect_with(&build(&with("manifest.json", m.as_bytes())), &NO_KEYS).unwrap();
+        assert!(plain.tokens.unwrap().style.is_none());
+        // `"style": null` is the same as no style block.
+        let info = inspect_with(&build(&styled_entries(2, "null")), &NO_KEYS).unwrap();
+        assert!(info.tokens.unwrap().style.is_none());
+    }
+
+    #[test]
+    fn style_block_is_refused_in_a_v1_pack() {
+        let err = err_of(&build(&styled_entries(1, STYLE)));
+        assert_eq!(
+            err,
+            "tokens.style needs manifest version 2 (this pack declares \"v\": 1)"
+        );
+        // Even an empty one: a v1 pack has no style at all.
+        assert!(err_of(&build(&styled_entries(1, "{}"))).contains("needs manifest version 2"));
+    }
+
+    #[test]
+    fn newer_manifest_versions_ask_for_a_newer_decks() {
+        for v in [3_u32, 7, 4_000_000_000] {
+            let m = MANIFEST.replacen("\"v\":1", &format!("\"v\":{v}"), 1);
+            let err = err_of(&build(&with("manifest.json", m.as_bytes())));
+            assert!(err.contains("needs a newer MixAI Decks"), "{v}: {err}");
+            assert!(err.contains(&format!("manifest version {v}")), "{v}: {err}");
+        }
+        let m = MANIFEST.replacen("\"v\":1", "\"v\":0", 1);
+        let err = err_of(&build(&with("manifest.json", m.as_bytes())));
+        assert_eq!(err, "unsupported manifest version 0 (expected 1 or 2)");
+        // A real newer manifest brings fields this version does not know: the answer is still
+        // "update", in the same words, not serde's "unknown field".
+        let plain = MANIFEST.replacen("\"v\":1", "\"v\":3", 1);
+        let want = err_of(&build(&with("manifest.json", plain.as_bytes())));
+        assert_eq!(
+            want,
+            "manifest version 3 is not supported: this pack needs a newer MixAI Decks (this version reads 1 and 2)"
+        );
+        for extra in [
+            "\"v\":3,\"plugins\":[\"fx/echo.wasm\"]",
+            "\"v\":3,\"kind\":\"plugin\"",
+            "\"v\":3,\"pro\":\"trial\"",
+        ] {
+            let m = MANIFEST.replacen("\"v\":1", extra, 1);
+            let err = err_of(&build(&with("manifest.json", m.as_bytes())));
+            assert_eq!(err, want, "{extra}");
+        }
+        // Beyond u32 the version is still read.
+        let m = MANIFEST.replacen("\"v\":1", "\"v\":5000000000", 1);
+        let err = err_of(&build(&with("manifest.json", m.as_bytes())));
+        assert!(
+            err.contains("manifest version 5000000000 is not supported"),
+            "{err}"
+        );
+        // A version this app reads keeps the strict parse: an unknown field is an error.
+        let m = MANIFEST.replacen("\"v\":1", "\"v\":2,\"plugins\":[]", 1);
+        let err = err_of(&build(&with("manifest.json", m.as_bytes())));
+        assert!(
+            err.contains("manifest.json is invalid") && err.contains("plugins"),
+            "{err}"
+        );
+        // Not an unsigned integer at all: serde refuses it before the version check.
+        let m = MANIFEST.replacen("\"v\":1", "\"v\":-1", 1);
+        assert!(
+            err_of(&build(&with("manifest.json", m.as_bytes())))
+                .contains("manifest.json is invalid")
+        );
+    }
+
+    #[test]
+    fn style_rejections_name_the_problem() {
+        let cases = [
+            (r#"{"glow":1}"#, "unknown style key 'glow'"),
+            (
+                r##"{"colors":{"well":"red"}}"##,
+                "style.colors.well must be a valid colour",
+            ),
+            (
+                r##"{"colors":{"well":"url(https://x)"}}"##,
+                "style.colors.well must be a valid colour",
+            ),
+            (
+                r##"{"colors":{"sparkle":"#ffffff"}}"##,
+                "unknown style colour 'sparkle'",
+            ),
+            (
+                r#"{"sizes":{"panelGap":17}}"#,
+                "style.sizes.panelGap must be a number in 0..16",
+            ),
+            (
+                r#"{"sizes":{"wavePlayedAlpha":0.1}}"#,
+                "style.sizes.wavePlayedAlpha must be a number in 0.2..1",
+            ),
+            (r#"{"sizes":{"zoom":2}}"#, "unknown style size 'zoom'"),
+            (
+                r#"{"layout":"Pro Vertical"}"#,
+                "style.layout must be a layout id (a-z, 0-9, '.', '_', '-'; max 48)",
+            ),
+            (
+                r#"{"look":"neon"}"#,
+                "style.look must be signature or classic",
+            ),
+            (
+                r#"{"waves":"mirror"}"#,
+                "style.waves must be stacked or overlay",
+            ),
+            (
+                r#"{"platter":"yes"}"#,
+                "style.platter must be true or false",
+            ),
+            (r#"[]"#, "style must be an object"),
+        ];
+        for (style, want) in cases {
+            let err = err_of(&build(&styled_entries(2, style)));
+            assert_eq!(err, want, "{style}");
+        }
+        // Several problems are all reported.
+        let err = err_of(&build(&styled_entries(
+            2,
+            r#"{"look":"neon","waves":"mirror"}"#,
+        )));
+        assert_eq!(
+            err,
+            "style.look must be signature or classic; style.waves must be stacked or overlay"
+        );
     }
 
     #[test]
@@ -1177,7 +1418,7 @@ mod tests {
     #[test]
     fn manifest_rules_are_enforced() {
         let cases = [
-            ("\"v\":1", "\"v\":2"),
+            ("\"v\":1", "\"v\":3"),
             ("com.example.skin.neon", "Ro.Mixai"),
             ("com.example.skin.neon", "single"),
             ("\"1.0.0\"", "\"1.0\""),

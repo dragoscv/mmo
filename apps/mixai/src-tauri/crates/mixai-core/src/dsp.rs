@@ -141,9 +141,17 @@ impl Biquad {
         self.set(b0, b1, b2, a0, a1, a2);
     }
 
+    /// Cutoff kept inside `20 Hz ..= Nyquist − 100 Hz`. Written as `min` then `max` because
+    /// `f32::clamp` panics when the upper bound is below the lower one (any rate under 240 Hz),
+    /// and release builds abort on panic.
+    #[inline]
+    fn cutoff(freq: f32, sr: f32) -> f32 {
+        freq.min(sr / 2.0 - 100.0).max(20.0)
+    }
+
     /// Resonant low-pass (RBJ cookbook).
     pub fn low_pass(&mut self, freq: f32, q: f32, sr: f32) {
-        let w0 = 2.0 * std::f32::consts::PI * freq.clamp(20.0, sr / 2.0 - 100.0) / sr;
+        let w0 = 2.0 * std::f32::consts::PI * Self::cutoff(freq, sr) / sr;
         let (sn, cs) = w0.sin_cos();
         let alpha = sn / (2.0 * q);
         let b1 = 1.0 - cs;
@@ -157,7 +165,7 @@ impl Biquad {
 
     /// Resonant high-pass (RBJ cookbook).
     pub fn high_pass(&mut self, freq: f32, q: f32, sr: f32) {
-        let w0 = 2.0 * std::f32::consts::PI * freq.clamp(20.0, sr / 2.0 - 100.0) / sr;
+        let w0 = 2.0 * std::f32::consts::PI * Self::cutoff(freq, sr) / sr;
         let (sn, cs) = w0.sin_cos();
         let alpha = sn / (2.0 * q);
         let one_plus_cs = 1.0 + cs;
@@ -203,4 +211,44 @@ pub fn db_to_lin(db: f32) -> f32 {
 #[inline]
 pub fn soft_clip(x: f32) -> f32 {
     x.tanh()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn coeffs(b: &Biquad) -> [f32; 5] {
+        [b.b0, b.b1, b.b2, b.a1, b.a2]
+    }
+
+    #[test]
+    fn pass_filters_never_panic_on_a_tiny_sample_rate() {
+        // Below 240 Hz the upper cutoff bound (sr / 2 − 100) is under the 20 Hz floor.
+        for sr in [1.0f32, 8.0, 100.0, 239.0, 240.0] {
+            let mut b = Biquad::identity();
+            b.low_pass(250.0, 0.7, sr);
+            b.high_pass(4_000.0, 0.7, sr);
+        }
+    }
+
+    #[test]
+    fn cutoff_bounds_are_unchanged_at_audio_rates() {
+        let q = std::f32::consts::FRAC_1_SQRT_2;
+        let of = |low: bool, freq: f32| {
+            let mut b = Biquad::identity();
+            if low {
+                b.low_pass(freq, q, 48_000.0);
+            } else {
+                b.high_pass(freq, q, 48_000.0);
+            }
+            coeffs(&b)
+        };
+        for low in [true, false] {
+            // Above Nyquist − 100 Hz and below 20 Hz are pinned to the bounds …
+            assert_eq!(of(low, 30_000.0), of(low, 23_900.0));
+            assert_eq!(of(low, 1.0), of(low, 20.0));
+            // … and a cutoff inside the range is used as given.
+            assert_ne!(of(low, 1_000.0), of(low, 1_001.0));
+        }
+    }
 }

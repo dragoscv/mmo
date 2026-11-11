@@ -1,8 +1,9 @@
 /**
  * Appearance extras under the shared ThemeSettings: skins (built-in +
- * installed + install from file), colour-blind deck palettes, accessibility
- * and motion/performance switches. Shell prefs live in `useShellPrefs`, skins
- * in `usePackStore`.
+ * installed + install from file + the live skin editor), deck display (booth
+ * mode, virtual platter, hot cue colours), colour-blind deck palettes,
+ * accessibility and motion/performance switches. Shell prefs live in
+ * `useShellPrefs`, skins in `usePackStore`.
  */
 import { useId, useState } from "react";
 import { ExternalLink, FileUp, Play, Trash2 } from "lucide-react";
@@ -17,15 +18,22 @@ import {
     Button,
     RadioGroup,
     RadioGroupItem,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
     Switch,
 } from "@mmo/ui";
 import { packs, type PackInfo } from "@/bridge/packs";
 import { useT, type MessageKey } from "@/i18n";
 import { BUILTIN_SKINS } from "@/packs/builtin-skins";
+import { skinDescription, skinName } from "@/packs/skin-text";
 import { ContrastBadge, formatBytes, PackCard, TrustBadge } from "@/packs/PackCard";
 import { contrastProblems } from "@/packs/apply-tokens";
 import { usePackStore } from "@/packs/pack-store";
-import { DECK_PALETTES, useShellPrefs, type DeckPalette, type ShellPrefs } from "@/shell/shell-prefs";
+import { SkinEditorEntry } from "@/settings/SkinEditor";
+import { CUE_PALETTES, DECK_PALETTES, useShellPrefs, type CuePalette, type DeckPalette, type ShellPrefs } from "@/shell/shell-prefs";
 import { Section } from "../sections/shared";
 
 export const DECKS_PRO_URL = "https://mixai.ro/decks/pro";
@@ -166,24 +174,25 @@ function SkinSection() {
                 />
                 {skins.map((p) => {
                     const builtin = BUILTIN_SKINS.includes(p);
+                    const name = skinName(t, p);
                     return (
                         <PackCard
                             key={p.manifest.id}
-                            name={p.manifest.name}
+                            name={name}
                             author={p.manifest.author}
                             trust={p.trust}
                             tokens={p.tokens}
                             active={activeSkin === p.manifest.id}
                             onSelect={() => store().setActiveSkin(p.manifest.id)}
-                            selectLabel={t("pack.applyAria", { name: p.manifest.name })}
-                            description={p.manifest.description}
+                            selectLabel={t("pack.applyAria", { name })}
+                            description={skinDescription(t, p)}
                             actions={
                                 <>
-                                    <Button variant="outline" size="xs" aria-label={t("pack.tryAria", { name: p.manifest.name })} onClick={() => store().startTry(p, null)}>
+                                    <Button variant="outline" size="xs" aria-label={t("pack.tryAria", { name })} onClick={() => store().startTry(p, null)}>
                                         <Play aria-hidden /> {t("pack.try")}
                                     </Button>
                                     {builtin ? null : (
-                                        <Button variant="ghost" size="xs" aria-label={t("pack.removeAria", { name: p.manifest.name })} onClick={() => void store().remove(p.manifest.id)}>
+                                        <Button variant="ghost" size="xs" aria-label={t("pack.removeAria", { name })} onClick={() => void store().remove(p.manifest.id)}>
                                             <Trash2 aria-hidden /> {t("pack.remove")}
                                         </Button>
                                     )}
@@ -197,6 +206,7 @@ function SkinSection() {
                 <Button variant="outline" size="sm" onClick={() => void pickFile()} loading={busy}>
                     <FileUp aria-hidden /> {t("pack.installFile")}
                 </Button>
+                <SkinEditorEntry />
                 <p role="status" className="text-xs text-muted-foreground">
                     {note}
                 </p>
@@ -288,6 +298,65 @@ function PaletteSection() {
 
 type BoolKey = { [K in keyof ShellPrefs]: ShellPrefs[K] extends boolean ? K : never }[keyof ShellPrefs];
 
+const CUE_LABEL: Record<CuePalette, MessageKey> = { default: "settings.cuePaletteDefault", safe: "settings.cuePaletteSafe" };
+const CUE_HINT: Record<CuePalette, MessageKey> = { default: "settings.cuePaletteDefaultHint", safe: "settings.cuePaletteSafeHint" };
+const CUE_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+
+/** Deck display: booth mode, virtual platter, hot cue colour set (live: `data-*` on <html>). */
+function DecksSection() {
+    const t = useT();
+    const booth = useShellPrefs((s) => s.booth);
+    const platter = useShellPrefs((s) => s.platter);
+    const cuePalette = useShellPrefs((s) => s.cuePalette);
+    const set = useShellPrefs((s) => s.set);
+    const uid = useId();
+    const items = Object.fromEntries(CUE_PALETTES.map((p) => [p, t(CUE_LABEL[p])])) as Record<CuePalette, string>;
+    return (
+        <Section title={t("settings.decksTitle")} settingId="appearance.decks">
+            <div className="grid gap-2">
+                <SwitchRow id="appearance.booth" label={t("settings.boothMode")} hint={t("settings.boothModeHint")} checked={booth} onChange={(v) => set({ booth: v })} />
+                <SwitchRow id="appearance.platter" label={t("settings.platter")} hint={t("settings.platterHint")} checked={platter} onChange={(v) => set({ platter: v })} />
+                <div data-setting-id="appearance.cuePalette" className="flex scroll-mt-4 items-start justify-between gap-4 rounded-lg py-1 data-[highlight=true]:ring-2 data-[highlight=true]:ring-ring/60">
+                    <div className="grid gap-1">
+                        <span id={`${uid}-label`} className="text-sm font-medium">
+                            {t("settings.cuePalette")}
+                        </span>
+                        <p id={`${uid}-hint`} className="text-xs text-muted-foreground">
+                            {t("settings.cuePaletteHint")} {t(CUE_HINT[cuePalette])}
+                        </p>
+                        {/* The swatches read the live variables, so they show the set in use. */}
+                        <span role="img" aria-label={t("settings.cuePreview")} className="appearance-cues">
+                            {CUE_SLOTS.map((n) => (
+                                <span key={n} aria-hidden style={{ background: `var(--cue-${n})` }}>
+                                    {n}
+                                </span>
+                            ))}
+                        </span>
+                    </div>
+                    <Select
+                        items={items}
+                        value={cuePalette}
+                        onValueChange={(v) => {
+                            if (CUE_PALETTES.includes(v as CuePalette)) set({ cuePalette: v as CuePalette });
+                        }}
+                    >
+                        <SelectTrigger aria-labelledby={`${uid}-label`} aria-describedby={`${uid}-hint`} className="w-56 shrink-0">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {CUE_PALETTES.map((p) => (
+                                <SelectItem key={p} value={p}>
+                                    {items[p]}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+        </Section>
+    );
+}
+
 function Toggles({ title, settingId, rows }: { title: string; settingId: string; rows: { id: string; key: BoolKey; label: string; hint: string }[] }) {
     const prefs = useShellPrefs();
     return (
@@ -306,6 +375,7 @@ export function AppearanceExtras() {
     return (
         <div className="grid gap-6">
             <SkinSection />
+            <DecksSection />
             <PaletteSection />
             <Toggles
                 title={t("pack.a11yTitle")}

@@ -10,15 +10,16 @@ import { ToggleChip } from "./ToggleChip";
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 /**
- * Headphone / booth routing (WP19-06): cue mix (cue ↔ master), headphone
- * level, split-mono, 4-channel mapping (only when the device has ≥4 outputs)
- * and booth level. Per-output latency offsets live in Settings.
+ * Headphone / booth routing (WP19-06): cue mix (cue ↔ master), headphone level, booth level,
+ * split-mono and the 4-channel mapping (only when the device has ≥ 4 outputs). Per-output
+ * latency offsets live in Settings.
  *
- * `variant="inline"` = the mixer's bottom row: just the three knobs at 26 px
- * with their labels (fits a 42 px row); SPLIT / 4-CH stay in the full form
- * (mixer popover).
+ *  - `variant="full"`: the whole form (mixer "More" popover).
+ *  - `variant="column"`: `count` knobs stacked, 26 px with legends: the mixer's master column
+ *    (2 = cue mix + phones, 3 = + booth).
+ *  - `variant="inline"`: the same knobs in a row.
  */
-export function RoutingPanel({ variant = "full" }: { variant?: "full" | "inline" }) {
+export function RoutingPanel({ variant = "full", count = 3 }: { variant?: "full" | "inline" | "column"; count?: 2 | 3 }) {
     const t = useT();
     const routing = usePerfStore((s) => s.routing);
     const channels = usePerfStore((s) => s.outputChannels);
@@ -35,51 +36,38 @@ export function RoutingPanel({ variant = "full" }: { variant?: "full" | "inline"
 
     const canFour = fourChannelAvailable(channels);
     const fourOn = routing.mode === "fourChannel" && canFour;
-    const fourHint = canFour
-        ? t("routing.fourChHint")
-        : t("routing.fourChUnavailable", { n: channels ?? "?" });
+    const fourHint = canFour ? t("routing.fourChHint") : t("routing.fourChUnavailable", { n: channels ?? "?" });
 
-    if (variant === "inline") {
-        const s = 26;
-        return (
-            <div role="group" aria-label={t("routing.title")} className="flex min-w-0 items-start justify-center gap-2">
-                <Knob size={s} value={routing.cueMix} min={0} max={1} center={0.5} label={t("routing.cueMix")} ariaLabel={t("routing.cueMixAria")} format={(v) => `${pct(1 - v)}·${pct(v)}`} showValue={false} onChange={(v) => patchRouting({ cueMix: v })} />
-                <Knob size={s} value={routing.headphoneLevel} min={0} max={1.5} center={0.7} label={t("routing.phones")} ariaLabel={t("routing.phonesAria")} format={pct} showValue={false} onChange={(v) => patchRouting({ headphoneLevel: v })} />
-                <Knob size={s} value={routing.boothLevel} min={0} max={1.5} center={0} label={t("routing.booth")} ariaLabel={t("routing.boothAria")} format={(v) => (v <= 0.001 ? t("routing.off") : pct(v))} showValue={false} onChange={(v) => patchRouting({ boothLevel: v })} />
-            </div>
-        );
-    }
-
-    return (
-        <section aria-label={t("routing.title")} style={{ display: "grid", gap: 8 }}>
-            <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em", textAlign: "center" }}>
-                {t("routing.title")}
-            </span>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+    const knobs = (size: number, showValue: boolean, n: number) => (
+        <>
+            <Knob
+                size={size}
+                value={routing.cueMix}
+                min={0}
+                max={1}
+                center={0.5}
+                label={t("routing.cueMix")}
+                ariaLabel={t("routing.cueMixAria")}
+                format={(v) => t("mix.cueMixValue", { cue: pct(1 - v), master: pct(v) })}
+                showValue={false}
+                onChange={(v) => patchRouting({ cueMix: v })}
+            />
+            <Knob
+                size={size}
+                value={routing.headphoneLevel}
+                min={0}
+                max={1.5}
+                center={0.7}
+                bipolar={false}
+                label={t("routing.phones")}
+                ariaLabel={t("routing.phonesAria")}
+                format={pct}
+                showValue={showValue}
+                onChange={(v) => patchRouting({ headphoneLevel: v })}
+            />
+            {n >= 3 && (
                 <Knob
-                    size={40}
-                    value={routing.cueMix}
-                    min={0}
-                    max={1}
-                    center={0.5}
-                    label={t("routing.cueMix")}
-                    ariaLabel={t("routing.cueMixAria")}
-                    format={(v) => `${pct(1 - v)}·${pct(v)}`}
-                    onChange={(v) => patchRouting({ cueMix: v })}
-                />
-                <Knob
-                    size={40}
-                    value={routing.headphoneLevel}
-                    min={0}
-                    max={1.5}
-                    center={0.7}
-                    label={t("routing.phones")}
-                    ariaLabel={t("routing.phonesAria")}
-                    format={pct}
-                    onChange={(v) => patchRouting({ headphoneLevel: v })}
-                />
-                <Knob
-                    size={40}
+                    size={size}
                     value={routing.boothLevel}
                     min={0}
                     max={1.5}
@@ -87,16 +75,27 @@ export function RoutingPanel({ variant = "full" }: { variant?: "full" | "inline"
                     label={t("routing.booth")}
                     ariaLabel={t("routing.boothAria")}
                     format={(v) => (v <= 0.001 ? t("routing.off") : pct(v))}
+                    showValue={showValue}
                     onChange={(v) => patchRouting({ boothLevel: v })}
                 />
+            )}
+        </>
+    );
+
+    if (variant !== "full") {
+        return (
+            <div role="group" aria-label={t("routing.title")} className="mx-sends" data-dir={variant === "column" ? "column" : "row"}>
+                {knobs(26, false, count)}
             </div>
-            <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
-                <ToggleChip
-                    size="xs"
-                    pressed={routing.splitMono}
-                    onClick={() => patchRouting({ splitMono: !routing.splitMono })}
-                    title={t("routing.splitMonoHint")}
-                >
+        );
+    }
+
+    return (
+        <section aria-label={t("routing.title")} className="mx-routing">
+            <span className="dk-label">{t("routing.title")}</span>
+            <div className="mx-routing-knobs">{knobs(34, true, 3)}</div>
+            <div className="mx-routing-toggles">
+                <ToggleChip size="xs" pressed={routing.splitMono} onClick={() => patchRouting({ splitMono: !routing.splitMono })} title={t("routing.splitMonoHint")}>
                     {t("routing.splitMono")}
                 </ToggleChip>
                 <Tooltip>

@@ -10,6 +10,30 @@ import { remapRefs, useLayoutStore } from "../layout/layout-store.ts";
 const pack = (id: string, ...layouts: unknown[]) => ({ manifest: { id }, layouts });
 const as = (id: string) => ({ ...CLASSIC, id, name: id });
 
+test("a layout preview (skin editor) is shown but not saved; a real choice ends it", () => {
+    const ls = () => useLayoutStore.getState();
+    ls().setActive("pro");
+    ls().setActive("classic", { persist: false });
+    assert.equal(ls().activeId, "classic", "the preview is what the shell shows");
+    assert.equal(ls().snapshot().activeId, "pro", "storage, exports and the cloud profile keep the user's layout");
+    // Another preview on top keeps the same saved layout.
+    ls().setActive("performance", { persist: false });
+    assert.equal(ls().snapshot().activeId, "pro");
+    // Saving something else during a preview (a snapshot slot) does not save the preview either.
+    ls().setSnapshot("1", "library");
+    assert.equal(ls().snapshot().activeId, "pro");
+    ls().setSnapshot("1", null);
+    // Leaving the preview: back to the saved layout, nothing held.
+    ls().setActive("pro", { persist: false });
+    assert.equal(ls().activeId, "pro");
+    assert.equal(ls().snapshot().activeId, "pro");
+    // A layout picked for real during a preview wins.
+    ls().setActive("classic", { persist: false });
+    ls().setActive("library");
+    assert.equal(ls().snapshot().activeId, "library");
+    ls().setActive("pro");
+});
+
 test("pack layouts are namespaced by pack id", () => {
     const out = packLayouts([pack("com.example.layout.radio", as("radio-host"))]);
     assert.deepEqual(out.map((l) => l.id), ["com.example.layout.radio/radio-host"]);

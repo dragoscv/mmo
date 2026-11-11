@@ -8,10 +8,13 @@ export const COLOR_KEYS = [
     "deck-a", "deck-b", "deck-c", "deck-d", "success", "warning",
 ];
 
-/** Plain decimal number (optionally signed / fractional); no exponents, no units. */
+/**
+ * Plain decimal number (optionally signed / fractional); no exponents, no units. A dot needs a
+ * digit after it (CSS drops `5.`), like `parse_num` in crates/decks-packs.
+ */
 function parseNum(s) {
     const body = s.startsWith("-") ? s.slice(1) : s;
-    if (!body || body.length > 12 || !/^[0-9.]+$/.test(body) || (body.match(/\./g) ?? []).length > 1 || body === ".") return null;
+    if (!body || body.length > 12 || !/^[0-9.]+$/.test(body) || (body.match(/\./g) ?? []).length > 1 || body.endsWith(".")) return null;
     const v = Number(s);
     return Number.isFinite(v) ? v : null;
 }
@@ -24,6 +27,14 @@ function parseNumPct(s, scale) {
     return parseNum(s);
 }
 
+/**
+ * Unicode White_Space, the set Rust's `split_whitespace` / `trim` use (pack.rs valid_color). JS `\s`
+ * differs in both directions: it has U+FEFF (not White_Space) and lacks U+0085 (White_Space).
+ */
+const WS = "\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const WS_SPLIT = new RegExp(`[${WS}]+`);
+const WS_TRIM = new RegExp(`^[${WS}]+|[${WS}]+$`, "g");
+
 /** `#rrggbb`, `#rrggbbaa`, `oklch(L C H)` or `oklch(L C H / A)`. Nothing else. */
 export function validColor(c) {
     if (typeof c !== "string") return false;
@@ -32,8 +43,8 @@ export function validColor(c) {
     const inner = c.slice(6, -1);
     const slash = inner.indexOf("/");
     const lch = slash < 0 ? inner : inner.slice(0, slash);
-    const alpha = slash < 0 ? null : inner.slice(slash + 1).trim();
-    const parts = lch.split(/\s+/).filter(Boolean);
+    const alpha = slash < 0 ? null : inner.slice(slash + 1).replace(WS_TRIM, "");
+    const parts = lch.split(WS_SPLIT).filter(Boolean);
     if (parts.length !== 3) return false;
     const l = parseNumPct(parts[0], 1);
     const ch = parseNum(parts[1]);

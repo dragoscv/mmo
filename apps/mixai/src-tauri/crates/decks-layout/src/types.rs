@@ -17,9 +17,10 @@ pub enum PanelId {
     Automix,
     Sampler,
     Plugins,
+    Waves,
 }
 
-pub const PANEL_IDS: [PanelId; 11] = [
+pub const PANEL_IDS: [PanelId; 12] = [
     PanelId::DeckA,
     PanelId::DeckB,
     PanelId::DeckC,
@@ -31,6 +32,7 @@ pub const PANEL_IDS: [PanelId; 11] = [
     PanelId::Automix,
     PanelId::Sampler,
     PanelId::Plugins,
+    PanelId::Waves,
 ];
 
 impl PanelId {
@@ -48,6 +50,7 @@ impl PanelId {
             PanelId::Automix => "automix",
             PanelId::Sampler => "sampler",
             PanelId::Plugins => "plugins",
+            PanelId::Waves => "waves",
         }
     }
 

@@ -10,12 +10,14 @@
  */
 import { useMemo } from "react";
 import { create } from "zustand";
-import { BUILTIN_LAYOUTS, CLASSIC } from "./presets.ts";
+import { BUILTIN_LAYOUTS, CLASSIC, DEFAULT_LAYOUT } from "./presets.ts";
 import { validateLayout } from "./solver.ts";
 import { PANEL_IDS, type LayoutDoc } from "./types.ts";
 import { remapLegacyRef } from "../packs/pack-layouts.ts";
 
 const KEY = "mixai-layout";
+/** Set once the 1.5 default-layout migration ran (see `migrateDefaultLayout`). */
+const MIGRATED_KEY = "mixai-layout-v2";
 
 export interface PersistedLayout {
     activeId: string;
@@ -24,7 +26,16 @@ export interface PersistedLayout {
     controllerLayouts: Record<string, string>; // device name -> layout id
 }
 
-const EMPTY: PersistedLayout = { activeId: CLASSIC.id, user: [], snapshots: {}, controllerLayouts: {} };
+const EMPTY: PersistedLayout = { activeId: DEFAULT_LAYOUT.id, user: [], snapshots: {}, controllerLayouts: {} };
+
+/**
+ * Decks 1.5 changed the default layout from Classic to Pro. An install that is still on the
+ * old default moves once (`migrated` false); any other choice is kept. Pure for tests.
+ */
+export function migrateDefaultLayout(s: PersistedLayout, migrated: boolean): PersistedLayout {
+    if (migrated || s.activeId !== CLASSIC.id) return s;
+    return { ...s, activeId: DEFAULT_LAYOUT.id };
+}
 
 /** Parse a persisted/imported blob; invalid user layouts are dropped. */
 export function parseLayoutState(raw: unknown): PersistedLayout {
@@ -36,7 +47,7 @@ export function parseLayoutState(raw: unknown): PersistedLayout {
             ? Object.fromEntries(Object.entries(m as Record<string, unknown>).filter(([, v]) => typeof v === "string")) as Record<string, string>
             : {};
     return {
-        activeId: typeof r.activeId === "string" ? r.activeId : CLASSIC.id,
+        activeId: typeof r.activeId === "string" ? r.activeId : DEFAULT_LAYOUT.id,
         user,
         snapshots: strMap(r.snapshots),
         controllerLayouts: strMap(r.controllerLayouts),
@@ -45,7 +56,13 @@ export function parseLayoutState(raw: unknown): PersistedLayout {
 
 function load(): PersistedLayout {
     try {
-        return parseLayoutState(JSON.parse(localStorage.getItem(KEY) ?? "null"));
+        const raw = localStorage.getItem(KEY);
+        const parsed = parseLayoutState(JSON.parse(raw ?? "null"));
+        const migrated = localStorage.getItem(MIGRATED_KEY) !== null;
+        if (!migrated) localStorage.setItem(MIGRATED_KEY, "1");
+        const next = migrateDefaultLayout(parsed, migrated);
+        if (next !== parsed) save(next);
+        return next;
     } catch {
         return { ...EMPTY };
     }
@@ -73,7 +90,11 @@ interface LayoutStore extends PersistedLayout {
     packLayouts: LayoutDoc[];
     all: () => LayoutDoc[];
     active: () => LayoutDoc;
-    setActive: (id: string) => void;
+    /**
+     * Switch layout. `persist: false` = show it without saving (a preview, e.g. the skin
+     * editor): storage keeps the user's layout, so a reload during the preview comes back to it.
+     */
+    setActive: (id: string, opts?: { persist?: boolean }) => void;
     saveUser: (l: LayoutDoc) => string[];
     removeUser: (id: string) => void;
     setSnapshot: (slot: string, id: string | null) => void;
@@ -85,17 +106,30 @@ interface LayoutStore extends PersistedLayout {
 }
 
 export const useLayoutStore = create<LayoutStore>((set, get) => {
+    /** The saved layout id while a preview shows another one (null = no preview). */
+    let held: string | null = null;
     const commit = (patch: Partial<PersistedLayout>) => {
+        // A layout chosen for real (picker, import, removed layout) ends any preview.
+        if (patch.activeId !== undefined) held = null;
         set(patch);
         const { activeId, user, snapshots, controllerLayouts } = get();
-        save({ activeId, user, snapshots, controllerLayouts });
+        save({ activeId: held ?? activeId, user, snapshots, controllerLayouts });
     };
     return {
         ...load(),
         packLayouts: [],
         all: () => [...BUILTIN_LAYOUTS, ...get().user, ...get().packLayouts],
-        active: () => get().all().find((l) => l.id === get().activeId) ?? CLASSIC,
-        setActive: (activeId) => commit({ activeId }),
+        active: () => get().all().find((l) => l.id === get().activeId) ?? DEFAULT_LAYOUT,
+        setActive: (activeId, opts) => {
+            if (opts?.persist === false) {
+                held ??= get().activeId;
+                // Back on the saved layout: nothing is held any more.
+                if (held === activeId) held = null;
+                set({ activeId });
+                return;
+            }
+            commit({ activeId });
+        },
         saveUser: (l) => {
             const errs = validateLayout(l, PANEL_IDS);
             if (errs.length) return errs;
@@ -103,7 +137,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
             commit({ user: [...get().user.filter((u) => u.id !== l.id), l] });
             return [];
         },
-        removeUser: (id) => commit({ user: get().user.filter((u) => u.id !== id), activeId: get().activeId === id ? CLASSIC.id : get().activeId }),
+        removeUser: (id) => commit({ user: get().user.filter((u) => u.id !== id), ...(get().activeId === id ? { activeId: DEFAULT_LAYOUT.id } : {}) }),
         setSnapshot: (slot, id) => {
             const snapshots = { ...get().snapshots };
             if (id) snapshots[slot] = id;
@@ -127,7 +161,8 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         restore: (s) => commit(remapRefs(parseLayoutState(s), get().packLayouts)),
         snapshot: () => {
             const { activeId, user, snapshots, controllerLayouts } = get();
-            return { activeId, user, snapshots, controllerLayouts };
+            // A preview is not the user's choice: exports and the cloud profile get the saved layout.
+            return { activeId: held ?? activeId, user, snapshots, controllerLayouts };
         },
     };
 });

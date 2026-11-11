@@ -73,7 +73,11 @@
     <string name="decks_shortcuts" formatted="false">Keys: Space/Enter play A/B · Q/W cue · 1–4 / 7–0 hot cues · S/K sync · ↑↓ browse · ←/→ load · Ctrl+K skin</string>
     <string name="decks_skin" formatted="false">Skin: %1</string>
     <string name="decks_skin_next" formatted="false">Next skin</string>
-    <string name="decks_skin_nocturne" formatted="false">Nocturne</string>
+    <string name="decks_skin_signature" formatted="false">MixAI Signature</string>
+    <string name="decks_skin_glass_classic" formatted="false">Glass (classic)</string>
+    <string name="decks_skin_mainroom" formatted="false">Mainroom</string>
+    <string name="decks_skin_crate" formatted="false">Crate</string>
+    <string name="decks_skin_pilot" formatted="false">Pilot</string>
     <string name="decks_skin_club" formatted="false">Club</string>
     <string name="decks_skin_booth" formatted="false">Booth (high contrast)</string>
     <string name="decks_skin_studio" formatted="false">Studio (light)</string>
@@ -148,10 +152,13 @@
     <string name="decks_panel_automix" formatted="false">Automix</string>
     <string name="decks_panel_sampler" formatted="false">Sampler</string>
     <string name="decks_panel_plugins" formatted="false">Plugins</string>
+    <string name="decks_panel_waves" formatted="false">Waveforms</string>
     <string name="decks_panel_unavailable" formatted="false">%1 is not available in this app yet.</string>
     <string name="decks_dock_tab" formatted="false">Show %1</string>
     <string name="decks_layout" formatted="false">Layout: %1</string>
     <string name="decks_layout_next" formatted="false">Next layout</string>
+    <string name="decks_layout_pro" formatted="false">Pro</string>
+    <string name="decks_layout_pro_vertical" formatted="false">Vertical waves</string>
     <string name="decks_layout_classic" formatted="false">Classic</string>
     <string name="decks_layout_performance" formatted="false">Performance</string>
     <string name="decks_layout_library" formatted="false">Library</string>

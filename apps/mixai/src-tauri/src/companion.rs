@@ -53,6 +53,31 @@ fn http() -> Result<reqwest::Client, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Largest peaks sidecar handed to the webview (the real one is ~8 kB).
+const MAX_PEAKS_BYTES: usize = 1 << 20;
+
+/// Read a response body of at most `max` bytes. A larger body is refused with `too_large`
+/// before it is in memory: on the declared `Content-Length` when there is one, else as soon as
+/// the chunks read so far pass the cap (the rest is never read; dropping the response closes
+/// the connection).
+async fn read_capped(
+    mut resp: reqwest::Response,
+    max: usize,
+    too_large: &str,
+) -> Result<Vec<u8>, String> {
+    if resp.content_length().is_some_and(|n| n > max as u64) {
+        return Err(too_large.into());
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        if chunk.len() > max - body.len() {
+            return Err(too_large.into());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
+}
+
 // ─── Health / status ──────────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -148,6 +173,12 @@ pub struct LibraryTrack {
     pub rating: Option<i64>,
     /// Stem separation status: "queued" | "processing" | "ready" | "error" | null.
     pub stems_status: Option<String>,
+    /// Analysed energy 1..10.
+    pub energy: Option<i64>,
+    pub album: Option<String>,
+    pub year: Option<i64>,
+    /// ISO timestamp the track entered the library.
+    pub added_at: Option<String>,
 }
 
 /// The companion returns rows with camelCase keys (Drizzle column names map to
@@ -171,6 +202,14 @@ struct RawTrack {
     rating: Option<i64>,
     #[serde(alias = "stems_status")]
     stems_status: Option<String>,
+    #[serde(default)]
+    energy: Option<i64>,
+    #[serde(default)]
+    album: Option<String>,
+    #[serde(default)]
+    year: Option<i64>,
+    #[serde(default, alias = "added_at")]
+    added_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -252,12 +291,54 @@ pub async fn companion_tracks(
                 is_favorite: t.is_favorite,
                 rating: t.rating,
                 stems_status: t.stems_status,
+                energy: t.energy,
+                album: t.album,
+                year: t.year,
+                added_at: t.added_at,
             })
             .collect(),
         total: parsed.total,
         page: parsed.page,
         total_pages: parsed.total_pages,
     })
+}
+
+/// Overview waveform of a library track for the library's preview column: the analyzer's peaks
+/// sidecar as raw bytes (Int16 LE, interleaved `[min, max]` pairs, ~2000 pairs). Empty = the
+/// track has no peaks yet (not analysed).
+#[tauri::command]
+pub async fn companion_track_peaks(
+    id: i64,
+    state: tauri::State<'_, CompanionState>,
+) -> Result<tauri::ipc::Response, String> {
+    let (base, token, user) = {
+        let cfg = state.0.lock().unwrap();
+        if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
+            return Err("Companion not configured".into());
+        }
+        (
+            cfg.base().to_string(),
+            cfg.device_token.clone(),
+            cfg.user_id.clone(),
+        )
+    };
+    let resp = http()?
+        .get(format!("{base}/library/tracks/{id}/peaks"))
+        .header("X-Device-Token", token)
+        .header("X-User-Id", user)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(tauri::ipc::Response::new(Vec::new()));
+    }
+    if !resp.status().is_success() {
+        return Err(format!("companion {}", resp.status()));
+    }
+    // The sidecar is ~8 kB; refuse anything absurd instead of buffering it for the webview.
+    read_capped(resp, MAX_PEAKS_BYTES, "peaks sidecar too large")
+        .await
+        .map(tauri::ipc::Response::new)
 }
 
 /// Toggle a track's favorite flag on the companion.
@@ -330,6 +411,25 @@ struct RawTrackDetail {
     stems_melody_path: Option<String>,
 }
 
+/// `GET /library/tracks/{id}` answers `{ "track": row }` (server/src/library/routes.ts). Reading
+/// the row at the top level made every remote load fail with "track has no filepath" and every
+/// stem lookup come back empty. Both shapes are accepted so an older companion still works.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum TrackDetailResp {
+    Wrapped { track: RawTrackDetail },
+    Bare(RawTrackDetail),
+}
+
+impl TrackDetailResp {
+    fn into_detail(self) -> RawTrackDetail {
+        match self {
+            TrackDetailResp::Wrapped { track } => track,
+            TrackDetailResp::Bare(t) => t,
+        }
+    }
+}
+
 /// Fetch a single track's stem paths + status from the companion.
 #[tauri::command]
 pub async fn companion_track_stems(
@@ -360,7 +460,11 @@ pub async fn companion_track_stems(
         let body = resp.text().await.unwrap_or_default();
         return Err(format!("companion {status}: {body}"));
     }
-    let t: RawTrackDetail = resp.json().await.map_err(|e| e.to_string())?;
+    let t = resp
+        .json::<TrackDetailResp>()
+        .await
+        .map_err(|e| e.to_string())?
+        .into_detail();
     Ok(TrackStems {
         status: t.stems_status,
         model: t.stems_model,
@@ -614,16 +718,17 @@ pub async fn fetch_track_audio(
 
     // First resolve the track's filepath (the /audio route is keyed by path).
     let meta_client = http()?;
-    let detail: RawTrackDetail = meta_client
+    let detail = meta_client
         .get(format!("{base}/library/tracks/{id}"))
         .header("X-Device-Token", &token)
         .header("X-User-Id", &user)
         .send()
         .await
         .map_err(|e| e.to_string())?
-        .json()
+        .json::<TrackDetailResp>()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .into_detail();
     let filepath = detail
         .filepath
         .ok_or_else(|| "track has no filepath".to_string())?;
@@ -670,4 +775,156 @@ fn urlencoding_encode(s: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::thread::JoinHandle;
+
+    /// One-connection HTTP server on loopback: reads the request head, then lets `respond`
+    /// write whatever it wants. Returns the URL and the thread (joins to `respond`'s result).
+    fn serve_once<T: Send + 'static>(
+        respond: impl FnOnce(&mut TcpStream) -> T + Send + 'static,
+    ) -> (String, JoinHandle<T>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/peaks", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            let (mut sock, _) = listener.accept().unwrap();
+            sock.set_read_timeout(Some(Duration::from_secs(10)))
+                .unwrap();
+            sock.set_write_timeout(Some(Duration::from_secs(10)))
+                .unwrap();
+            let mut head = Vec::new();
+            let mut byte = [0u8; 1];
+            while !head.ends_with(b"\r\n\r\n") && sock.read(&mut byte).unwrap_or(0) == 1 {
+                head.push(byte[0]);
+            }
+            respond(&mut sock)
+        });
+        (url, handle)
+    }
+
+    /// GET `url` and read the body through [`read_capped`] with a `max`-byte cap.
+    fn fetch_capped(url: &str, max: usize) -> Result<Vec<u8>, String> {
+        let url = url.to_owned();
+        tauri::async_runtime::block_on(async move {
+            let client = reqwest::Client::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .unwrap();
+            let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+            read_capped(resp, max, "peaks sidecar too large").await
+        })
+    }
+
+    #[test]
+    fn capped_read_returns_a_body_within_the_cap() {
+        let (url, server) = serve_once(|s| {
+            s.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\n12345678",
+            )
+            .unwrap();
+        });
+        // Exactly at the cap is fine.
+        assert_eq!(fetch_capped(&url, 8).unwrap(), b"12345678");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn capped_read_refuses_a_declared_length_before_reading_the_body() {
+        // The server announces 2 MB and never sends a byte of it: the refusal has to come from
+        // the header alone. It then waits for the client to hang up (a read timeout = it did not).
+        let (url, server) = serve_once(|s| {
+            s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2000000\r\n\r\n")
+                .unwrap();
+            let mut rest = [0u8; 64];
+            match s.read(&mut rest) {
+                Ok(n) => n == 0,
+                Err(e) => !matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ),
+            }
+        });
+        let started = std::time::Instant::now();
+        assert_eq!(
+            fetch_capped(&url, MAX_PEAKS_BYTES).unwrap_err(),
+            "peaks sidecar too large"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "waited for the body"
+        );
+        assert!(server.join().unwrap(), "client kept the connection open");
+    }
+
+    #[test]
+    fn capped_read_stops_a_chunked_body_at_the_cap() {
+        // No Content-Length: 64 MB offered in 64 kB chunks. With a 4 kB cap the read stops at
+        // once and the connection is dropped, so the server cannot push the whole body out.
+        const CHUNK: usize = 64 * 1024;
+        const CHUNKS: usize = 1024;
+        let (url, server) = serve_once(|s| {
+            if s.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n")
+                .is_err()
+            {
+                return 0;
+            }
+            let mut frame = format!("{CHUNK:x}\r\n").into_bytes();
+            frame.resize(frame.len() + CHUNK, 0);
+            frame.extend_from_slice(b"\r\n");
+            let mut sent = 0usize;
+            for _ in 0..CHUNKS {
+                if s.write_all(&frame).is_err() {
+                    break;
+                }
+                sent += 1;
+            }
+            sent
+        });
+        assert_eq!(
+            fetch_capped(&url, 4096).unwrap_err(),
+            "peaks sidecar too large"
+        );
+        let sent = server.join().unwrap();
+        assert!(sent < CHUNKS / 2, "server pushed {sent} of {CHUNKS} chunks");
+    }
+
+    #[test]
+    fn track_detail_accepts_the_wrapped_and_the_bare_row() {
+        // What the companion answers today: `{ "track": row }` (server/src/library/routes.ts).
+        let wrapped: TrackDetailResp = serde_json::from_str(
+            r#"{"track":{"id":7,"filepath":"D:\\Music\\a.flac","stemsStatus":"ready",
+                "stemsModel":"htdemucs","stemsVocalsPath":"D:\\stems\\7\\vocals.wav",
+                "stemsDrumsPath":null,"bpm":128.0}}"#,
+        )
+        .unwrap();
+        assert!(matches!(wrapped, TrackDetailResp::Wrapped { .. }));
+        let t = wrapped.into_detail();
+        assert_eq!(t.filepath.as_deref(), Some("D:\\Music\\a.flac"));
+        assert_eq!(t.stems_status.as_deref(), Some("ready"));
+        assert_eq!(t.stems_model.as_deref(), Some("htdemucs"));
+        assert_eq!(
+            t.stems_vocals_path.as_deref(),
+            Some("D:\\stems\\7\\vocals.wav")
+        );
+        assert_eq!(t.stems_drums_path, None);
+        assert_eq!(t.stems_bass_path, None);
+        // An older companion: the row at the top level (snake_case aliases included).
+        let bare: TrackDetailResp = serde_json::from_str(
+            r#"{"id":7,"filepath":"/music/a.flac","stems_status":"queued",
+                "stems_melody_path":"/stems/7/other.wav"}"#,
+        )
+        .unwrap();
+        assert!(matches!(bare, TrackDetailResp::Bare(_)));
+        let t = bare.into_detail();
+        assert_eq!(t.filepath.as_deref(), Some("/music/a.flac"));
+        assert_eq!(t.stems_status.as_deref(), Some("queued"));
+        assert_eq!(t.stems_melody_path.as_deref(), Some("/stems/7/other.wav"));
+        assert_eq!(t.stems_vocals_path, None);
+    }
 }

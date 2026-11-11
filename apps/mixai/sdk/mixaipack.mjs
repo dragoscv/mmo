@@ -2,7 +2,7 @@
 // MixAI Decks Skin SDK — `.mixaipack` CLI. Zero dependencies (Node 24+).
 // Format: docs/decks/packs.md · Rust verifier: apps/mixai/src-tauri/src/pack.rs.
 //
-//   node apps/mixai/sdk/mixaipack.mjs init <dir> --kind skin|layout|bundle --id <id> --name <name>
+//   node apps/mixai/sdk/mixaipack.mjs init <dir> --kind skin|layout|bundle --id <id> --name <name> [--style]
 //   node apps/mixai/sdk/mixaipack.mjs validate <dir|file.mixaipack> [--allow-low-contrast]
 //   node apps/mixai/sdk/mixaipack.mjs import-dtcg <tokens.json> <dir>
 //   node apps/mixai/sdk/mixaipack.mjs preview <dir>
@@ -16,11 +16,13 @@ import { buildCatalog, buildPack } from "./lib/pack.mjs";
 import { renderPreview } from "./lib/png.mjs";
 import { loadSeedFile, sha256Hex } from "./lib/sign.mjs";
 import { readPackDir, validPackId, validatePath } from "./lib/validate.mjs";
+import { IMAGE_EXT, entryNameError, extOf } from "./lib/zip.mjs";
 
 const USAGE = `mixaipack — MixAI Decks Skin SDK
 
 Commands:
-  init <dir> --kind skin|layout|bundle --id <id> --name <name> [--author <a>]
+    init <dir> --kind skin|layout|bundle --id <id> --name <name> [--author <a>] [--style]
+                                                                            --style: manifest v2 with a starter "style" block (needs Decks 1.5+)
   validate <dir|file.mixaipack> [--allow-low-contrast]
   import-dtcg <figma-tokens.json> <dir>
   preview <dir>                       (re)generate assets/preview.png from the palette/layout
@@ -37,7 +39,7 @@ export function parseArgs(argv) {
         else if (a.startsWith("--")) {
             const k = a.slice(2);
             const next = argv[i + 1];
-            if (["allow-low-contrast", "embed-pubkey", "help"].includes(k)) flags[k] = true;
+            if (["allow-low-contrast", "embed-pubkey", "help", "style"].includes(k)) flags[k] = true;
             else { flags[k] = next; i++; }
         } else pos.push(a);
     }
@@ -60,11 +62,13 @@ function printResult(res, label, log) {
 function cmdInit({ pos, flags }, log) {
     const dir = pos[0];
     const kind = flags.kind;
-    if (!dir || !["skin", "layout", "bundle"].includes(kind) || !flags.id || !flags.name) throw new Error("usage: init <dir> --kind skin|layout|bundle --id <id> --name <name>");
+    if (!dir || !["skin", "layout", "bundle"].includes(kind) || !flags.id || !flags.name) throw new Error("usage: init <dir> --kind skin|layout|bundle --id <id> --name <name> [--style]");
     if (!validPackId(flags.id)) throw new Error(`--id '${flags.id}' must look like 'com.you.skin.name' (lowercase, dots)`);
+    if (flags.style && kind === "layout") throw new Error("--style needs tokens: use --kind skin or --kind bundle");
     if (existsSync(join(dir, "manifest.json"))) throw new Error(`${dir} already has a manifest.json`);
     const manifest = {
-        v: 1,
+        // v2 only when the pack uses a style block: a v1 pack installs on every Decks version.
+        v: flags.style ? 2 : 1,
         id: flags.id,
         name: flags.name,
         version: "1.0.0",
@@ -86,7 +90,16 @@ function cmdInit({ pos, flags }, log) {
     };
     if (kind !== "layout") {
         manifest.tokens = "tokens.json";
-        writeJson(join(dir, "tokens.json"), { mode: "dark", surface: "glass", radius: "md", colors });
+        const tokens = { mode: "dark", surface: "glass", radius: "md", colors };
+        if (flags.style) {
+            tokens.style = {
+                look: "signature",
+                waves: "stacked",
+                colors: { on: "oklch(0.8 0.2 150)", waveLow: "oklch(0.6 0.2 250)", waveMid: "oklch(0.75 0.17 160)", waveHigh: "oklch(0.95 0.02 270)" },
+                sizes: { panelGap: 6, panelRadius: 8, controlRadius: 6 },
+            };
+        }
+        writeJson(join(dir, "tokens.json"), tokens);
     }
     let layout = null;
     if (kind !== "skin") {
@@ -159,6 +172,11 @@ function cmdPreview({ pos }, log) {
     for (const [k, v] of Object.entries(tokens.decks ?? {})) colors[`deck-${k}`] = v;
     const layout = m.layouts?.[0] ? JSON.parse(readFileSync(join(dir, m.layouts[0]), "utf8")) : null;
     const out = m.preview ?? "assets/preview.png";
+    // `preview` comes from the folder's manifest: it must be a pack entry name (no '..', no absolute path, no
+    // drive), or this command would write a PNG outside the folder.
+    const bad = typeof out !== "string" ? "manifest.preview must be a string" : entryNameError(out);
+    if (bad) throw new Error(bad);
+    if (!IMAGE_EXT.includes(extOf(out))) throw new Error(`manifest.preview '${out}' must be one of: ${IMAGE_EXT.join(", ")}`);
     mkdirSync(dirname(join(dir, out)), { recursive: true });
     writeFileSync(join(dir, out), renderPreview(colors, layout));
     if (!m.preview) { m.preview = out; writeJson(join(dir, "manifest.json"), m); }

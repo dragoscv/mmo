@@ -3,65 +3,101 @@
  * deltas, feeds the pure governor, writes `data-motion-governor` on <html> and
  * shows fps (only when the user enabled the HUD in Settings → Appearance, or the
  * governor is currently reducing animations).
+ *
+ * Idle is free:
+ * - the frame loop runs only while someone needs it: the HUD is on, or the governor is on
+ *   AND a deck is playing (nothing animates with every deck stopped, so there is no frame
+ *   budget to protect); it also stops while the window is hidden;
+ * - no React state per frame: the fps text is written straight into its text node, at most
+ *   twice a second and only when the number changed. React renders only when the governor
+ *   switches between normal and reduced.
  */
-import { useEffect, useState } from "react";
-import { Gauge } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Gauge, TriangleAlert } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mmo/ui";
+import { useMixerStore } from "@/state/mixer-store";
 import { fpsOf, initialGovernor, stepGovernor } from "./governor";
 import { useShellPrefs } from "./shell-prefs";
 import { useT } from "@/i18n";
+
+/** The window is visible (a hidden window gets no frames: nothing to measure). */
+function useVisible(): boolean {
+    const [visible, setVisible] = useState(() => typeof document === "undefined" || !document.hidden);
+    useEffect(() => {
+        const on = () => setVisible(!document.hidden);
+        document.addEventListener("visibilitychange", on);
+        return () => document.removeEventListener("visibilitychange", on);
+    }, []);
+    return visible;
+}
 
 export function PerfHud() {
     const t = useT();
     const showHud = useShellPrefs((s) => s.hud);
     const governor = useShellPrefs((s) => s.governor);
-    const [view, setView] = useState({ fps: 60, reduced: false });
+    // A boolean: the 30 Hz engine snapshots re-render this only when playback starts or stops.
+    const playing = useMixerStore((s) => s.decks.some((d) => d.playing));
+    const visible = useVisible();
+    const [reduced, setReduced] = useState(false);
+    const fpsRef = useRef<HTMLSpanElement>(null);
+    const tRef = useRef(t);
+    tRef.current = t;
+
+    const needed = visible && (showHud || (governor && playing));
 
     useEffect(() => {
-        // Nothing to measure when the HUD is hidden and the governor is off.
-        if (!governor && !showHud) return;
+        if (!needed) return;
         let s = initialGovernor;
         let last = performance.now();
         let raf = 0;
-        let lastPaint = 0;
+        let lastText = 0;
+        let shownFps = -1;
+        let shownReduced = false;
         const root = document.documentElement;
         const loop = (now: number) => {
             s = stepGovernor(s, now - last);
             last = now;
-            const reduced = governor && s.reduced;
-            if ((root.dataset.motionGovernor === "reduced") !== reduced) {
-                if (reduced) root.dataset.motionGovernor = "reduced";
+            const nowReduced = governor && s.reduced;
+            if (nowReduced !== shownReduced) {
+                shownReduced = nowReduced;
+                if (nowReduced) root.dataset.motionGovernor = "reduced";
                 else delete root.dataset.motionGovernor;
+                setReduced(nowReduced);
             }
-            // Update the HUD text at most twice a second.
-            if (now - lastPaint > 500) {
-                lastPaint = now;
-                setView((v) => (v.fps === fpsOf(s.avgMs) && v.reduced === reduced ? v : { fps: fpsOf(s.avgMs), reduced }));
+            // The HUD text: at most twice a second, written without React.
+            if (now - lastText > 500) {
+                lastText = now;
+                const fps = fpsOf(s.avgMs);
+                const el = fpsRef.current;
+                if (el && fps !== shownFps) {
+                    shownFps = fps;
+                    el.textContent = tRef.current("shell.hudFps", { fps });
+                }
             }
             raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
         return () => {
             cancelAnimationFrame(raf);
+            // Nothing is measured from here on: do not leave the app in reduced motion.
             delete root.dataset.motionGovernor;
+            setReduced(false);
         };
-    }, [governor, showHud]);
+    }, [needed, governor]);
 
-    if (!showHud && !view.reduced) return null;
+    if (!showHud && !reduced) return null;
+    const Icon = reduced ? TriangleAlert : Gauge;
     return (
         <Tooltip>
             <TooltipTrigger
                 render={
-                    <span
-                        className={"mono inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] " + (view.reduced ? "bg-warning/20 text-warning" : "text-muted-foreground")}
-                        aria-label={t("shell.hud")}
-                    >
-                        <Gauge className="size-3" aria-hidden />
-                        {t("shell.hudFps", { fps: view.fps })}
+                    <span className="tb-hud dk-num dk-num-sm" data-reduced={reduced} aria-label={reduced ? t("shell.hudReduced") : t("shell.hud")}>
+                        <Icon aria-hidden />
+                        <span ref={fpsRef}>{t("shell.hudFps", { fps: "–" })}</span>
                     </span>
                 }
             />
-            <TooltipContent>{view.reduced ? t("shell.hudReduced") : t("shell.hud")}</TooltipContent>
+            <TooltipContent>{reduced ? t("shell.hudReduced") : t("shell.hud")}</TooltipContent>
         </Tooltip>
     );
 }

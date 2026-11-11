@@ -58,9 +58,30 @@ object DecksColors {
      * every skin; only an installed skin pack may set them explicitly (`deck-a..deck-d`).
      */
     val decks: List<Color> get() = palette.decks
-    val waveLow get() = palette.waveLow
-    val waveMid get() = palette.waveMid
-    val waveHigh get() = palette.waveHigh
+
+    // Look roles (Decks 1.5, look.css): wells, waveform backdrop, micro labels, ON, CUE, alert.
+    val well get() = palette.well
+    val waveBg get() = palette.waveBg
+    val faint get() = palette.faint
+    val on get() = palette.on
+    val onFg get() = palette.onFg
+    val cueButton get() = palette.cueButton
+    val alert get() = palette.alert
+    val waveGrid get() = palette.waveGrid
+    val waveDownbeat get() = palette.waveDownbeat
+    val wavePlayhead get() = palette.wavePlayhead
+    val wavePlayedAlpha get() = palette.wavePlayedAlpha
+
+    /** Waveform band colours of deck [i] (Signature: three tones of the deck colour). */
+    fun waveLow(i: Int): Color = palette.waveLow(i)
+    fun waveMid(i: Int): Color = palette.waveMid(i)
+    fun waveHigh(i: Int): Color = palette.waveHigh(i)
+
+    /** PLAY colour of deck [i]: the deck colour unless the skin fixes one. */
+    fun play(i: Int): Color = palette.play(i)
+
+    /** Hot cue colour of [slot] (0-based, 8 colours). */
+    fun cue(slot: Int): Color = palette.cues[slot.mod(palette.cues.size)]
 
     fun deck(i: Int): Color = decks[i.coerceIn(0, decks.lastIndex)]
 
@@ -90,7 +111,7 @@ data class DecksType(
 )
 
 fun decksType(scale: Float = 1f) = DecksType(
-    label = TextStyle(color = DecksColors.muted, fontSize = (11 * scale).sp, fontWeight = FontWeight.Medium, letterSpacing = 0.6.sp),
+    label = TextStyle(color = DecksColors.faint, fontSize = (11 * scale).sp, fontWeight = FontWeight.Medium, letterSpacing = 0.6.sp),
     small = TextStyle(color = DecksColors.foreground, fontSize = (12 * scale).sp),
     body = TextStyle(color = DecksColors.foreground, fontSize = (14 * scale).sp),
     title = TextStyle(color = DecksColors.foreground, fontSize = (16 * scale).sp, fontWeight = FontWeight.SemiBold),
@@ -105,9 +126,9 @@ val LocalReducedMotion = staticCompositionLocalOf { false }
 /** Active skin geometry (corner radius, control height, layout). */
 val LocalDecksSkin = staticCompositionLocalOf { DecksSkin.default }
 
-/** Control / panel shapes from the skin radius (controls use the smaller radius). */
-fun controlShape(skin: DecksSkin) = RoundedCornerShape((skin.radiusDp * 0.8f).dp)
-fun panelShape(skin: DecksSkin) = RoundedCornerShape((skin.radiusDp * 1.2f).dp)
+/** Control / panel shapes of the skin's look (Signature: 3 dp / 2 dp; classic: from the token radius). */
+fun controlShape(skin: DecksSkin) = RoundedCornerShape(skin.controlRadiusDp.dp)
+fun panelShape(skin: DecksSkin) = RoundedCornerShape(skin.panelRadiusDp.dp)
 
 @Composable
 fun DecksTheme(

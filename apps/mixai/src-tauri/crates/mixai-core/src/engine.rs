@@ -29,7 +29,7 @@ use crate::dsp::{crossfader_gain, soft_clip};
 use crate::error::CoreError;
 use crate::output::{self, BufferChoice, OutputInfo};
 use crate::routing::{CompDelay, RoutingConfig, write_frame};
-use crate::state::{AudioDevice, CrossfaderAssign, DeckId, MixerState};
+use crate::state::{AudioDevice, CrossfaderAssign, CrossfaderCurve, DeckId, MixerState};
 
 /// Where the master clock comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -125,6 +125,10 @@ pub enum Command {
     Filter(DeckId, f32),
     Cue(DeckId, bool),
     Crossfader(f32),
+    /// Crossfader gain law (linear / smooth = equal power / sharp = cut).
+    CrossfaderCurve(CrossfaderCurve),
+    /// Which crossfader side a deck sits on (`Thru` bypasses the crossfader).
+    CrossfaderAssign(DeckId, CrossfaderAssign),
     MasterVolume(f32),
     // Hot cues (slot 0..7).
     SetHotCue(DeckId, usize),
@@ -221,6 +225,12 @@ pub struct Snapshot {
     pub deck_slip_pos: [AtomicU64; 4],
     /// Frames in the last audio callback (0 = no callback yet).
     pub buffer_frames: AtomicU32,
+    /// Audio callback load in permille of the buffer period (peak-held, slow decay).
+    pub dsp_load: AtomicU32,
+    /// Callbacks that took longer than their buffer period since the engine started. The
+    /// snapshot belongs to the engine, not to one stream: the count (and the peak-held
+    /// `dsp_load`) carries over an output device switch.
+    pub overruns: AtomicU32,
 }
 
 impl Snapshot {
@@ -236,6 +246,8 @@ impl Snapshot {
             deck_tempo: std::array::from_fn(|_| AtomicU64::new(1f64.to_bits())),
             deck_slip_pos: std::array::from_fn(|_| AtomicU64::new(u64::MAX)),
             buffer_frames: AtomicU32::new(0),
+            dsp_load: AtomicU32::new(0),
+            overruns: AtomicU32::new(0),
             master_vu: AtomicU32::new(0),
             deck_vu: Default::default(),
             deck_pos_ms: Default::default(),
@@ -258,6 +270,8 @@ struct Mixer {
     curve: u8,
     master_vol: crate::dsp::Smoothed,
     master_vu: f32,
+    /// Callback time / buffer period, peak-held (see `Snapshot::dsp_load`).
+    dsp_load: f32,
     // Master clock.
     clock_cfg: ClockSource,
     internal_bpm: f64,
@@ -296,6 +310,7 @@ impl Mixer {
             curve: 1, // smooth
             master_vol: crate::dsp::Smoothed::new(0.85, sr, 15.0),
             master_vu: 0.0,
+            dsp_load: 0.0,
             clock_cfg: ClockSource::Auto,
             internal_bpm: 120.0,
             internal_beat: 0.0,
@@ -361,6 +376,8 @@ impl Mixer {
                 Command::Filter(d, v) => self.decks[d.index()].set_filter(v),
                 Command::Cue(d, on) => self.decks[d.index()].set_cue(on),
                 Command::Crossfader(v) => self.crossfader = v.clamp(-1.0, 1.0),
+                Command::CrossfaderCurve(c) => self.curve = c.law(),
+                Command::CrossfaderAssign(d, a) => self.decks[d.index()].crossfader_assign = a,
                 Command::MasterVolume(v) => self.master_vol.set_target(v.clamp(0.0, 1.5)),
                 Command::SetHotCue(d, slot) => self.decks[d.index()].set_hot_cue(slot),
                 Command::JumpHotCue(d, slot) => {
@@ -555,6 +572,10 @@ impl Mixer {
 
     /// Fill an interleaved output buffer through the routing matrix.
     fn render(&mut self, out: &mut [f32], channels: usize) {
+        // First statement, so draining is timed too: a `Load` drops the previous track buffer
+        // there, which is the work most likely to overrun the period.
+        // Monotonic clock read: no allocation, no lock (QPC / clock_gettime).
+        let started = std::time::Instant::now();
         self.drain_commands();
         if channels == 0 {
             return;
@@ -630,6 +651,23 @@ impl Mixer {
         }
         self.frames_total = self.frames_total.wrapping_add(frames);
         self.publish_snapshot();
+
+        // DSP load: time spent in this callback against the time the buffer lasts.
+        let period = frames as f64 / self.sr.max(1.0) as f64;
+        if period > 0.0 {
+            let load = (started.elapsed().as_secs_f64() / period).min(4.0) as f32;
+            self.dsp_load = if load > self.dsp_load {
+                load
+            } else {
+                self.dsp_load * 0.97 + load * 0.03
+            };
+            self.snapshot
+                .dsp_load
+                .store((self.dsp_load * 1000.0) as u32, Ordering::Relaxed);
+            if load >= 1.0 {
+                self.snapshot.overruns.fetch_add(1, Ordering::Relaxed);
+            }
+        }
     }
 
     fn publish_snapshot(&mut self) {
@@ -1058,6 +1096,18 @@ impl Engine {
         self.send(Command::Trim(deck, db));
     }
 
+    /// Crossfader gain law (linear / smooth = equal power / sharp = cut).
+    pub fn set_crossfader_curve(&self, curve: CrossfaderCurve) {
+        self.mirror().crossfader_curve = curve;
+        self.send(Command::CrossfaderCurve(curve));
+    }
+
+    /// Put a deck on crossfader side A / B, or `Thru` (always at full level, crossfader ignored).
+    pub fn set_crossfader_assign(&self, deck: DeckId, assign: CrossfaderAssign) {
+        self.mirror().decks[deck.index()].crossfader_assign = assign;
+        self.send(Command::CrossfaderAssign(deck, assign));
+    }
+
     /// Slip shadow playhead in seconds while slip is engaged (published by the audio thread).
     pub fn slip_shadow_secs(&self, deck: DeckId) -> Option<f64> {
         let bits = self.snapshot.deck_slip_pos[deck.index()].load(Ordering::Relaxed);
@@ -1390,6 +1440,8 @@ impl Engine {
         state.buffer_frames = self.buffer_frames();
         let s = &self.snapshot;
         state.master_vu = s.master_vu.load(Ordering::Relaxed) as f32 / 1000.0;
+        state.dsp_load = s.dsp_load.load(Ordering::Relaxed) as f32 / 1000.0;
+        state.overruns = s.overruns.load(Ordering::Relaxed);
         for (i, deck) in state.decks.iter_mut().enumerate() {
             deck.vu = s.deck_vu[i].load(Ordering::Relaxed) as f32 / 1000.0;
             deck.position = s.deck_pos_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
@@ -1580,6 +1632,25 @@ mod tests {
     }
 
     #[test]
+    fn command_draining_counts_towards_dsp_load() {
+        // 100 000 queued commands take far longer to drain than the 167 µs an 8-frame buffer
+        // lasts, while rendering 8 frames of empty decks takes a few µs: the callback is an
+        // overrun only when the drain is inside the timed span.
+        let (tx, rx) = bounded::<Command>(100_000);
+        let (rec_tx, _rec_rx) = bounded(4);
+        let mut m = Mixer::new(SR, rx, Arc::new(Snapshot::new()), rec_tx);
+        for _ in 0..100_000 {
+            tx.send(Command::Eq(DeckId::A, "low".to_owned(), 0.0))
+                .unwrap();
+        }
+        let mut out = vec![0.0f32; 16];
+        m.render(&mut out, 2);
+        assert!(tx.is_empty(), "queue drained");
+        assert_eq!(m.snapshot.overruns.load(Ordering::Relaxed), 1);
+        assert!(m.snapshot.dsp_load.load(Ordering::Relaxed) >= 1000);
+    }
+
+    #[test]
     fn split_mono_routes_cue_only_left() {
         let (mut m, tx) = mixer();
         load(&mut m, DeckId::A, 120.0, 0.0);
@@ -1689,6 +1760,121 @@ mod tests {
         // −∞ silences, the ceiling is +12 dB.
         assert_eq!(crate::deck::trim_gain(f32::NEG_INFINITY), 0.0);
         assert!((crate::deck::trim_gain(40.0) - crate::dsp::db_to_lin(12.0)).abs() < 1e-6);
+    }
+
+    /// Master RMS (left) over ~0.2 s after letting ramps settle for ~0.2 s.
+    fn master_rms(m: &mut Mixer) -> f64 {
+        let mut out = vec![0.0f32; 512];
+        let (mut acc, mut n) = (0.0f64, 0usize);
+        for block in 0..80 {
+            m.render(&mut out, 2);
+            if block >= 40 {
+                for fr in out.chunks(2) {
+                    acc += (fr[0] as f64) * (fr[0] as f64);
+                    n += 1;
+                }
+            }
+        }
+        (acc / n as f64).sqrt()
+    }
+
+    /// Deck A alone, playing a steady sine; master low enough that the soft clip is linear.
+    fn sine_on_a() -> (Mixer, Sender<Command>) {
+        let (mut m, tx) = mixer();
+        let deck = &mut m.decks[0];
+        deck.load(sine_track(8.0), (None, None, None, 0.0));
+        deck.set_key_lock(false);
+        deck.play();
+        tx.send(Command::MasterVolume(0.1)).unwrap();
+        (m, tx)
+    }
+
+    #[test]
+    fn crossfader_curve_command_changes_the_gain_law() {
+        let (mut m, tx) = sine_on_a();
+        // Fader three quarters of the way to B: deck A sits at x = 0.25 of its travel.
+        tx.send(Command::Crossfader(0.5)).unwrap();
+        tx.send(Command::CrossfaderCurve(CrossfaderCurve::Linear))
+            .unwrap();
+        let linear = master_rms(&mut m);
+        assert!(linear > 1e-4, "deck A is audible: {linear}");
+        tx.send(Command::CrossfaderCurve(CrossfaderCurve::Smooth))
+            .unwrap();
+        let smooth = master_rms(&mut m);
+        tx.send(Command::CrossfaderCurve(CrossfaderCurve::Sharp))
+            .unwrap();
+        let sharp = master_rms(&mut m);
+        // linear = 0.25, smooth = sin(0.25 · π/2) = 0.3827, sharp = min(4 · 0.25, 1) = 1.
+        let want_smooth = (0.25f64 * std::f64::consts::FRAC_PI_2).sin() / 0.25;
+        assert!(
+            (smooth / linear - want_smooth).abs() < 0.02,
+            "smooth/linear {} (want {want_smooth})",
+            smooth / linear
+        );
+        assert!(
+            (sharp / linear - 4.0).abs() < 0.05,
+            "sharp/linear {}",
+            sharp / linear
+        );
+        // Sharp cuts fully at the far end, like every curve.
+        tx.send(Command::Crossfader(1.0)).unwrap();
+        assert!(master_rms(&mut m) < 1e-6);
+    }
+
+    #[test]
+    fn crossfader_assign_thru_ignores_the_crossfader() {
+        let (mut m, tx) = sine_on_a();
+        // Default side of deck A is A: open at -1, closed at +1.
+        tx.send(Command::Crossfader(-1.0)).unwrap();
+        let open = master_rms(&mut m);
+        assert!(open > 1e-4, "deck A is audible: {open}");
+        tx.send(Command::Crossfader(1.0)).unwrap();
+        assert!(master_rms(&mut m) < 1e-6, "side A is closed at +1");
+        // THRU: full level wherever the crossfader is.
+        tx.send(Command::CrossfaderAssign(DeckId::A, CrossfaderAssign::Thru))
+            .unwrap();
+        for pos in [1.0f32, 0.0, -1.0] {
+            tx.send(Command::Crossfader(pos)).unwrap();
+            let thru = master_rms(&mut m);
+            assert!(
+                (thru / open - 1.0).abs() < 0.01,
+                "thru at {pos}: {thru} vs open {open}"
+            );
+        }
+        // Side B mirrors side A; other decks keep their own side.
+        tx.send(Command::CrossfaderAssign(DeckId::A, CrossfaderAssign::B))
+            .unwrap();
+        tx.send(Command::Crossfader(-1.0)).unwrap();
+        assert!(master_rms(&mut m) < 1e-6, "side B is closed at -1");
+        tx.send(Command::Crossfader(1.0)).unwrap();
+        assert!((master_rms(&mut m) / open - 1.0).abs() < 0.01);
+        assert_eq!(m.decks[1].crossfader_assign, CrossfaderAssign::B);
+    }
+
+    #[test]
+    fn crossfader_wire_names_parse_and_reject_junk() {
+        // Same names as the serde `rename_all = "lowercase"` form the UI receives in the snapshot.
+        for (wire, c) in [
+            ("linear", CrossfaderCurve::Linear),
+            ("smooth", CrossfaderCurve::Smooth),
+            ("sharp", CrossfaderCurve::Sharp),
+        ] {
+            assert_eq!(CrossfaderCurve::parse(wire), Some(c));
+        }
+        for (wire, a) in [
+            ("a", CrossfaderAssign::A),
+            ("thru", CrossfaderAssign::Thru),
+            ("b", CrossfaderAssign::B),
+        ] {
+            assert_eq!(CrossfaderAssign::parse(wire), Some(a));
+        }
+        for junk in ["", "Smooth", "c", "THRU", "linear "] {
+            assert_eq!(CrossfaderCurve::parse(junk), None, "{junk:?}");
+            assert_eq!(CrossfaderAssign::parse(junk), None, "{junk:?}");
+        }
+        // The mixer starts on the law the UI mirror reports.
+        let (m, _tx) = mixer();
+        assert_eq!(m.curve, MixerState::initial(48_000).crossfader_curve.law());
     }
 
     #[test]

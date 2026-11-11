@@ -46,8 +46,8 @@ export function tierLayout(ok: boolean, tier: string, scope: string): (block: st
     return (block) => ({ layout: true, layoutId: `${scope}:${block}`, layoutDependency: tier, transition: { duration: 0.18, ease: "easeOut" } });
 }
 
-export const iconBtn =
-    "inline-flex size-6 min-h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-[var(--bg-elev-2)] text-[var(--fg)] hover:bg-[var(--bg-elev)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] disabled:opacity-40";
+/** 24×24 icon button (look from `dk-btn` in src/look/look.css). */
+export const iconBtn = "dk-btn dk-btn-icon";
 
 /** Popover opened from a 24×24 icon button; holds controls a smaller tier hides. */
 export function MorePopover({
@@ -80,7 +80,7 @@ export function MorePopover({
                 {triggerContent ?? icon ?? <MoreHorizontal size={14} aria-hidden />}
             </PopoverTrigger>
             <PopoverContent side={side} className={cn("grid w-auto max-w-[min(92vw,24rem)] gap-2 p-3", contentClassName)}>
-                <PopoverTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--fg-dim)]">{title ?? label}</PopoverTitle>
+                <PopoverTitle className="dk-label">{title ?? label}</PopoverTitle>
                 {children}
             </PopoverContent>
         </Popover>
@@ -89,5 +89,5 @@ export function MorePopover({
 
 /** Tiny uppercase section label used inside panels. */
 export function PanelLabel({ children, className }: { children: ReactNode; className?: string }) {
-    return <span className={cn("truncate text-[10px] uppercase tracking-[0.12em] text-[var(--fg-dim)]", className)}>{children}</span>;
+    return <span className={cn("dk-label truncate", className)}>{children}</span>;
 }

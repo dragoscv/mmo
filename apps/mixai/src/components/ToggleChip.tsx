@@ -12,40 +12,20 @@ interface ToggleChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 
 /**
  * Small DJ-style button. When `pressed` is given it is a toggle and exposes
- * `aria-pressed`; colours come only from token variables. Focus ring is the
- * global `:focus-visible` outline from @mmo/ui. Never smaller than 24×24 CSS px
- * (WCAG 2.2 2.5.8), so it can sit in the tightest panel tier.
+ * `aria-pressed`; the look comes from the `dk-btn` class (src/look/look.css): in the
+ * Signature look every ON state is the one accent, in the classic look it is `accent`.
+ * Never smaller than 24×24 CSS px (WCAG 2.2 2.5.8), so it can sit in the tightest panel tier.
  */
-export function ToggleChip({ pressed, accent = "var(--accent)", size = "sm", style, children, disabled, ...rest }: ToggleChipProps) {
+export function ToggleChip({ pressed, accent = "var(--accent)", size = "sm", style, className, children, disabled, ...rest }: ToggleChipProps) {
     const on = pressed === true;
-    const unavailable = disabled || rest["aria-disabled"] === true || rest["aria-disabled"] === "true";
     return (
         <button
             type="button"
             aria-pressed={pressed === undefined ? undefined : on}
             disabled={disabled}
             {...rest}
-            style={{
-                padding: size === "xs" ? "0 7px" : "0 9px",
-                minHeight: 24,
-                minWidth: 24,
-                borderRadius: size === "xs" ? 6 : 8,
-                fontSize: size === "xs" ? 9 : 10,
-                fontWeight: 700,
-                letterSpacing: "0.04em",
-                lineHeight: 1.1,
-                background: on ? accent : "var(--bg-elev-2)",
-                color: on ? "var(--accent-fg)" : "var(--fg)",
-                opacity: unavailable ? 0.4 : 1,
-                cursor: unavailable ? "not-allowed" : "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                ...style,
-            }}
+            className={`dk-btn${size === "xs" ? " dk-btn-xs" : ""}${className ? ` ${className}` : ""}`}
+            style={{ ["--chip-accent" as string]: accent, ...style }}
         >
             {children}
         </button>

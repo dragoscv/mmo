@@ -94,11 +94,27 @@ test("non-essential placements always fit their tier minimum", () => {
             }
 });
 
-test("classic at 1920x1080 shows full decks; at 1366x768 they degrade, library docks or shrinks", () => {
+test("classic at 1920x1080 shows full decks; in a narrow window they degrade", () => {
     const big = solve(CLASSIC, { w: 1896, h: 1000 }, PANEL_SPECS);
     assert.equal(big.placements.find((p) => p.panel === "deckA")?.tier, "full");
-    const small = solve(CLASSIC, { w: 1342, h: 700 }, PANEL_SPECS);
-    assert.notEqual(small.placements.find((p) => p.panel === "deckA")?.tier, "full");
+    // Decks 1.5: a deck is full from 480x250, so 1366x768 still shows full decks.
+    const laptop = solve(CLASSIC, { w: 1342, h: 700 }, PANEL_SPECS);
+    assert.equal(laptop.placements.find((p) => p.panel === "deckA")?.tier, "full");
+    const small = solve(CLASSIC, { w: 1000, h: 600 }, PANEL_SPECS);
+    assert.equal(small.placements.find((p) => p.panel === "deckA")?.tier, "compact");
+});
+
+test("pro (default) keeps full decks, mixer and waveform band from 1500x969 down to 1366x768", () => {
+    const pro = BUILTIN_LAYOUTS[0]!;
+    assert.equal(pro.id, "pro");
+    const tier = (w: number, h: number, panel: string) => solve({ ...pro, gap: 2 }, { w, h }, PANEL_SPECS).placements.find((p) => p.panel === panel)?.tier;
+    // Workspace = window minus the 36 px title bar and 4 px shell padding.
+    for (const [w, h] of [[1492, 929], [1912, 1040]] as const) {
+        for (const panel of ["waves", "deckA", "deckB", "mixer", "library"]) assert.equal(tier(w, h, panel), "full", `${panel} at ${w}x${h}`);
+    }
+    assert.equal(tier(1358, 728, "deckA"), "full");
+    assert.equal(tier(1358, 728, "waves"), "full");
+    assert.equal(solve({ ...pro, gap: 2 }, { w: 1358, h: 728 }, PANEL_SPECS).docked.length, 0);
 });
 
 test("at its minimum size an essential panel fits its icon tier", () => {

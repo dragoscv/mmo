@@ -7,12 +7,14 @@ const fn sz(w: f64, h: f64) -> Size {
     Size { w, h }
 }
 
+// Decks 1.5 look: a deck is a wide, short strip (header, overview, transport + pads) that also
+// fills a tall box; the mixer puts its knob column beside the fader when it is short.
 const fn deck(id: PanelId) -> PanelSpec {
     PanelSpec {
         id,
-        full: sz(460.0, 560.0),
-        compact: sz(340.0, 330.0),
-        icon: sz(220.0, 150.0),
+        full: sz(480.0, 250.0),
+        compact: sz(340.0, 190.0),
+        icon: sz(220.0, 110.0),
         essential: true,
     }
 }
@@ -28,7 +30,7 @@ const fn spec(id: PanelId, full: Size, compact: Size, icon: Size, essential: boo
 }
 
 /// Same order as `PANEL_IDS`.
-pub const PANEL_SPECS: [PanelSpec; 11] = [
+pub const PANEL_SPECS: [PanelSpec; 12] = [
     deck(PanelId::DeckA),
     deck(PanelId::DeckB),
     deck(PanelId::DeckC),
@@ -42,16 +44,16 @@ pub const PANEL_SPECS: [PanelSpec; 11] = [
     ),
     spec(
         PanelId::Mixer,
-        sz(240.0, 440.0),
-        sz(200.0, 260.0),
-        sz(150.0, 150.0),
+        sz(240.0, 250.0),
+        sz(200.0, 190.0),
+        sz(150.0, 110.0),
         true,
     ),
     spec(
         PanelId::Crossfader,
-        sz(220.0, 100.0),
-        sz(180.0, 56.0),
-        sz(140.0, 36.0),
+        sz(220.0, 84.0),
+        sz(180.0, 40.0),
+        sz(140.0, 28.0),
         true,
     ),
     spec(
@@ -80,6 +82,15 @@ pub const PANEL_SPECS: [PanelSpec; 11] = [
         sz(220.0, 160.0),
         sz(160.0, 96.0),
         sz(96.0, 48.0),
+        false,
+    ),
+    // Stacked scrolling waveforms of every deck in the layout (+ phase meter). The panel turns
+    // itself vertical when its box is clearly taller than wide, whatever tier it got.
+    spec(
+        PanelId::Waves,
+        sz(480.0, 110.0),
+        sz(320.0, 64.0),
+        sz(200.0, 36.0),
         false,
     ),
 ];
@@ -120,6 +131,43 @@ fn doc(id: &str, name: &str, columns: &[f64], rows: &[f64], areas: Vec<LayoutAre
 }
 
 use PanelId::*;
+
+/// Pro (default): waveform band on top, decks around the mixer, library below.
+pub fn pro() -> LayoutDoc {
+    doc(
+        "pro",
+        "Pro",
+        &[16.0, 7.0, 16.0],
+        // Weights must stay in (0, 20] (validator).
+        &[7.0, 12.0, 2.0, 19.0],
+        vec![
+            area(Waves, 0, 0, 3, 1),
+            area(DeckA, 0, 1, 1, 2),
+            area(Mixer, 1, 1, 1, 1),
+            area(Crossfader, 1, 2, 1, 1),
+            area(DeckB, 2, 1, 1, 2),
+            area(Library, 0, 3, 3, 1),
+        ],
+    )
+}
+
+/// Vertical waves: tall parallel waveforms between the decks; the mixer sits beside the library.
+pub fn pro_vertical() -> LayoutDoc {
+    doc(
+        "pro-vertical",
+        "Vertical waves",
+        &[16.0, 7.0, 9.0, 7.0],
+        &[19.0, 2.0, 19.0],
+        vec![
+            area(DeckA, 0, 0, 1, 2),
+            area(Waves, 1, 0, 1, 1),
+            area(Crossfader, 1, 1, 1, 1),
+            area(DeckB, 2, 0, 2, 2),
+            area(Library, 0, 2, 3, 1),
+            area(Mixer, 3, 2, 1, 1),
+        ],
+    )
+}
 
 /// Classic: decks left/right, mixer centre, utility band below.
 pub fn classic() -> LayoutDoc {
@@ -238,12 +286,19 @@ pub fn stage() -> LayoutDoc {
 /// `BUILTIN_LAYOUTS` of presets.ts (Stage is separate there too).
 pub fn builtin_layouts() -> Vec<LayoutDoc> {
     vec![
+        pro(),
+        pro_vertical(),
         classic(),
         performance(),
         library(),
         four_deck(),
         ultrawide(),
     ]
+}
+
+/// `DEFAULT_LAYOUT` of presets.ts: the layout a fresh install starts on.
+pub fn default_layout() -> LayoutDoc {
+    pro()
 }
 
 /// Every preset the native apps offer: the built-ins plus Stage.

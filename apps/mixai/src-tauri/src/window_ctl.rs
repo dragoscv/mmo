@@ -15,6 +15,7 @@ pub const POPOUT_PANELS: &[&str] = &[
     "deckB",
     "deckC",
     "deckD",
+    "waves",
     "mixer",
     "crossfader",
     "clock",

@@ -91,7 +91,15 @@ fun PadButton(
         active || down -> accent
         else -> DecksColors.surfaceRaised
     }
-    val fg = if (active || down) DecksColors.onPrimary else if (enabled) DecksColors.foreground else DecksColors.muted
+    // Text on a lit button: whichever of the two ink colours reads better on THIS accent (deck colours, cue
+    // colours and a skin's ON / PLAY fills range from near-white to deep blue; `onPrimary` alone was white on
+    // Mainroom's near-white deck colour).
+    val onPrimary = DecksColors.onPrimary
+    val ink = DecksColors.background
+    val lit = remember(accent, onPrimary, ink) {
+        if (ro.mixai.decks.ui.theme.Oklab.contrast(onPrimary, accent) >= ro.mixai.decks.ui.theme.Oklab.contrast(ink, accent)) onPrimary else ink
+    }
+    val fg = if (active || down) lit else if (enabled) DecksColors.foreground else DecksColors.muted
     val skin = LocalDecksSkin.current
     val shape = controlShape(skin)
     val minH = maxOf(44, skin.controlHeightDp).dp
@@ -298,15 +306,19 @@ fun Readout(label: String, value: String, modifier: Modifier = Modifier, color: 
     }
 }
 
+/** A layout panel tile. [verticalPad] replaces the look's panel padding above / below (thin strips). */
 @Composable
-fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val shape = panelShape(LocalDecksSkin.current)
+fun Panel(modifier: Modifier = Modifier, verticalPad: Dp? = null, content: @Composable () -> Unit) {
+    val skin = LocalDecksSkin.current
+    val shape = panelShape(skin)
+    // Signature look: flat tiles, no outline (look.css `.panel { border: 0 }`); the classic look keeps its border.
+    val outlined = !skin.signature || skin.highContrast
     Box(
         modifier
             .clip(shape)
             .background(DecksColors.surface)
-            .border(1.dp, DecksColors.border, shape)
-            .padding(10.dp),
+            .then(if (outlined) Modifier.border(1.dp, DecksColors.border, shape) else Modifier)
+            .padding(horizontal = skin.panelPadDp.dp, vertical = verticalPad ?: skin.panelPadDp.dp),
     ) { content() }
 }
 

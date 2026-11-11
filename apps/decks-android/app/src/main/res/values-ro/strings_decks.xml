@@ -73,7 +73,11 @@
     <string name="decks_shortcuts" formatted="false">Taste: Space/Enter redă A/B · Q/W cue · 1–4 / 7–0 hot cue · S/K sync · ↑↓ navighează · ←/→ încarcă · Ctrl+K temă</string>
     <string name="decks_skin" formatted="false">Temă: %1</string>
     <string name="decks_skin_next" formatted="false">Tema următoare</string>
-    <string name="decks_skin_nocturne" formatted="false">Nocturn</string>
+    <string name="decks_skin_signature" formatted="false">MixAI Signature</string>
+    <string name="decks_skin_glass_classic" formatted="false">Glass (clasic)</string>
+    <string name="decks_skin_mainroom" formatted="false">Mainroom</string>
+    <string name="decks_skin_crate" formatted="false">Crate</string>
+    <string name="decks_skin_pilot" formatted="false">Pilot</string>
     <string name="decks_skin_club" formatted="false">Club</string>
     <string name="decks_skin_booth" formatted="false">Cabină (contrast mare)</string>
     <string name="decks_skin_studio" formatted="false">Studio (luminos)</string>
@@ -148,10 +152,13 @@
     <string name="decks_panel_automix" formatted="false">Automix</string>
     <string name="decks_panel_sampler" formatted="false">Sampler</string>
     <string name="decks_panel_plugins" formatted="false">Pluginuri</string>
+    <string name="decks_panel_waves" formatted="false">Waveform-uri</string>
     <string name="decks_panel_unavailable" formatted="false">%1 nu este încă disponibil în această aplicație.</string>
     <string name="decks_dock_tab" formatted="false">Afișează %1</string>
     <string name="decks_layout" formatted="false">Aranjament: %1</string>
     <string name="decks_layout_next" formatted="false">Aranjamentul următor</string>
+    <string name="decks_layout_pro" formatted="false">Pro</string>
+    <string name="decks_layout_pro_vertical" formatted="false">Waveform-uri verticale</string>
     <string name="decks_layout_classic" formatted="false">Clasic</string>
     <string name="decks_layout_performance" formatted="false">Performanță</string>
     <string name="decks_layout_library" formatted="false">Bibliotecă</string>

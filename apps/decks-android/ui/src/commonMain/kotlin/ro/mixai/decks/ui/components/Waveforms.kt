@@ -1,11 +1,15 @@
 package ro.mixai.decks.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -23,6 +27,8 @@ import ro.mixai.decks.ui.model.PeaksData
 import ro.mixai.decks.ui.model.WaveDeck
 import ro.mixai.decks.ui.model.WaveFrame
 import ro.mixai.decks.ui.theme.DecksColors
+import ro.mixai.decks.ui.theme.LocalDecksSkin
+import ro.mixai.decks.ui.theme.panelShape
 
 /** Slot for the scrolling waveform area: GPU (decks-render) on device, [ComposeWaveforms] otherwise. */
 typealias WaveformSlot = @Composable (frame: WaveFrame, peaks: List<PeaksData?>, modifier: Modifier) -> Unit
@@ -77,7 +83,7 @@ fun ComposeWaveforms(
 }
 
 private fun DrawScope.drawLane(d: WaveDeck, p: PeaksData?, grid: GridStateUi?, zoom: Float, origin: Offset, area: Size) {
-    drawRect(DecksColors.background, origin, area)
+    drawRect(DecksColors.waveBg, origin, area)
     val mid = origin.y + area.height / 2
     if (!d.loaded || p == null || p.size == 0) {
         drawLine(DecksColors.border, Offset(0f, mid), Offset(area.width, mid), 1f)
@@ -93,6 +99,11 @@ private fun DrawScope.drawLane(d: WaveDeck, p: PeaksData?, grid: GridStateUi?, z
     }
     // Peaks: low / mid / high stacked, mirrored around the centre line
     val half = area.height / 2 * 0.92f
+    val low = DecksColors.waveLow(d.index)
+    val midC = DecksColors.waveMid(d.index)
+    val high = DecksColors.waveHigh(d.index)
+    // The part left of the playhead has already played: dimmed by the look (`--wave-played-alpha`).
+    val playedAlpha = DecksColors.wavePlayedAlpha
     var x = 0f
     while (x < area.width) {
         val t = t0 + x * secPerPx
@@ -101,9 +112,10 @@ private fun DrawScope.drawLane(d: WaveDeck, p: PeaksData?, grid: GridStateUi?, z
             val lo = (p.low[idx].toInt() and 0xFF) / 255f
             val mi = (p.mid[idx].toInt() and 0xFF) / 255f
             val hi = (p.high[idx].toInt() and 0xFF) / 255f
-            drawLine(DecksColors.waveLow, Offset(x, mid - lo * half), Offset(x, mid + lo * half), 1.5f)
-            drawLine(DecksColors.waveMid, Offset(x, mid - mi * half * 0.75f), Offset(x, mid + mi * half * 0.75f), 1.5f)
-            drawLine(DecksColors.waveHigh, Offset(x, mid - hi * half * 0.45f), Offset(x, mid + hi * half * 0.45f), 1.5f)
+            val a = if (x < area.width / 2) playedAlpha else 1f
+            drawLine(low, Offset(x, mid - lo * half), Offset(x, mid + lo * half), 1.5f, alpha = a)
+            drawLine(midC, Offset(x, mid - mi * half * 0.75f), Offset(x, mid + mi * half * 0.75f), 1.5f, alpha = a)
+            drawLine(high, Offset(x, mid - hi * half * 0.45f), Offset(x, mid + hi * half * 0.45f), 1.5f, alpha = a)
         }
         x += 2f
     }
@@ -115,7 +127,7 @@ private fun DrawScope.drawLane(d: WaveDeck, p: PeaksData?, grid: GridStateUi?, z
         for ((bt, bar) in gridBeatLines(g, t0, t1)) {
             val bx = ((bt - t0) / secPerPx).toFloat()
             drawLine(
-                if (bar) DecksColors.foreground.copy(alpha = 0.55f) else DecksColors.border,
+                if (bar) DecksColors.waveDownbeat else DecksColors.waveGrid,
                 Offset(bx, origin.y), Offset(bx, origin.y + area.height), if (bar) 2f else 1f,
             )
         }
@@ -126,10 +138,10 @@ private fun DrawScope.drawLane(d: WaveDeck, p: PeaksData?, grid: GridStateUi?, z
         val mx = ((sec - t0) / secPerPx).toFloat()
         if (mx in 0f..area.width) drawLine(c, Offset(mx, origin.y), Offset(mx, origin.y + area.height), 2f)
     }
-    marker(d.cuePointSec, DecksColors.warning)
-    d.hotCues.forEachIndexed { i, h -> if (h != null) marker(h, DecksColors.deck(i % 4)) }
+    marker(d.cuePointSec, DecksColors.cueButton)
+    d.hotCues.forEachIndexed { i, h -> if (h != null) marker(h, DecksColors.cue(i)) }
     // Playhead
-    drawLine(DecksColors.danger, Offset(area.width / 2, origin.y), Offset(area.width / 2, origin.y + area.height), 2f)
+    drawLine(DecksColors.wavePlayhead, Offset(area.width / 2, origin.y), Offset(area.width / 2, origin.y + area.height), 2f)
 }
 
 /**
@@ -173,6 +185,24 @@ fun GridMarkersOverlay(frame: WaveFrame, modifier: Modifier, grids: List<GridSta
 }
 
 /**
+ * Layout panel `waves` (Decks 1.5, `PanelId.Waves`): the scrolling waveform band of every deck as a
+ * panel of the layout instead of a fixed strip. [lanes] is the waveform slot of the screen (GPU
+ * renderer or [ComposeWaveforms], with the beatgrids): one lane per deck, playhead centred. Edge to
+ * edge on the waveform backdrop, no padding, at every tier (a 200×36 dp icon box still shows lanes).
+ *
+ * Not yet at parity with WavesPanel.tsx: no header chips / beat keeper / phase meter, no zoom or seek
+ * on the lanes, lanes stay horizontal in a tall box (TS turns them into columns, playhead at 1/3) and
+ * the skin's `overlay` arrangement is not drawn (lanes stay stacked).
+ */
+@Composable
+fun WavesPanel(modifier: Modifier = Modifier, lanes: @Composable (Modifier) -> Unit) {
+    val shape = panelShape(LocalDecksSkin.current)
+    Box(modifier.clip(shape).background(DecksColors.waveBg)) {
+        lanes(Modifier.fillMaxSize())
+    }
+}
+
+/**
  * Whole-track overview for one deck. Tap seeks; Left/Right keys seek ±5 %.
  */
 @Composable
@@ -199,7 +229,7 @@ fun Overview(
             .focusable()
             .semantics { contentDescription = description; stateDescription = positionText },
     ) {
-        drawRect(DecksColors.background)
+        drawRect(DecksColors.waveBg)
         val mid = size.height / 2
         if (peaks != null && peaks.size > 0) {
             val cols = size.width.toInt().coerceAtLeast(1)
@@ -221,7 +251,7 @@ fun Overview(
             deck.hotCues.forEachIndexed { i, h ->
                 if (h != null) {
                     val x = (h / deck.durationSec * size.width).toFloat()
-                    drawLine(DecksColors.deck(i % 4), Offset(x, 0f), Offset(x, size.height), 2f)
+                    drawLine(DecksColors.cue(i), Offset(x, 0f), Offset(x, size.height), 2f)
                 }
             }
         }

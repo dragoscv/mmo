@@ -9,6 +9,7 @@
 //! * `layout_validate`, `layout_minimum_size`, `layout_presets_json`, `pack_layouts_json`.
 //! * `pack_resolve_colors(tokens_json)` -> `[(key, 0xRRGGBB, alpha)]`, so native code never parses
 //!   `oklch(...)`.
+//! * `pack_build_skin(request_json)` -> unsigned skin `.mixaipack` bytes (the skin-editor export).
 
 use decks_layout as dl;
 use decks_packs as dp;
@@ -53,6 +54,67 @@ pub struct PackColor {
     pub alpha: f32,
 }
 
+/// One `style.sizes` entry (key -> number; ranges in `decks_packs::STYLE_SIZES`).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct PackStyleSize {
+    pub key: String,
+    pub value: f64,
+}
+
+/// The `style` block of a manifest-v2 skin (`PackStyle` in src/look/style-vars.ts), flattened
+/// for native UIs: enums as strings, style colours resolved to sRGB like [`PackColor`].
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct PackStyle {
+    /// `signature` (default when `None`) or `classic`.
+    #[uniffi(default = None)]
+    pub look: Option<String>,
+    /// Show the virtual platter while the skin is active (`None` = leave the user setting).
+    #[uniffi(default = None)]
+    pub platter: Option<bool>,
+    /// Layout id to switch to with the skin (built-in, or bundled in the same pack).
+    #[uniffi(default = None)]
+    pub layout: Option<String>,
+    /// `stacked` (default when `None`) or `overlay`.
+    #[uniffi(default = None)]
+    pub waves: Option<String>,
+    /// `style.colors` resolved to sRGB (`key` = `well`, `waveLow`, `cue1`, ...).
+    #[uniffi(default = [])]
+    pub colors: Vec<PackColor>,
+    /// `style.sizes` (`key` = `panelGap`, `wavePlayedAlpha`, ...).
+    #[uniffi(default = [])]
+    pub sizes: Vec<PackStyleSize>,
+}
+
+fn style_out(s: &dp::PackStyle) -> PackStyle {
+    PackStyle {
+        look: s.look.clone(),
+        platter: s.platter,
+        layout: s.layout.clone(),
+        waves: s.waves.clone(),
+        colors: s
+            .colors
+            .iter()
+            .flatten()
+            .filter_map(|(k, v)| {
+                dp::resolve_color(v).map(|(rgb, alpha)| PackColor {
+                    key: k.clone(),
+                    rgb,
+                    alpha,
+                })
+            })
+            .collect(),
+        sizes: s
+            .sizes
+            .iter()
+            .flatten()
+            .map(|(k, v)| PackStyleSize {
+                key: k.clone(),
+                value: *v,
+            })
+            .collect(),
+    }
+}
+
 /// A verified pack, flattened for native UIs. `info_json` carries everything else (the camelCase
 /// `PackInfo` of the TS contract, including preview / asset data URLs).
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -83,6 +145,12 @@ pub struct PackSummary {
     pub layouts_json: String,
     /// Full `PackInfo` JSON (camelCase, same shape as the Tauri `pack_inspect` command).
     pub info_json: String,
+    /// Manifest schema version (1, or 2 when the pack may carry a `style` block).
+    #[uniffi(default = 1)]
+    pub manifest_v: u32,
+    /// The skin's `style` block (manifest v2), `None` for v1 packs and skins without one.
+    #[uniffi(default = None)]
+    pub style: Option<PackStyle>,
 }
 
 fn colors_out(t: &dp::PackTokens) -> Vec<PackColor> {
@@ -126,6 +194,8 @@ fn summary(info: dp::PackInfo) -> Result<PackSummary, DecksError> {
         colors: colors_out(&tokens),
         layouts_json,
         info_json,
+        manifest_v: info.manifest.v,
+        style: tokens.style.as_ref().map(style_out),
     })
 }
 
@@ -173,6 +243,16 @@ pub fn pack_resolve_colors(tokens_json: String) -> Result<Vec<PackColor>, DecksE
     t.decks = colors("decks")?;
     t.accent = obj.get("accent").and_then(Value::as_str).map(str::to_owned);
     Ok(colors_out(&t))
+}
+
+/// Build an unsigned skin `.mixaipack` from a skin-editor request (the camelCase
+/// `PackExportRequest` JSON of src/bridge/packs.ts: id, name, author, description, version,
+/// tokens). The result passes the same validation as `pack_inspect`, so it always installs.
+#[uniffi::export]
+pub fn pack_build_skin(request_json: String) -> Result<Vec<u8>, DecksError> {
+    let req: dp::PackExportRequest = serde_json::from_str(&request_json)
+        .map_err(|e| pack_err(format!("export request is invalid: {e}")))?;
+    dp::build_skin_pack(&req).map_err(pack_err)
 }
 
 /// Installed packs under one directory (`<dir>/<id>.mixaipack` + `index.json`); every archive
@@ -244,6 +324,8 @@ pub enum LayoutPanel {
     Automix,
     Sampler,
     Plugins,
+    /// Stacked scrolling waveforms of every deck in the layout (Decks 1.5).
+    Waves,
 }
 
 impl From<dl::PanelId> for LayoutPanel {
@@ -260,6 +342,7 @@ impl From<dl::PanelId> for LayoutPanel {
             dl::PanelId::Automix => Self::Automix,
             dl::PanelId::Sampler => Self::Sampler,
             dl::PanelId::Plugins => Self::Plugins,
+            dl::PanelId::Waves => Self::Waves,
         }
     }
 }
@@ -278,6 +361,7 @@ impl From<LayoutPanel> for dl::PanelId {
             LayoutPanel::Automix => Self::Automix,
             LayoutPanel::Sampler => Self::Sampler,
             LayoutPanel::Plugins => Self::Plugins,
+            LayoutPanel::Waves => Self::Waves,
         }
     }
 }
@@ -392,8 +476,16 @@ pub fn layout_minimum_size(layout_json: String) -> Result<LayoutSize, DecksError
     Ok(LayoutSize { w: s.w, h: s.h })
 }
 
-/// Built-in presets (classic, performance, library, four-deck, ultrawide, stage) as a JSON array.
+/// Built-in presets (pro, pro-vertical, classic, performance, library, four-deck, ultrawide,
+/// stage) as a JSON array, in the order the layout picker shows them.
 #[uniffi::export]
 pub fn layout_presets_json() -> String {
     serde_json::to_string(&dl::all_presets()).unwrap_or_else(|_| "[]".into())
+}
+
+/// Id of the layout a fresh install starts on (`DEFAULT_LAYOUT` in presets.ts: `pro`). It
+/// places the `waves` panel, so a host that does not render that panel shows it as a dock tab.
+#[uniffi::export]
+pub fn layout_default_id() -> String {
+    dl::default_layout().id
 }

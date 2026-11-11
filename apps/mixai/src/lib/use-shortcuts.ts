@@ -8,7 +8,7 @@ import { useEffect } from "react";
 import { engine } from "@/bridge/engine";
 import { useMixerStore } from "@/state/mixer-store";
 import { useUiStore } from "@/state/ui-store";
-import { type Shortcut } from "@/lib/shortcuts";
+import { matchShortcut, type Shortcut } from "@/lib/shortcuts";
 import { useKeybindStore } from "@/state/keybind-store";
 import { usePerfStore } from "@/state/perf-store";
 
@@ -79,10 +79,9 @@ async function dispatch(s: Shortcut, shift = false): Promise<void> {
 export function useShortcuts(): void {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            // Let modifier combos (Ctrl/Cmd/Alt) pass through to the OS / browser.
-            if (e.ctrlKey || e.metaKey || e.altKey) return;
-            if (isEditableTarget(e.target)) return;
-            const s = useKeybindStore.getState().bindings.get(e.code);
+            // A control that used the key (list, slider, radio group) called preventDefault: the
+            // key is not a shortcut then. Modifier combos pass through to the OS / browser.
+            const s = matchShortcut(e, isEditableTarget(e.target), useKeybindStore.getState().bindings);
             if (!s) return;
             e.preventDefault();
             void dispatch(s, e.shiftKey);

@@ -1,20 +1,106 @@
-// Pack validation: the rules of apps/mixai/src-tauri/src/pack.rs (manifest, tokens, layouts,
-// presets, limits, names) + the TS layout validator + the WCAG contrast gate.
+// Pack validation: the rules of apps/mixai/src-tauri/crates/decks-packs (manifest v1 / v2,
+// tokens, the v2 `style` block, layouts, presets, limits, names) + the TS layout validator +
+// the WCAG contrast gate.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { COLOR_KEYS, contrastProblems, validColor } from "./color.mjs";
-import { validateLayout } from "./layout.mjs";
+import { BUILTIN_LAYOUT_IDS, validateLayout } from "./layout.mjs";
 import { SIGNATURE_FILE, verifyFiles } from "./sign.mjs";
 import { ALLOWED_EXT, IMAGE_EXT, LIMITS, entryNameError, extOf, readZip, short } from "./zip.mjs";
 
 export const MANIFEST_FILE = "manifest.json";
+/** Manifest schema versions the app reads. 2 = tokens may carry a `style` block (Decks >= 1.5). */
+export const MANIFEST_VERSIONS = [1, 2];
+export const STYLE_MANIFEST_VERSION = 2;
 const KINDS = ["skin", "layout", "bundle", "controller"];
 const MANIFEST_KEYS = ["v", "id", "name", "version", "kind", "author", "description", "pro", "tokens", "layouts", "presets", "preview", "fonts"];
 const FONT_KEYS = ["family", "file", "weight", "style"];
-const TOKEN_KEYS = ["mode", "accent", "surface", "density", "radius", "colors", "decks", "fontHeading", "fontBody", "background", "color"];
+const TOKEN_KEYS = ["mode", "accent", "surface", "density", "radius", "colors", "decks", "fontHeading", "fontBody", "background", "color", "style"];
+
+// ---- style block (manifest v2) ------------------------------------------------------------
+// Mirror of apps/mixai/src/look/style-vars.ts and crates/decks-packs/src/style.rs, key for key:
+// change all three together (test "style tables match style-vars.ts" fails on drift).
+
+export const STYLE_KEYS = ["look", "platter", "layout", "waves", "colors", "sizes"];
+export const STYLE_COLOR_KEYS = [
+    "well", "waveBg", "line", "faint", "on", "onFg", "play", "playFg", "cue", "alert",
+    "waveLow", "waveMid", "waveHigh", "waveGrid", "waveDownbeat", "wavePlayhead", "wavePlayheadCap",
+    "cue1", "cue2", "cue3", "cue4", "cue5", "cue6", "cue7", "cue8",
+];
+/** Size key -> inclusive [min, max]. */
+export const STYLE_SIZES = {
+    panelGap: [0, 16],
+    panelRadius: [0, 16],
+    panelPad: [4, 16],
+    controlRadius: [0, 12],
+    padRadius: [0, 12],
+    controlHeight: [20, 32],
+    titlebarHeight: [28, 48],
+    wavePlayedAlpha: [0.2, 1],
+};
+export const STYLE_LOOKS = ["signature", "classic"];
+export const STYLE_WAVES = ["stacked", "overlay"];
+const STYLE_LAYOUT_RE = /^[a-z0-9][a-z0-9._-]{0,47}$/;
+const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+/**
+ * A `style.colors` value: the bounded pack grammar (validColor) minus the two forms the app's
+ * own check (isStyleColor in style-vars.ts) does not take: signed numbers (`oklch(-0 0 0)`) and
+ * non-ASCII whitespace between the numbers. Same as `valid_style_color` in Rust: what passes
+ * here is always applied by the UI.
+ */
+export const validStyleColor = (c) => validColor(c) && !c.includes("-") && /^[\x00-\x7f]*$/.test(c);
+
+/**
+ * Problems of a `style` block (empty = valid). Same checks and messages as `validateStyle` in
+ * style-vars.ts and `validate_style` in Rust. Colours use the bounded pack grammar, like Rust:
+ * stricter than the regex in style-vars.ts (no surrounding spaces, L <= 1, C <= 0.5, H <= 360).
+ */
+export function validateStyle(raw) {
+    if (raw === undefined || raw === null) return [];
+    if (!isObject(raw)) return ["style must be an object"];
+    const errs = [];
+    for (const k of Object.keys(raw)) if (!STYLE_KEYS.includes(k)) errs.push(`unknown style key '${short(k)}'`);
+    if (raw.look !== undefined && !STYLE_LOOKS.includes(raw.look)) errs.push("style.look must be signature or classic");
+    if (raw.platter !== undefined && typeof raw.platter !== "boolean") errs.push("style.platter must be true or false");
+    if (raw.layout !== undefined && (typeof raw.layout !== "string" || !STYLE_LAYOUT_RE.test(raw.layout))) errs.push("style.layout must be a layout id (a-z, 0-9, '.', '_', '-'; max 48)");
+    if (raw.waves !== undefined && !STYLE_WAVES.includes(raw.waves)) errs.push("style.waves must be stacked or overlay");
+    if (raw.colors !== undefined) {
+        if (!isObject(raw.colors)) errs.push("style.colors must be an object");
+        else for (const [k, v] of Object.entries(raw.colors)) {
+            if (!STYLE_COLOR_KEYS.includes(k)) errs.push(`unknown style colour '${short(k)}'`);
+            else if (!validStyleColor(v)) errs.push(`style.colors.${k} must be a valid colour`);
+        }
+    }
+    if (raw.sizes !== undefined) {
+        if (!isObject(raw.sizes)) errs.push("style.sizes must be an object");
+        else for (const [k, v] of Object.entries(raw.sizes)) {
+            const range = Object.hasOwn(STYLE_SIZES, k) ? STYLE_SIZES[k] : null;
+            if (!range) errs.push(`unknown style size '${short(k)}'`);
+            else if (typeof v !== "number" || !Number.isFinite(v) || v < range[0] || v > range[1]) errs.push(`style.sizes.${k} must be a number in ${range[0]}..${range[1]}`);
+        }
+    }
+    return errs;
+}
+
+/** A validated style block with only the known keys (what the app hands to the UI). */
+function cleanStyle(raw) {
+    const out = {};
+    for (const k of ["look", "platter", "layout", "waves"]) if (raw[k] !== undefined) out[k] = raw[k];
+    for (const k of ["colors", "sizes"]) if (raw[k] && Object.keys(raw[k]).length) out[k] = { ...raw[k] };
+    return out;
+}
 
 export function validPackId(id) {
     return typeof id === "string" && id.length <= 100 && /^[a-z0-9]+(\.[a-z0-9-]+){1,6}$/.test(id);
+}
+/**
+ * True when some `"v": <value>` of the manifest text is a plain digit run. The manifest has no
+ * other key named `v` (unknown fields are errors), and inside a JSON string the quotes are escaped,
+ * so a description cannot fake one.
+ */
+function vIsIntegerLiteral(text) {
+    const hits = [...text.matchAll(/"v"\s*:\s*([^\s,}]+)/g)];
+    return hits.length > 0 && hits.some((h) => /^[0-9]+$/.test(h[1]));
 }
 const validVersion = (v) => typeof v === "string" && /^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$/.test(v);
 export const validFontFamily = (f) => typeof f === "string" && /^[A-Za-z0-9 -]{1,40}$/.test(f);
@@ -97,7 +183,10 @@ export function validateManifest(files, errors) {
     for (const k of Object.keys(m)) if (!MANIFEST_KEYS.includes(k)) errors.push(`manifest.json is invalid: unknown field \`${k}\``);
     for (const k of ["id", "name", "version", "kind", "author"]) if (typeof m[k] !== "string") errors.push(`manifest.json is invalid: \`${k}\` must be a string`);
     if (!Number.isInteger(m.v) || m.v < 0) errors.push("manifest.json is invalid: `v` must be an unsigned integer");
-    else if (m.v !== 1) errors.push(`unsupported manifest version ${m.v} (expected 1)`);
+    // JSON.parse turns `2.0` and `2e0` into the integer 2; the app (serde, u32) refuses both.
+    else if (!vIsIntegerLiteral(files.get(MANIFEST_FILE).toString("utf8"))) errors.push("manifest.json is invalid: `v` must be written as an integer (1 or 2, not 2.0 or 2e0)");
+    else if (m.v > Math.max(...MANIFEST_VERSIONS)) errors.push(`manifest version ${m.v} is not supported: this pack needs a newer MixAI Decks (this version reads 1 and 2)`);
+    else if (!MANIFEST_VERSIONS.includes(m.v)) errors.push(`unsupported manifest version ${m.v} (expected 1 or 2)`);
     if (m.description !== undefined && typeof m.description !== "string") errors.push("manifest.json is invalid: `description` must be a string");
     if (m.pro !== undefined && typeof m.pro !== "boolean") errors.push("manifest.json is invalid: `pro` must be a boolean");
     if (typeof m.kind === "string" && !KINDS.includes(m.kind)) errors.push(`manifest.json is invalid: kind '${short(m.kind)}' must be one of ${KINDS.join(", ")}`);
@@ -130,8 +219,11 @@ export function validateManifest(files, errors) {
     return errors.length === before ? m : null;
 }
 
-/** Returns the merged PackTokens (like Rust) or null on error. */
-export function validateTokens(files, path, errors) {
+/**
+ * Returns the merged PackTokens (like Rust) or null on error. `manifestV` = the manifest's `v`:
+ * a `style` block is only allowed from version 2 on (an older Decks would drop half the skin).
+ */
+export function validateTokens(files, path, errors, manifestV = 1) {
     const v = parseJson(files, path, errors, path);
     if (v === undefined) return null;
     if (!v || typeof v !== "object" || Array.isArray(v)) { errors.push(`${path} must be a JSON object`); return null; }
@@ -201,6 +293,14 @@ export function validateTokens(files, path, errors) {
     }
     const bg = str("background");
     if (bg !== undefined && requireFile(files, "tokens.background", bg, IMAGE_EXT, errors)) t.background = bg;
+    if (v.style !== undefined && v.style !== null) {
+        if (manifestV < STYLE_MANIFEST_VERSION) errors.push(`tokens.style needs manifest version ${STYLE_MANIFEST_VERSION} (this pack declares "v": ${manifestV})`);
+        else {
+            const styleErrors = validateStyle(v.style);
+            errors.push(...styleErrors);
+            if (!styleErrors.length) t.style = cleanStyle(v.style);
+        }
+    }
     return errors.length === before ? t : null;
 }
 
@@ -230,7 +330,7 @@ export function validateFiles(files, opts = {}) {
             (opts.fromZip ? errors : warnings).push(opts.fromZip ? msg : `${msg} (sign with the official key)`);
         }
         if ((manifest.fonts ?? []).length > 8) errors.push("at most 8 fonts per pack");
-        if (manifest.tokens) tokens = validateTokens(files, manifest.tokens, errors);
+        if (manifest.tokens) tokens = validateTokens(files, manifest.tokens, errors, manifest.v);
         else if (manifest.kind === "skin") warnings.push("skin packs normally declare manifest.tokens");
         for (const l of manifest.layouts ?? []) {
             const raw = files.get(l);
@@ -242,6 +342,21 @@ export function validateFiles(files, opts = {}) {
             layouts.push(doc);
         }
         for (const p of manifest.presets ?? []) parseJson(files, p, errors, `preset '${short(p)}'`);
+        // The `waves` panel exists from Decks 1.5 on; an older Decks rejects the layout ("unknown panel"), and
+        // only a v2 manifest tells it up front that the pack needs a newer app.
+        if (manifest.v < STYLE_MANIFEST_VERSION) {
+            for (const l of layouts) {
+                if (Array.isArray(l.areas) && l.areas.some((a) => a && a.panel === "waves")) {
+                    warnings.push(`layout '${short(l.id)}' places the 'waves' panel, which needs MixAI Decks 1.5: declare "v": ${STYLE_MANIFEST_VERSION} in the manifest (Decks 1.4 and older reject this layout as "unknown panel")`);
+                }
+            }
+        }
+        // The app resolves style.layout to a layout of the same pack first, then to a built-in
+        // (or the user's own) layout; an unknown id keeps the current layout.
+        const wanted = tokens?.style?.layout;
+        if (wanted && !BUILTIN_LAYOUT_IDS.includes(wanted) && !layouts.some((l) => l.id === wanted)) {
+            warnings.push(`style.layout '${short(wanted)}' is not a built-in layout (${BUILTIN_LAYOUT_IDS.join(", ")}) or a layout of this pack; the app will keep the current layout`);
+        }
         if ((manifest.kind === "layout" || manifest.kind === "bundle") && !(manifest.layouts ?? []).length) warnings.push(`${manifest.kind} packs normally declare manifest.layouts`);
         if (manifest.preview && files.get(manifest.preview).length > LIMITS.MAX_PREVIEW_BYTES) warnings.push(`preview is larger than ${LIMITS.MAX_PREVIEW_BYTES} bytes and will not be shown in the app`);
         const declared = new Set([MANIFEST_FILE, SIGNATURE_FILE, manifest.tokens, manifest.preview, tokens?.background, ...(manifest.layouts ?? []), ...(manifest.presets ?? []), ...(manifest.fonts ?? []).map((f) => f.file)]);

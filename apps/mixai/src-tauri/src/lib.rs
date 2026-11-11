@@ -33,6 +33,61 @@ mod window_ctl;
 /// whole app — the UI degrades to "UI preview" mode.
 pub struct EngineState(pub Mutex<Option<Engine>>);
 
+/// Points per second of the 3-band waveform the UI scrolls (one point = 6.7 ms).
+const WAVE_POINTS_PER_SECOND: u32 = 150;
+
+/// Three-band waveform of the track loaded on each deck, computed once at load time (the
+/// engine takes the sample buffer) and fetched by the UI with `deck_waveform_bands`.
+#[derive(Default)]
+pub struct WaveState(pub Mutex<[Option<Vec<u8>>; 4]>);
+
+/// Peak lanes of the separated stems loaded on each deck (see `stem_lanes_bytes`), fetched by
+/// the UI with `deck_stem_lanes`. Cleared when the engine receives another track for the deck
+/// (`publish_track_waves`), not when that load starts: a load can take two minutes over a
+/// tunnel, and until it lands the deck still plays the previous track and its stems.
+#[derive(Default)]
+pub struct StemWaveState(pub Mutex<[Option<Vec<u8>>; 4]>);
+
+/// A new track was handed to the engine for `slot`: publish its band waveform and drop the
+/// stem lanes, which belonged to the previous track (the engine drops its stems on a load).
+/// Called with the engine lock held, like the stem-lane store in `load_stems`, so the lanes
+/// always describe what the engine was sent last.
+fn publish_track_waves(slot: usize, bands: Vec<u8>, waves: &WaveState, stem_waves: &StemWaveState) {
+    waves.0.lock().unwrap()[slot] = Some(bands);
+    stem_waves.0.lock().unwrap()[slot] = None;
+}
+
+/// Wire form of the stem lanes: `[u32 LE points_per_second][u32 LE len][u32 LE mask]` then four
+/// lanes of `len` bytes (vocals, drums, bass, melody; bit `i` of `mask` = stem `i` is loaded,
+/// a missing stem is all zeros). Same point grid as the band waveform.
+fn stem_lanes_bytes(pps: u32, lanes: &[Option<Vec<u8>>; 4]) -> Vec<u8> {
+    let len = lanes.iter().flatten().map(Vec::len).max().unwrap_or(0);
+    let mut mask = 0u32;
+    let mut out = Vec::with_capacity(12 + 4 * len);
+    out.extend_from_slice(&pps.to_le_bytes());
+    out.extend_from_slice(&(len as u32).to_le_bytes());
+    out.extend_from_slice(&[0; 4]);
+    for (i, lane) in lanes.iter().enumerate() {
+        let start = out.len();
+        if let Some(l) = lane {
+            mask |= 1 << i;
+            out.extend_from_slice(l);
+        }
+        out.resize(start + len, 0);
+    }
+    out[8..12].copy_from_slice(&mask.to_le_bytes());
+    out
+}
+
+fn deck_slot(deck: DeckId) -> usize {
+    match deck {
+        DeckId::A => 0,
+        DeckId::B => 1,
+        DeckId::C => 2,
+        DeckId::D => 3,
+    }
+}
+
 fn parse_deck(s: &str) -> Result<DeckId, String> {
     DeckId::from_str(s).ok_or_else(|| format!("invalid deck '{s}'"))
 }
@@ -100,7 +155,12 @@ struct LoadReq {
 }
 
 #[tauri::command]
-fn load_track(req: LoadReq, state: State<'_, EngineState>) -> Result<Vec<f32>, String> {
+fn load_track(
+    req: LoadReq,
+    state: State<'_, EngineState>,
+    waves: State<'_, WaveState>,
+    stem_waves: State<'_, StemWaveState>,
+) -> Result<Vec<f32>, String> {
     let deck = parse_deck(&req.deck)?;
     // Decode off the audio thread, then send the buffer in.
     let buffer = mixai_core::decoder::decode_file(&req.source).map_err(|e| e.to_string())?;
@@ -112,12 +172,15 @@ fn load_track(req: LoadReq, state: State<'_, EngineState>) -> Result<Vec<f32>, S
         req.artist,
         req.bpm,
         &state,
+        &waves,
+        &stem_waves,
     )
 }
 
 /// Shared loader: analyse a decoded buffer, mirror metadata, send it to the
 /// engine, and return the precomputed waveform peaks. Used by both the local
 /// (`load_track`) and remote-streaming (`load_track_stream`) paths.
+#[allow(clippy::too_many_arguments)]
 fn load_decoded(
     deck: DeckId,
     buffer: mixai_core::deck::TrackBuffer,
@@ -126,10 +189,15 @@ fn load_decoded(
     artist: Option<String>,
     req_bpm: Option<f64>,
     state: &State<'_, EngineState>,
+    waves: &State<'_, WaveState>,
+    stem_waves: &State<'_, StemWaveState>,
 ) -> Result<Vec<f32>, String> {
     let dur = buffer.duration_secs();
     // Precompute waveform peaks while we own the buffer (engine takes ownership).
     let peaks = buffer.compute_peaks(2000);
+    let bands = buffer
+        .compute_band_peaks(WAVE_POINTS_PER_SECOND)
+        .to_bytes();
     // Analyse tempo + beat phase. Use the supplied BPM when present (library
     // metadata is authoritative); otherwise fall back to local detection.
     let analysis = mixai_core::analyze(&buffer);
@@ -166,7 +234,36 @@ fn load_decoded(
     if bpm > 0.0 {
         engine.set_grid(deck, BeatGrid::constant(bpm, analysis.first_beat_secs));
     }
+    publish_track_waves(deck_slot(deck), bands, waves, stem_waves);
     Ok(peaks)
+}
+
+/// Three-band waveform of the track on `deck` as raw bytes (`BandWave::to_bytes`): a binary
+/// IPC body, never a JSON number array (a 7-minute track is ~190 kB). Empty = nothing loaded.
+#[tauri::command]
+fn deck_waveform_bands(
+    deck: String,
+    waves: State<'_, WaveState>,
+) -> Result<tauri::ipc::Response, String> {
+    let deck = parse_deck(&deck)?;
+    let bytes = waves.0.lock().unwrap()[deck_slot(deck)]
+        .clone()
+        .unwrap_or_default();
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Peak lanes of the stems loaded on `deck` as raw bytes (`stem_lanes_bytes`). Empty = the
+/// deck has no stems.
+#[tauri::command]
+fn deck_stem_lanes(
+    deck: String,
+    stem_waves: State<'_, StemWaveState>,
+) -> Result<tauri::ipc::Response, String> {
+    let deck = parse_deck(&deck)?;
+    let bytes = stem_waves.0.lock().unwrap()[deck_slot(deck)]
+        .clone()
+        .unwrap_or_default();
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[derive(Deserialize)]
@@ -188,6 +285,8 @@ async fn load_track_stream(
     req: StreamReq,
     engine: State<'_, EngineState>,
     companion: State<'_, CompanionState>,
+    waves: State<'_, WaveState>,
+    stem_waves: State<'_, StemWaveState>,
 ) -> Result<Vec<f32>, String> {
     let deck = parse_deck(&req.deck)?;
     let audio = companion::fetch_track_audio(&companion, req.track_id).await?;
@@ -201,6 +300,8 @@ async fn load_track_stream(
         req.artist,
         req.bpm,
         &engine,
+        &waves,
+        &stem_waves,
     )
 }
 
@@ -340,6 +441,27 @@ fn set_crossfader(value: f32, state: State<'_, EngineState>) -> Result<(), Strin
     engine.mirror().crossfader = value;
     engine.send(Command::Crossfader(value));
     Ok(())
+}
+
+/// Crossfader gain law: `"linear"`, `"smooth"` (equal power) or `"sharp"` (cut).
+#[tauri::command]
+fn set_crossfader_curve(curve: String, state: State<'_, EngineState>) -> Result<(), String> {
+    let curve = mixai_core::CrossfaderCurve::parse(&curve)
+        .ok_or_else(|| format!("invalid crossfader curve '{curve}'"))?;
+    with_engine(&state, |e| e.set_crossfader_curve(curve))
+}
+
+/// Crossfader side of a deck: `"a"`, `"b"` or `"thru"` (bypasses the crossfader).
+#[tauri::command]
+fn deck_set_crossfader_assign(
+    deck: String,
+    assign: String,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    let assign = mixai_core::CrossfaderAssign::parse(&assign)
+        .ok_or_else(|| format!("invalid crossfader assign '{assign}'"))?;
+    with_engine(&state, |e| e.set_crossfader_assign(deck, assign))
 }
 
 #[tauri::command]
@@ -826,10 +948,15 @@ struct LoadStemsReq {
 /// Decode and attach separated stems to a deck (off the audio thread).
 /// Returns the indices [0..3] that were successfully loaded.
 #[tauri::command]
-fn load_stems(req: LoadStemsReq, state: State<'_, EngineState>) -> Result<Vec<usize>, String> {
+fn load_stems(
+    req: LoadStemsReq,
+    state: State<'_, EngineState>,
+    stem_waves: State<'_, StemWaveState>,
+) -> Result<Vec<usize>, String> {
     let deck = parse_deck(&req.deck)?;
     let paths = [req.vocals, req.drums, req.bass, req.melody];
     let mut layers: [Option<mixai_core::deck::TrackBuffer>; 4] = [None, None, None, None];
+    let mut lanes: [Option<Vec<u8>>; 4] = [None, None, None, None];
     let mut loaded = Vec::new();
     for (i, p) in paths.iter().enumerate() {
         if let Some(path) = p {
@@ -838,6 +965,7 @@ fn load_stems(req: LoadStemsReq, state: State<'_, EngineState>) -> Result<Vec<us
             }
             match mixai_core::decoder::decode_file(path) {
                 Ok(buf) => {
+                    lanes[i] = Some(buf.compute_peak_lane(WAVE_POINTS_PER_SECOND));
                     layers[i] = Some(buf);
                     loaded.push(i);
                 }
@@ -848,7 +976,13 @@ fn load_stems(req: LoadStemsReq, state: State<'_, EngineState>) -> Result<Vec<us
     if loaded.is_empty() {
         return Err("no stems could be decoded".into());
     }
-    with_engine(&state, |e| e.load_stems(deck, layers))?;
+    let bytes = stem_lanes_bytes(WAVE_POINTS_PER_SECOND, &lanes);
+    // Stored under the engine lock, in the order the engine gets the commands (see
+    // `publish_track_waves`): a track load that lands right after this clears them again.
+    with_engine(&state, |e| {
+        e.load_stems(deck, layers);
+        stem_waves.0.lock().unwrap()[deck_slot(deck)] = Some(bytes);
+    })?;
     Ok(loaded)
 }
 
@@ -1050,6 +1184,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(EngineState(Mutex::new(None)))
+        .manage(WaveState::default())
+        .manage(StemWaveState::default())
         .manage(MidiState::new())
         .manage(BleMidiState::new())
         .manage(HidState::new())
@@ -1104,6 +1240,8 @@ pub fn run() {
             get_mixer_state,
             load_track,
             load_track_stream,
+            deck_waveform_bands,
+            deck_stem_lanes,
             deck_play,
             deck_pause,
             deck_seek,
@@ -1115,6 +1253,8 @@ pub fn run() {
             deck_set_filter,
             deck_set_cue,
             set_crossfader,
+            set_crossfader_curve,
+            deck_set_crossfader_assign,
             set_master_volume,
             set_output_device,
             audio_output_info,
@@ -1174,6 +1314,7 @@ pub fn run() {
             companion::companion_status,
             companion::companion_configure,
             companion::companion_tracks,
+            companion::companion_track_peaks,
             companion::companion_toggle_favorite,
             companion::companion_track_stems,
             companion::companion_request_stems,
@@ -1192,9 +1333,57 @@ pub fn run() {
             pack::pack_list,
             pack::pack_remove,
             pack::pack_pick_file,
+            pack::pack_build,
+            pack::pack_export,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MIXAI");
+}
+
+#[cfg(test)]
+mod stem_lane_tests {
+    use super::{StemWaveState, WaveState, publish_track_waves, stem_lanes_bytes};
+
+    #[test]
+    fn a_track_load_replaces_the_bands_and_drops_that_decks_stem_lanes() {
+        let waves = WaveState::default();
+        let stems = StemWaveState::default();
+        waves.0.lock().unwrap()[1] = Some(vec![1]);
+        *stems.0.lock().unwrap() = [Some(vec![10]), Some(vec![11]), None, Some(vec![13])];
+        publish_track_waves(1, vec![7, 8, 9], &waves, &stems);
+        assert_eq!(
+            *waves.0.lock().unwrap(),
+            [None, Some(vec![7, 8, 9]), None, None]
+        );
+        // Only the loaded deck loses its lanes (they were the previous track's stems).
+        assert_eq!(
+            *stems.0.lock().unwrap(),
+            [Some(vec![10]), None, None, Some(vec![13])]
+        );
+    }
+
+    #[test]
+    fn stem_lanes_wire_form_is_header_mask_and_four_padded_lanes() {
+        // Drums (1) and melody (3) loaded; melody is one point shorter and gets zero-padded.
+        let lanes = [None, Some(vec![1, 2, 3]), None, Some(vec![7, 8])];
+        assert_eq!(
+            stem_lanes_bytes(150, &lanes),
+            vec![
+                150, 0, 0, 0, // points per second
+                3, 0, 0, 0, // len
+                0b1010, 0, 0, 0, // mask
+                0, 0, 0, // vocals (absent)
+                1, 2, 3, // drums
+                0, 0, 0, // bass (absent)
+                7, 8, 0, // melody (padded)
+            ]
+        );
+        // No stems at all: header only, len 0, mask 0.
+        assert_eq!(
+            stem_lanes_bytes(150, &[None, None, None, None]),
+            vec![150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
+    }
 }
 
 #[cfg(test)]

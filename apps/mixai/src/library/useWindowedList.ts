@@ -1,30 +1,41 @@
 /**
  * React binding for the pure `windowState` reducer: measures the list viewport
  * with a ResizeObserver and derives how many fixed-height rows fit
- * (floor(height / rowHeight)). Row height follows the theme density
- * (`<html data-density="compact">` → 32 px, otherwise 40 px).
+ * (floor(height / rowHeight)). Row height follows the theme (`rowHeightFor` in
+ * ./track-view.ts: 22 px in the dense default, 26 px otherwise, 28 px in booth
+ * mode, 44 px in touch mode).
  */
 import { useCallback, useEffect, useReducer, useState, useSyncExternalStore, type Dispatch } from "react";
+import { rowHeightFor } from "./track-view.ts";
 import { initialWindow, windowState, type WindowAction, type WindowState } from "./window-state.ts";
 
-export const ROW_HEIGHT_COMPACT = 32;
-export const ROW_HEIGHT_DEFAULT = 40;
+const ROW_HEIGHT_SSR = 22;
 
-function subscribeDensity(cb: () => void): () => void {
+function subscribeRoot(cb: () => void): () => void {
     if (typeof MutationObserver === "undefined" || typeof document === "undefined") return () => {};
     const mo = new MutationObserver(cb);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-density"] });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-density", "data-touch", "data-booth"] });
     return () => mo.disconnect();
 }
 
 function readRowHeight(): number {
-    if (typeof document === "undefined") return ROW_HEIGHT_DEFAULT;
-    return document.documentElement.dataset.density === "compact" ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_DEFAULT;
+    if (typeof document === "undefined") return ROW_HEIGHT_SSR;
+    const d = document.documentElement.dataset;
+    return rowHeightFor({ density: d.density, touch: d.touch, booth: d.booth });
 }
 
-/** Fixed row height for the current density; re-renders when the density changes. */
+function readTouch(): boolean {
+    return typeof document !== "undefined" && document.documentElement.dataset.touch === "on";
+}
+
+/** Fixed row height for the current theme; re-renders when density / booth / touch mode change. */
 export function useRowHeight(): number {
-    return useSyncExternalStore(subscribeDensity, readRowHeight, () => ROW_HEIGHT_DEFAULT);
+    return useSyncExternalStore(subscribeRoot, readRowHeight, () => ROW_HEIGHT_SSR);
+}
+
+/** True in touch mode (every target is at least 44 px, so fixed button columns are wider). */
+export function useTouchMode(): boolean {
+    return useSyncExternalStore(subscribeRoot, readTouch, () => false);
 }
 
 export interface WindowedList {

@@ -11,9 +11,9 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [controllers.md](controllers.md) | User guide (RO): DDJ-FLX4, Circuit Tracks, MIDI keyboard, BLE MIDI, MIDI learn |
 | [mapping-format.md](mapping-format.md) | Controller mapping format v1, action vocabulary, scripts, MIDI clock, groove lane, BLE MIDI |
 | [dvs.md](dvs.md) | Digital vinyl decoder: support matrix, API, MixAI timecode, measured results |
-| [skins.md](skins.md) | Skins: token-derived palettes, layouts, contrast gate, persistence |
-| [layouts.md](layouts.md) | Zero-scroll shell: layout JSON, solver + tiers, panel contract, title bar, stage mode, snapshots, pop-out |
-| [packs.md](packs.md) | `.mixaipack` format: manifest, DTCG tokens, layouts, assets, Ed25519 signing, trust levels, Marketplace |
+| [skins.md](skins.md) | Skins: the MixAI Signature default look and the classic skin, how a skin changes style and layout, built-in skins, legal note for look-alike skins, skin editor status; native apps: token-derived palettes, contrast gate, persistence |
+| [layouts.md](layouts.md) | Zero-scroll shell: layout JSON, 12 panels incl. `waves`, built-in layouts (`pro` default, `pro-vertical`), gap rule, solver + tiers, panel minimum sizes, title bar, stage mode, snapshots, pop-out |
+| [packs.md](packs.md) | `.mixaipack` format: manifest `v` 1 / 2, DTCG tokens, `style` block reference + refusal messages, layouts, assets, Ed25519 signing, trust levels, building a skin pack, Marketplace |
 | [stems.md](stems.md) | On-device stem separation: HT-Demucs ONNX, accelerators, cache, server fallback |
 | [remote.md](remote.md) | Connected mode: phone remote, second screen, Party DJ requests (LAN, QR pairing, security model) |
 | [transitions.md](transitions.md) | AI Transition Designer: next-track ranking, phrase-aligned plans, editable automation, set safety, RO/EN commands, risers |

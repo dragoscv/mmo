@@ -100,6 +100,27 @@ export const SHORTCUTS_BY_ID: ReadonlyMap<string, Shortcut> = new Map(
     ALL_SHORTCUTS.map((s) => [shortcutId(s), s]),
 );
 
+/** The part of a `KeyboardEvent` the global listener decides on. */
+export interface ShortcutKeyEvent {
+    code: string;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    altKey: boolean;
+    defaultPrevented: boolean;
+}
+
+/**
+ * The shortcut a key press triggers, or null. A key that a focused control already handled
+ * (`defaultPrevented`: arrows in a list, a slider, a radio group) is never a shortcut, nor is a
+ * modifier combo (Ctrl / Cmd / Alt) or a key typed in an editable field.
+ */
+export function matchShortcut(e: ShortcutKeyEvent, editable: boolean, bindings: ReadonlyMap<string, Shortcut>): Shortcut | null {
+    if (e.defaultPrevented) return null;
+    if (e.ctrlKey || e.metaKey || e.altKey) return null;
+    if (editable) return null;
+    return bindings.get(e.code) ?? null;
+}
+
 /** Pretty label for a `KeyboardEvent.code` (e.g. `KeyQ`→`Q`, `Digit1`→`1`). */
 export function codeLabel(code: string): string {
     if (code.startsWith("Key")) return code.slice(3);

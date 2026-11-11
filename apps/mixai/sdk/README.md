@@ -2,8 +2,8 @@
 
 Make skins, layouts and bundles for MixAI Decks as `.mixaipack` files. Zero dependencies:
 Node 24+ only. Format reference: [`docs/decks/packs.md`](../../../docs/decks/packs.md). The app
-verifies every pack in Rust (`apps/mixai/src-tauri/src/pack.rs`); this CLI applies the same rules
-first, so a pack that passes `validate` installs.
+verifies every pack in Rust (`apps/mixai/src-tauri/crates/decks-packs`); this CLI applies the same
+rules first, so a pack that passes `validate` installs.
 
 ```powershell
 node apps/mixai/sdk/mixaipack.mjs help
@@ -22,7 +22,21 @@ node apps/mixai/sdk/mixaipack.mjs pack my-skin -o com.yourname.skin.sunset.mixai
 Then in MixAI Decks: **Skins → Install from file**. You can try a pack for 30 seconds before installing it.
 
 `--kind layout` scaffolds `layouts/example.json`; `--kind bundle` scaffolds both tokens and a layout.
+Add `--style` (skin or bundle) for a manifest v2 pack with a starter [`style` block](#style-block-manifest-v2).
 `README.md` files and dotfiles in the pack folder are never packed.
+
+### Manifest version
+
+`manifest.json` → `"v"` is `1` or `2`:
+
+| `v` | Works on | Adds |
+|---|---|---|
+| `1` | every MixAI Decks version | — |
+| `2` | MixAI Decks 1.5 and newer | `tokens.json` may carry a `style` block |
+
+Keep `1` unless you use `style`: a v2 pack is refused by Decks 1.4 and older. A `style` block in a
+v1 pack is an error (`tokens.style needs manifest version 2`), and a version above 2 is refused
+with "this pack needs a newer MixAI Decks".
 
 ### `tokens.json`
 
@@ -48,6 +62,43 @@ Then in MixAI Decks: **Skins → Install from file**. You can try a pack for 30 
 - `mode` dark|light · `surface` glass|solid|flat · `density` comfortable|compact · `radius` sm|md|lg ·
   `fontHeading`/`fontBody` (declare the `.woff2` in `manifest.fonts`) · `background` (an image in the pack).
 
+### Style block (manifest v2)
+
+What a skin may change beyond the theme colours: the look, the layout it opens with, waveform and
+cue colours, and a few sizes. Data only: colours, bounded numbers and fixed words. Every key is
+optional; unknown keys are refused.
+
+```json
+{
+  "mode": "dark",
+  "colors": { "background": "#050607", "foreground": "#f2f5f3" },
+  "style": {
+    "look": "signature",
+    "platter": false,
+    "layout": "pro-vertical",
+    "waves": "stacked",
+    "colors": { "on": "#00d37f", "waveLow": "oklch(0.6 0.2 250)", "cue1": "#ff0000" },
+    "sizes": { "panelGap": 6, "panelRadius": 8, "wavePlayedAlpha": 0.45 }
+  }
+}
+```
+
+| Key | Values |
+|---|---|
+| `look` | `signature` (default) or `classic` (the glass look of Decks 1.4) |
+| `platter` | `true` / `false`: show the virtual platter in the decks while the skin is active |
+| `layout` | id of the layout to open with the skin: a layout of the same pack, or a built-in one (`pro`, `pro-vertical`, `classic`, `performance`, `library`, `four-deck`, `ultrawide`). `a-z 0-9 . _ -`, starts with a letter or digit, max 48. The user's previous layout comes back with their previous skin; an unknown id keeps the current layout (`validate` warns) |
+| `waves` | `stacked` (default, one lane per deck) or `overlay` (all decks in one lane) |
+| `colors` | `well`, `waveBg`, `line`, `faint`, `on`, `onFg`, `play`, `playFg`, `cue`, `alert`, `waveLow`, `waveMid`, `waveHigh`, `waveGrid`, `waveDownbeat`, `wavePlayhead`, `wavePlayheadCap`, `cue1` … `cue8`. Same colour syntax as above, without a minus sign |
+| `sizes` | numbers, limits included: `panelGap` 0–16 · `panelRadius` 0–16 · `panelPad` 4–16 · `controlRadius` 0–12 · `padRadius` 0–12 · `controlHeight` 20–32 · `titlebarHeight` 28–48 · `wavePlayedAlpha` 0.2–1 |
+
+The same list lives in three places that must change together: `apps/mixai/src/look/style-vars.ts`
+(the app), `crates/decks-packs/src/style.rs` (the verifier) and `sdk/lib/validate.mjs` (this CLI).
+The SDK and Rust tests read `style-vars.ts` and fail when the lists differ.
+
+The skin editor in MixAI Decks exports exactly this: an unsigned manifest v2 skin with
+`manifest.json` + `tokens.json`. Unpack it, add a preview or layouts, and `pack` it again to sign it.
+
 ### Contrast gate
 
 `validate` and `pack` refuse a skin whose text is hard to read (WCAG 2.2 AA): foreground/background,
@@ -59,8 +110,30 @@ warnings (for experiments; such skins will not be accepted as verified).
 
 A layout is a grid of weighted columns/rows with panels placed on it (the same schema as the
 built-in layouts in `apps/mixai/src/layout/presets.ts`). Panels: deckA, deckB, deckC, deckD,
-clock, mixer, crossfader, library, automix, sampler, plugins. deckA, deckB and mixer are required;
-panels may not overlap or leave the grid; 1–8 columns/rows with weights in (0, 20]; gap 0–32.
+clock, mixer, crossfader, library, automix, sampler, plugins, waves. deckA, deckB and mixer are
+required; panels may not overlap or leave the grid; 1–8 columns/rows with weights in (0, 20];
+gap 0–32.
+
+`waves` (Decks 1.5) is the band of scrolling waveforms of every deck in the layout; it turns
+vertical by itself in a box that is clearly taller than wide. Layouts stay schema `"v": 1`, but a
+layout that places `waves` is not accepted by Decks 1.4 and older ("unknown panel"), so ship it in
+a manifest v2 pack.
+
+A panel shows its full, compact or icon form depending on the box the layout gives it; one that
+does not even fit as an icon becomes a tab in the dock (decks, mixer and crossfader are never
+docked). Minimum box per form, width × height in px:
+
+| Panel | Full | Compact | Icon |
+|---|---|---|---|
+| deckA … deckD | 480 × 250 | 340 × 190 | 220 × 110 |
+| mixer | 240 × 250 | 200 × 190 | 150 × 110 |
+| crossfader | 220 × 84 | 180 × 40 | 140 × 28 |
+| waves | 480 × 110 | 320 × 64 | 200 × 36 |
+| clock | 220 × 72 | 160 × 40 | 90 × 28 |
+| library | 520 × 240 | 320 × 160 | 200 × 96 |
+| automix | 230 × 230 | 190 × 130 | 120 × 56 |
+| sampler | 270 × 250 | 200 × 140 | 120 × 56 |
+| plugins | 220 × 160 | 160 × 96 | 96 × 48 |
 
 ## Import from Figma
 

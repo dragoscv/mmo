@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -45,9 +46,11 @@ import ro.mixai.decks.ui.components.LocalDeckGrids
 import ro.mixai.decks.ui.components.PadButton
 import ro.mixai.decks.ui.components.Panel
 import ro.mixai.decks.ui.components.WaveformSlot
+import ro.mixai.decks.ui.components.WavesPanel
 import ro.mixai.decks.ui.engine.DemoPacks
 import ro.mixai.decks.ui.engine.GridPort
 import ro.mixai.decks.ui.engine.GridStateUi
+import ro.mixai.decks.ui.engine.LayoutDoc
 import ro.mixai.decks.ui.engine.PackPort
 import ro.mixai.decks.ui.engine.PanelId
 import ro.mixai.decks.ui.engine.PanelTier
@@ -108,12 +111,48 @@ class DeckGridCache(private val port: GridPort?, private val decks: Int) {
     }
 }
 
+/** Padding around the screen and the gap between its rows (dp). */
+const val SCREEN_PAD_DP = 8
+
+/** A layout without its own gap takes the look's panel gap (Signature 2 dp, classic 12 dp), as Workspace.tsx does. */
+fun LayoutDoc.withLookGap(skin: DecksSkin): LayoutDoc = if (gap == null) copy(gap = skin.panelGapDp) else this
+
+/** Height (dp) of the status bar: one row of 44 dp buttons inside a panel. */
+fun statusBarDp(skin: DecksSkin): Double = 2.0 * skin.panelPadDp + maxOf(44, skin.controlHeightDp)
+
+/**
+ * Height (dp) of the fixed waveform strip above the panels in a [widthDp] × [heightDp] window;
+ * performance-style layouts (no library area) get the tall one.
+ */
+fun waveStripDp(widthDp: Float, heightDp: Float, hasLibrary: Boolean): Int = when {
+    widthDp < 1000f || heightDp < 700f -> 90
+    !hasLibrary -> 220
+    else -> 130
+}
+
+/**
+ * Size (dp) the layout host gets in a [w] × [h] window with no extra panel open: the window minus
+ * the screen padding, the status bar and — for layouts without a `waves` area — the waveform strip.
+ * (A layout whose `waves` panel got docked also shows the strip; that case is not modelled here.)
+ */
+fun layoutHostSize(w: Double, h: Double, skin: DecksSkin, layout: LayoutDoc): Pair<Double, Double> {
+    var hh = h - 2 * SCREEN_PAD_DP - statusBarDp(skin) - SCREEN_PAD_DP
+    if (layout.areas.none { it.panel == PanelId.Waves }) {
+        hh -= waveStripDp(w.toFloat(), h.toFloat(), layout.areas.any { it.panel == PanelId.Library }) + SCREEN_PAD_DP
+    }
+    return (w - 2 * SCREEN_PAD_DP).coerceAtLeast(0.0) to hh.coerceAtLeast(0.0)
+}
+
+private val WavesShownInStrip: Set<PanelId> = setOf(PanelId.Waves)
+private val NothingShownElsewhere: Set<PanelId> = emptySet()
+
 /**
  * Root of the Decks UI (shared by Android and Desktop).
  * Zero-scroll (WP19-34): status bar + waveform strip, then a [LayoutHost] that places every panel
  * by the solver (the skin's layout: a built-in preset or an installed pack layout; phones under
  * [PHONE_MAX_WIDTH_DP] get the native phone layout). Panels that do not fit, or that this app does
- * not have, go to the dock. Nothing scrolls.
+ * not have, go to the dock. Nothing scrolls. [onLayoutSolved] reports the layout in use and every
+ * new solver result (tests, diagnostics).
  */
 @Composable
 fun DecksScreen(
@@ -128,6 +167,7 @@ fun DecksScreen(
     packNotice: PackNotice? = null,
     onDismissPackNotice: () -> Unit = {},
     pickFile: (((String) -> Unit) -> Unit)? = null,
+    onLayoutSolved: ((LayoutDoc, ro.mixai.decks.ui.engine.LayoutSolution) -> Unit)? = null,
 ) {
     val reduced = LocalReducedMotion.current
     val skin = LocalDecksSkin.current
@@ -177,12 +217,16 @@ fun DecksScreen(
             .focusRequester(focus)
             .focusable(),
     ) {
-        val wide = maxWidth >= 1000.dp
-        val short = maxHeight < 700.dp
-        val layout = effectiveLayout(chosen, maxWidth.value)
+        // One LayoutDoc instance per (layout, gap): a new copy every frame would defeat the skipping of
+        // LayoutHost and every panel under it (this scope recomposes each frame for the waveform).
+        val winW = maxWidth.value
+        val winH = maxHeight.value
+        val base = effectiveLayout(chosen, winW)
+        val gap = skin.panelGapDp
+        val layout = remember(base, gap) { if (base.gap == null) base.copy(gap = gap) else base }
         val peaks = ctl.controls.map { it.peaks }
         val frame = ctl.waveFrame(zoom, reduced)
-        Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxSize().padding(SCREEN_PAD_DP.dp), verticalArrangement = Arrangement.spacedBy(SCREEN_PAD_DP.dp)) {
             StatusBar(
                 ctl, skins, if (recordPath != null) ({ showSet = !showSet }) else null, { showAi = !showAi },
                 layoutLabel = layoutName(chosen),
@@ -237,25 +281,51 @@ fun DecksScreen(
             val waveLabel = str(Str.Waveform)
             // Performance-style layouts (no library area) get the tall waveform strip.
             val hasLibrary = layout.areas.any { it.panel == PanelId.Library }
-            val waveH = when {
-                !wide || short -> 90.dp
-                !hasLibrary -> 220.dp
-                else -> 130.dp
-            }
-            Box(Modifier.fillMaxWidth().height(waveH)) {
-                // The grids reach every renderer (Compose fallback, GPU) through the local (P1-18).
-                CompositionLocalProvider(LocalDeckGrids provides gridCache.grids) {
-                    waveforms(frame, peaks, Modifier.fillMaxSize().semantics { contentDescription = waveLabel })
+            val waveH = waveStripDp(winW, winH, hasLibrary).dp
+            // The scrolling waveforms of every deck: one lane per deck, centre playhead, beatgrid, cues, loop
+            // (GPU renderer on device, Compose painter otherwise). The grids reach every renderer through
+            // the local (P1-18). The lambda is one stable instance that reads the per-frame frame / peaks
+            // through state, so only the lanes redraw each frame, not the layout host that carries them.
+            val frameNow = rememberUpdatedState(frame)
+            val peaksNow = rememberUpdatedState(peaks)
+            val slot = rememberUpdatedState(waveforms)
+            val lanes: @Composable (Modifier) -> Unit = remember(gridCache, waveLabel) {
+                { m ->
+                    CompositionLocalProvider(LocalDeckGrids provides gridCache.grids) {
+                        slot.value(frameNow.value, peaksNow.value, m.semantics { contentDescription = waveLabel })
+                    }
                 }
             }
+            // Decks 1.5: layouts with a `waves` area (Pro, Vertical waves) place the band as a panel; the fixed
+            // strip above the panels stays for layouts without one (the 1.x layouts, phones) and for windows
+            // where the solver could not place that panel and docked it (Vertical waves under ~1120 dp): a
+            // DJ screen always shows a scrolling waveform. The strip then replaces the panel's dock tab.
+            val hasWaves = layout.areas.any { it.panel == PanelId.Waves }
+            var wavesDocked by remember(layout) { mutableStateOf(false) }
+            val strip = !hasWaves || wavesDocked
+            if (strip) {
+                Box(Modifier.fillMaxWidth().height(waveH)) { lanes(Modifier.fillMaxSize()) }
+            }
             val hasCrossfader = layout.areas.any { it.panel == PanelId.Crossfader }
-            LayoutHost(layout, port, Modifier.fillMaxWidth().weight(1f)) { id, tier, m ->
+            val report = rememberUpdatedState(onLayoutSolved)
+            val onSolved: (ro.mixai.decks.ui.engine.LayoutSolution) -> Unit = remember(layout) {
+                { sol ->
+                    wavesDocked = PanelId.Waves in sol.docked
+                    report.value?.invoke(layout, sol)
+                }
+            }
+            LayoutHost(
+                layout, port, Modifier.fillMaxWidth().weight(1f),
+                shownElsewhere = if (strip && hasWaves) WavesShownInStrip else NothingShownElsewhere,
+                onSolved = onSolved,
+            ) { id, tier, m ->
                 when (id) {
                     PanelId.DeckA -> DeckPanel(ctl, 0, m, tier)
                     PanelId.DeckB -> DeckPanel(ctl, 1, m, tier)
                     PanelId.Mixer -> MixerPanel(ctl, m, tier, withCrossfader = !hasCrossfader)
                     PanelId.Crossfader -> CrossfaderPanel(ctl, m, tier)
                     PanelId.Library -> LibraryPanel(ctl, onScanFolder, m)
+                    PanelId.Waves -> WavesPanel(m, lanes)
                     else -> Unavailable(id, m)
                 }
             }
@@ -342,11 +412,15 @@ private fun StatusBar(
 
 @Composable
 fun skinName(s: DecksSkin): String = when (s.id) {
+    "signature" -> str(Str.SkinSignature)
+    "glass-classic", "nocturne" -> str(Str.SkinGlassClassic)
+    "mainroom" -> str(Str.SkinMainroom)
+    "crate" -> str(Str.SkinCrate)
+    "pilot" -> str(Str.SkinPilot)
     "club" -> str(Str.SkinClub)
     "booth" -> str(Str.SkinBooth)
     "studio" -> str(Str.SkinStudio)
     "emerald" -> str(Str.SkinEmerald)
-    "nocturne" -> str(Str.SkinNocturne)
     else -> s.id
 }
 

@@ -22,6 +22,7 @@ export const PANEL_IDS = [
     "automix",
     "sampler",
     "plugins",
+    "waves",
 ] as const;
 
 export type PanelId = (typeof PANEL_IDS)[number];

@@ -1,0 +1,568 @@
+/* Decks 1.5 look: styles owned by this area (see src/look/look.css for the shared vocabulary).
+   Mixer, crossfader, master clock, Knob, Fader, level meters. Sizes used by the mixer layout
+   are mirrored in src/components/panel-fit.ts (MIXER): keep them in sync. */
+
+/* ── knob ── */
+.mx-knob {
+    display: grid;
+    justify-items: center;
+    flex: none;
+    min-width: 0;
+    border-radius: var(--ctl-radius, 6px);
+}
+.mx-knob:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+.mx-knob[aria-disabled="true"] {
+    opacity: 0.4;
+}
+.mx-knob > svg {
+    display: block;
+    cursor: ns-resize;
+    touch-action: none;
+}
+.mx-knob[aria-disabled="true"] > svg {
+    cursor: not-allowed;
+}
+.mx-knob-track {
+    fill: none;
+    stroke: color-mix(in oklab, var(--foreground) 24%, transparent);
+    stroke-width: 2;
+}
+.mx-knob-arc {
+    fill: none;
+    stroke: var(--knob-color, var(--muted-foreground));
+    stroke-width: 2;
+}
+.mx-knob-body {
+    fill: var(--secondary);
+    stroke: var(--line, var(--border));
+    stroke-width: 1;
+}
+.mx-knob-ptr {
+    stroke: var(--foreground);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+.mx-knob-label {
+    line-height: 10px;
+}
+.mx-knob-value {
+    min-width: 46px;
+    text-align: center;
+    font-size: 10px;
+    line-height: 12px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+
+/* ── fader ── */
+.mx-fader {
+    --cap: 12px;
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
+    background: var(--well, var(--bg-elev-2));
+    border-radius: var(--ctl-radius, 6px);
+    cursor: ns-resize;
+    touch-action: none;
+}
+.mx-fader[data-orient="horizontal"] {
+    --cap: 14px;
+    cursor: ew-resize;
+}
+.mx-fader:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+.mx-fader-slot,
+.mx-fader-fill {
+    position: absolute;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    bottom: calc(var(--cap) / 2);
+}
+.mx-fader-slot {
+    top: calc(var(--cap) / 2);
+    background: color-mix(in oklab, var(--foreground) 24%, transparent);
+}
+.mx-fader-fill {
+    height: calc((100% - var(--cap)) * var(--p, 0));
+    background: var(--fader-color, var(--deck, var(--muted-foreground)));
+}
+.mx-fader-cap {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    height: var(--cap);
+    bottom: calc((100% - var(--cap)) * var(--p, 0));
+    background: var(--foreground);
+    border-radius: 1px;
+}
+.mx-fader-cap::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    background: var(--card);
+}
+.mx-fader[data-orient="horizontal"] .mx-fader-slot,
+.mx-fader[data-orient="horizontal"] .mx-fader-fill {
+    left: calc(var(--cap) / 2);
+    top: 50%;
+    bottom: auto;
+    width: auto;
+    height: 2px;
+    margin: -1px 0 0;
+}
+.mx-fader[data-orient="horizontal"] .mx-fader-slot {
+    right: calc(var(--cap) / 2);
+}
+.mx-fader[data-orient="horizontal"] .mx-fader-fill {
+    width: calc((100% - var(--cap)) * var(--p, 0));
+}
+.mx-fader[data-orient="horizontal"] .mx-fader-cap {
+    top: 2px;
+    bottom: 2px;
+    left: calc((100% - var(--cap)) * var(--p, 0));
+    right: auto;
+    width: var(--cap);
+    height: auto;
+}
+.mx-fader[data-orient="horizontal"] .mx-fader-cap::after {
+    left: 50%;
+    right: auto;
+    top: 3px;
+    bottom: 3px;
+    width: 2px;
+    height: auto;
+    margin: 0 0 0 -1px;
+}
+
+/* ── segmented level meter: two static layers of `dk-led` cells (all off / all lit); the lit
+   layer is clipped to the level by ONE inline `clip-path` (VuMeter.tsx), the peak-hold cell is
+   one node placed by `--peak`. Cell 4 px + gap 2 px: keep in sync with `VU` in mixer/vu-math.ts ── */
+.mx-vu {
+    position: relative;
+    flex: none;
+    min-width: 0;
+    min-height: 0;
+}
+.mx-vu-cols {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 2px;
+}
+.mx-vu-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    min-width: 0;
+    min-height: 0;
+}
+.mx-vu[data-orient="horizontal"] .mx-vu-cols {
+    flex-direction: column;
+}
+.mx-vu[data-orient="horizontal"] .mx-vu-col {
+    flex-direction: row;
+}
+.mx-vu-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    --led: var(--success);
+}
+.mx-vu-cell[data-zone="hot"] {
+    --led: var(--warning);
+}
+.mx-vu-cell[data-zone="clip"] {
+    --led: var(--destructive);
+}
+/* Nothing lit until the meter writes its clip. */
+.mx-vu-lit {
+    clip-path: inset(100% 0 0 0);
+}
+.mx-vu[data-orient="horizontal"] .mx-vu-lit {
+    clip-path: inset(0 100% 0 0);
+}
+.mx-vu-peak {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc((100% + 2px) * var(--peak, 0) / var(--vu-cells, 1));
+    height: calc((100% + 2px) / var(--vu-cells, 1) - 2px);
+    display: flex;
+    gap: 2px;
+    --led: var(--success);
+}
+.mx-vu[data-orient="horizontal"] .mx-vu-peak {
+    top: 0;
+    bottom: 0;
+    right: auto;
+    left: calc((100% + 2px) * var(--peak, 0) / var(--vu-cells, 1));
+    width: calc((100% + 2px) / var(--vu-cells, 1) - 2px);
+    height: auto;
+    flex-direction: column;
+}
+.mx-vu-peak[data-zone="none"] {
+    display: none;
+}
+.mx-vu-peak[data-zone="hot"] {
+    --led: var(--warning);
+}
+.mx-vu-peak[data-zone="clip"] {
+    --led: var(--destructive);
+}
+.mx-vu-peak > i {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 1px;
+    background: var(--led);
+}
+
+/* ── mixer panel ── */
+.mx-panel {
+    /* Controls stay 24 px here even in booth mode: the layout model counts on it. */
+    --ctl-h: 24px;
+    display: flex;
+    align-items: stretch;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+.mx-ch,
+.mx-detail {
+    --knob-color: var(--deck);
+}
+.mx-ch {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    row-gap: 3px;
+    min-width: 0;
+    min-height: 0;
+}
+.mx-ch-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 12px;
+}
+.mx-ch-head::before,
+.mx-ch-head::after {
+    content: "";
+    flex: 1 1 0;
+    height: 1px;
+    background: color-mix(in oklab, var(--deck) 60%, transparent);
+}
+.mx-ch-id {
+    font-size: 11px;
+    line-height: 12px;
+    font-weight: 800;
+    color: var(--deck);
+}
+.mx-ch-btn {
+    flex: none;
+    width: 100%;
+    padding: 0;
+}
+.mx-ch-body {
+    flex: 1 1 0;
+    display: flex;
+    column-gap: 3px;
+    row-gap: 3px;
+    min-width: 0;
+    min-height: 0;
+}
+.mx-ch[data-side="right"] > .mx-ch-body,
+.mx-ch[data-side="right"] .mx-level {
+    flex-direction: row-reverse;
+}
+.mx-ch[data-mode="stack"] > .mx-ch-body {
+    flex-direction: column;
+}
+.mx-knobs {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    row-gap: 2px;
+    min-height: 0;
+}
+.mx-ch[data-mode="stack"] .mx-knobs {
+    justify-content: flex-start;
+}
+.mx-level {
+    flex: 1 1 0;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    min-width: 0;
+    min-height: 0;
+}
+.mx-ch-vu {
+    width: var(--vu-w, 8px);
+}
+.mx-ch-foot {
+    flex: none;
+    display: flex;
+    gap: 3px;
+    height: 24px;
+}
+.mx-ch[data-side="left"] > .mx-ch-foot {
+    flex-direction: row-reverse;
+}
+.mx-cue {
+    flex: 1 1 0;
+    min-width: 24px;
+    padding: 0 2px;
+}
+
+/* master column */
+.mx-master {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    row-gap: 3px;
+    min-height: 0;
+}
+.mx-master-label {
+    flex: none;
+}
+.mx-master-vu {
+    flex: 1 1 0;
+    width: 12px;
+    min-height: 36px;
+}
+.mx-sends {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+.mx-sends[data-dir="row"] {
+    flex-direction: row;
+    gap: 8px;
+}
+
+/* ── popovers ── */
+.mx-pop-wide {
+    max-width: min(92vw, 40rem);
+}
+.mx-detail {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+.mx-detail-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mx-detail-vu {
+    flex: 1 1 0;
+    height: 6px;
+    min-width: 48px;
+}
+.mx-detail-knobs {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+}
+.mx-pop-master {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.mx-pop-channels {
+    display: grid;
+    gap: 12px;
+}
+.mx-pop-channels[data-many="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.mx-routing {
+    display: grid;
+    gap: 6px;
+}
+.mx-routing-knobs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+.mx-routing-toggles {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.mx-seg {
+    display: inline-flex;
+    gap: 2px;
+}
+/* Cells in the mixer popovers are pointer targets: 24 px, not the 22 px of `dk-cell`. */
+.mx-seg > .dk-cell {
+    min-height: 24px;
+}
+.mx-row-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.mx-assign {
+    display: grid;
+    gap: 4px;
+}
+
+/* ── crossfader panel ── */
+.xf-panel {
+    --ctl-h: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    row-gap: 4px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 4px 8px;
+}
+.xf-panel[data-tier="full"] {
+    padding: 6px 8px;
+}
+.xf-panel[data-tier="icon"] {
+    padding: 2px 6px;
+}
+.xf-top {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 12px;
+}
+.xf-row {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 24px;
+    max-height: 32px;
+}
+.xf-extra {
+    flex: none;
+    height: 24px;
+}
+.xf-side {
+    flex: none;
+    min-width: 8px;
+    text-align: center;
+    font-size: 11px;
+    line-height: 12px;
+    font-weight: 800;
+    color: var(--deck);
+}
+.xf-fader {
+    flex: 1 1 0;
+    align-self: stretch;
+    min-width: 0;
+}
+.xf-fader .mx-fader-fill {
+    display: none;
+}
+/* Centre mark (the detent). Painted under the cap. */
+.xf-fader::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 3px;
+    bottom: 3px;
+    width: 2px;
+    margin-left: -1px;
+    background: color-mix(in oklab, var(--foreground) 40%, transparent);
+}
+.xf-master {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* ── form bits shared by Beat FX, colour FX and the master clock ── */
+.mx-select {
+    box-sizing: border-box;
+    min-height: 24px;
+    min-width: 0;
+    padding: 0 4px;
+    border-radius: var(--ctl-radius, 6px);
+    border: 1px solid var(--line, var(--border));
+    background: var(--secondary);
+    color: var(--foreground);
+    font-size: 11px;
+    font-weight: 700;
+}
+.mx-select:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+:root[data-touch="on"] .mx-select {
+    min-height: 44px;
+}
+.mx-field {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.mx-field-grow {
+    flex: 1 1 0;
+}
+.mx-seg-fill {
+    display: flex;
+}
+.mx-seg-fill > * {
+    flex: 1 1 0;
+}
+.mx-beatfx {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    min-width: 12rem;
+}
+.mx-beatfx[data-bare="false"] {
+    padding-top: 6px;
+    border-top: 1px solid var(--line, var(--border));
+}
+.mx-beatfx[data-bare="true"] > .mx-row-between {
+    justify-content: flex-end;
+}
+.mx-beatfx-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 8px;
+}
+.mx-colorfx {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}

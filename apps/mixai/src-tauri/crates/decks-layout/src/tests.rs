@@ -4,6 +4,7 @@ use serde_json::Value;
 use super::*;
 
 const FIXTURES: &str = include_str!("../../../../../../docs/decks/fixtures/layout-cases.json");
+const PRESETS_TS: &str = include_str!("../../../../src/layout/presets.ts");
 
 #[derive(Deserialize)]
 struct Fixtures {
@@ -45,10 +46,148 @@ fn same_rect(a: &Rect, b: &Rect) -> bool {
     close(a.x, b.x) && close(a.y, b.y) && close(a.w, b.w) && close(a.h, b.h)
 }
 
+/// presets.ts without comments and whitespace (so the line ends of the checkout do not matter).
+fn presets_ts_compact() -> String {
+    PRESETS_TS
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.starts_with("//") && !l.starts_with("/*") && !l.starts_with('*'))
+        .flat_map(str::chars)
+        .filter(|c| !c.is_whitespace())
+        .collect()
+}
+
+/// The part of `s` after `from` and before the next `to`.
+fn between<'a>(s: &'a str, from: &str, to: &str) -> &'a str {
+    let start = s
+        .find(from)
+        .unwrap_or_else(|| panic!("'{from}' not found in presets.ts"))
+        + from.len();
+    let end = s[start..]
+        .find(to)
+        .unwrap_or_else(|| panic!("'{to}' not found after '{from}' in presets.ts"));
+    &s[start..start + end]
+}
+
+/// Every number in `s`, in order.
+fn numbers(s: &str) -> Vec<f64> {
+    s.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .filter(|t| !t.is_empty())
+        .map(|t| t.parse().unwrap_or_else(|_| panic!("number '{t}'")))
+        .collect()
+}
+
+/// The golden cases use a coarse grid of window sizes, so a minimum that is off by one pixel can
+/// pass all of them (a mutation run showed it for the deck's full height and the mixer's compact
+/// height). This reads the table straight from presets.ts: every tier of every panel, the order
+/// of the panels and which ones are essential.
+#[test]
+fn panel_specs_equal_presets_ts() {
+    let ts = presets_ts_compact();
+    let deck = numbers(between(&ts, "constdeck:PanelSpec[\"min\"]={", "};"));
+    assert_eq!(deck.len(), 6, "{deck:?}");
+    let table = between(
+        &ts,
+        "exportconstPANEL_SPECS:Record<PanelId,PanelSpec>={",
+        "};",
+    );
+    let entries: Vec<&str> = table.split("{id:\"").skip(1).collect();
+    assert_eq!(entries.len(), PANEL_SPECS.len(), "{table}");
+    for (entry, spec) in entries.iter().zip(PANEL_SPECS.iter()) {
+        let id = spec.id.as_str();
+        assert!(entry.starts_with(&format!("{id}\",")), "{id}: {entry}");
+        let min = if entry.contains("min:deck") {
+            deck.clone()
+        } else {
+            let at = entry
+                .find("min:{")
+                .unwrap_or_else(|| panic!("{id} has no min in presets.ts"));
+            numbers(&entry[at..])
+        };
+        let rust = [
+            spec.full.w,
+            spec.full.h,
+            spec.compact.w,
+            spec.compact.h,
+            spec.icon.w,
+            spec.icon.h,
+        ];
+        assert_eq!(min, rust, "{id}: full, compact, icon as w, h");
+        assert_eq!(entry.contains("essential:true"), spec.essential, "{id}");
+    }
+}
+
 #[test]
 fn fixture_presets_equal_the_rust_presets() {
     let f = fixtures();
     assert_eq!(f.layouts, all_presets());
+}
+
+/// Count, order and default of the presets follow `BUILTIN_LAYOUTS` / `DEFAULT_LAYOUT` in
+/// presets.ts (the native layout pickers list them in this order).
+#[test]
+fn builtin_presets_follow_the_ts_order() {
+    let ids: Vec<String> = builtin_layouts().into_iter().map(|l| l.id).collect();
+    assert_eq!(
+        ids,
+        [
+            "pro",
+            "pro-vertical",
+            "classic",
+            "performance",
+            "library",
+            "four-deck",
+            "ultrawide"
+        ]
+    );
+    assert_eq!(all_presets().len(), 8);
+    assert_eq!(all_presets().last().unwrap().id, "stage");
+    assert_eq!(default_layout().id, "pro");
+    for l in all_presets() {
+        let raw = serde_json::to_value(&l).unwrap();
+        assert_eq!(
+            validate_layout(&raw, &PANEL_IDS),
+            [] as [&str; 0],
+            "{}",
+            l.id
+        );
+    }
+}
+
+/// `waves` is a panel of the format (12 ids, specs in the same order) and is not essential:
+/// too small for its icon tier it is docked, never squeezed.
+#[test]
+fn waves_is_a_regular_dockable_panel() {
+    assert_eq!(PANEL_IDS.len(), 12);
+    assert_eq!(PanelId::parse("waves"), Some(PanelId::Waves));
+    assert_eq!(
+        serde_json::to_value(PanelId::Waves).unwrap(),
+        Value::String("waves".into())
+    );
+    for (id, spec) in PANEL_IDS.iter().zip(PANEL_SPECS.iter()) {
+        assert_eq!(*id, spec.id);
+        assert_eq!(PanelId::parse(id.as_str()), Some(*id));
+    }
+    let waves = spec_of(&PANEL_SPECS, PanelId::Waves);
+    assert!(!waves.essential);
+    assert_eq!((waves.full.w, waves.full.h), (480.0, 110.0));
+    assert_eq!((waves.compact.w, waves.compact.h), (320.0, 64.0));
+    assert_eq!((waves.icon.w, waves.icon.h), (200.0, 36.0));
+    // 1500 x 969 (the size the Pro rows were tuned for): the band is full, nothing is docked.
+    let s = solve(&pro(), 1500.0, 969.0);
+    assert!(s.docked.is_empty(), "{:?}", s.docked);
+    let band = s
+        .placements
+        .iter()
+        .find(|p| p.panel == PanelId::Waves)
+        .unwrap();
+    assert_eq!(band.tier, Tier::Full);
+    // Vertical waves at 360 px wide: the lane is 58 px wide (< 200), so it becomes a dock tab
+    // while the essential panels stay placed as icons.
+    let small = solve(&pro_vertical(), 360.0, 300.0);
+    assert_eq!(small.docked, [PanelId::Waves], "{small:?}");
+    assert!(small.placements.iter().all(|p| p.tier == Tier::Icon));
+    assert!(small.dock.is_some());
 }
 
 #[test]

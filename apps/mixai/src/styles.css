@@ -6,6 +6,19 @@
 @import "tailwindcss";
 @import "../../../packages/design-tokens/dist/tokens.css";
 @import "../../../packages/ui/src/styles.css";
+/* Bundled UI fonts (SIL OFL 1.1), so the app looks the same on every machine. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+/* Decks-only look layer (default "MixAI Signature"); must come after the shared tokens. */
+@import "./look/look.css";
+/* One stylesheet per UI area (owned by that area's components). */
+@import "./shell/shell.css";
+@import "./components/waves.css";
+@import "./components/deck.css";
+@import "./components/deck-tabs.css";
+@import "./components/mixer.css";
+@import "./library/library.css";
+@import "./settings/skin-editor.css";
 @source "../../../packages/ui/src";
 
 /*
@@ -201,10 +214,23 @@ input[type="range"] {
 .mixai-shell {
     height: 100%;
     display: grid;
-    grid-template-rows: 40px minmax(0, 1fr);
+    grid-template-rows: 40px minmax(0, 1fr) var(--statusbar-h, 22px);
     gap: 0;
     padding: 0 0.5rem 0.5rem;
     overflow: hidden;
+}
+/* Permanent status bar: one fixed row under the workspace (content: shell/StatusBar.tsx). */
+.mixai-statusbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    height: var(--statusbar-h, 22px);
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 0.5rem;
+    font-size: 11px;
+    color: var(--muted-foreground);
+    white-space: nowrap;
 }
 
 /* ── shell: title bar, workspace, dock (WP19-30) ── */
@@ -235,7 +261,8 @@ input[type="range"] {
     display: flex;
     align-self: stretch;
     margin-left: 0.25rem;
-    margin-right: -0.5rem;
+    /* Reach the window edge: the shell pads 8 px (classic) or var(--shell-pad) (Signature). */
+    margin-right: calc(-1 * var(--shell-pad, 0.5rem));
 }
 .mixai-winbtn {
     width: 46px;
@@ -381,24 +408,10 @@ input[type="range"] {
    is a size container, so @container rules can fine-tune without media queries.
    Overflow is clipped as a last resort only: the components size themselves to
    fit (src/components/panel-fit.ts + the PANEL_SPECS minimums). */
-.deck-tier,
-.mixer-tier {
+.deck-tier {
     container-type: size;
     box-sizing: border-box;
 }
 .deck-tier :where(button, select, input) {
     flex-shrink: 0;
-}
-/* Deck compact: very low cards hide the tab caption (icons stay). */
-@container (max-height: 360px) {
-    .deck-tier[data-tier="compact"] [role="toolbar"] > span:last-child {
-        display: none;
-    }
-}
-/* Mixer: tighter knob labels in narrow 4-channel strips. */
-@container (max-width: 260px) {
-    .mixer-tier [role="slider"] > span {
-        font-size: 8px;
-        letter-spacing: 0.02em;
-    }
 }

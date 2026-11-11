@@ -1,0 +1,588 @@
+/*
+ * Decks 1.5 look: the library ("pro" table: dense rows, aligned columns, zero scroll).
+ * Shared vocabulary (dk-*) and tokens: src/look/look.css. Every colour has a fallback to a
+ * shared token so the classic look keeps working.
+ *
+ * Geometry contract with src/library/track-view.ts + components/Library.tsx:
+ *   row padding 8 px and column gap 8 px in the full tier (6 / 4 px in compact / icon),
+ *   position-thumb slot 10 px, row height from `--lib-row-h` (set by ScrolllessList).
+ *
+ * Target size (WCAG 2.5.8): rows are 22 px and the header 20 px by design, so the controls
+ * inside them are below 24 px. Each one has a 24 px equivalent: Enter / Shift+Enter on the
+ * list, and "Library options" in the toolbar (sort, load A/B, favourite, stems).
+ */
+.lib-root {
+    --lib-row-pad: 8px;
+    --lib-col-gap: 8px;
+    --lib-thumb: 10px;
+    --lib-row-h: 22px;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+.lib-root[data-tier="compact"] {
+    --lib-row-pad: 6px;
+    --lib-col-gap: 6px;
+}
+.lib-root[data-tier="icon"] {
+    --lib-row-pad: 4px;
+    --lib-col-gap: 4px;
+}
+
+/* Truncated single-line text. */
+.lib-c {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── toolbar (one 28 px row) ── */
+.lib-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 28px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--line, var(--border));
+}
+.lib-root[data-tier="icon"] .lib-toolbar {
+    min-height: 26px;
+    gap: 4px;
+    padding: 0 4px;
+}
+/* The toolbar sits on the panel edge: keep the focus ring inside its 2 px margin. */
+.lib-toolbar :is(.dk-btn, .dk-tab):focus-visible {
+    outline-offset: 0;
+}
+.lib-tabs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+}
+.lib-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+.lib-spacer {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.lib-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 120px;
+    min-width: 0;
+    max-width: 320px;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--line, var(--border));
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--well, var(--bg-elev));
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-root:is([data-tier="compact"], [data-tier="icon"]) .lib-search {
+    max-width: none;
+}
+.lib-search > svg {
+    flex: none;
+}
+.lib-search > input {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: none;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    -webkit-user-select: text;
+    user-select: text;
+}
+.lib-search > input::placeholder {
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-search:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: -1px;
+}
+.lib-count {
+    flex: none;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
+/* "Load failed" notice: warning icon + text (shape and words, not colour only); click dismisses. */
+.lib-loaderr {
+    flex: 0 1 auto;
+    min-width: 24px;
+    gap: 4px;
+}
+.lib-loaderr > svg,
+.lib-status-failed {
+    flex: none;
+    color: var(--alert, var(--destructive));
+}
+
+/* ── deck marks ── */
+.lib-deckletter {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    color: var(--deck-a);
+}
+.lib-deckdot {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--deck-a);
+    color: var(--background);
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.lib-deckletter[data-deck="b"] {
+    color: var(--deck-b);
+}
+.lib-deckletter[data-deck="c"] {
+    color: var(--deck-c);
+}
+.lib-deckletter[data-deck="d"] {
+    color: var(--deck-d);
+}
+.lib-deckdot[data-deck="b"] {
+    background: var(--deck-b);
+}
+.lib-deckdot[data-deck="c"] {
+    background: var(--deck-c);
+}
+.lib-deckdot[data-deck="d"] {
+    background: var(--deck-d);
+}
+
+/* ── list frame ── */
+.lib-list {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+.lib-list-head {
+    flex: none;
+    min-width: 0;
+    padding-right: var(--lib-thumb);
+    border-bottom: 1px solid var(--line, var(--border));
+}
+.lib-list-body {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+}
+.lib-viewport {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+.lib-listbox {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    outline: none;
+    touch-action: none;
+}
+.lib-placeholder,
+.lib-statewrap {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 4px 8px;
+}
+.lib-placeholder {
+    position: absolute;
+    inset: 0;
+}
+
+/* Position thumb: a plain element, not a scrollbar. The slot keeps its width when everything fits. */
+.lib-thumb {
+    position: relative;
+    flex: none;
+    width: var(--lib-thumb);
+    touch-action: none;
+}
+.lib-thumb[data-on] {
+    cursor: pointer;
+}
+.lib-thumb[data-on]::before {
+    content: "";
+    position: absolute;
+    inset: 2px auto 2px 5px;
+    width: 1px;
+    background: var(--line, var(--border));
+}
+.lib-thumb > i {
+    position: absolute;
+    left: 3px;
+    width: 5px;
+    border-radius: 2px;
+    background: color-mix(in oklab, var(--foreground) 38%, var(--card));
+}
+
+/* ── header (20 px with its hairline) ── */
+.lib-head {
+    display: grid;
+    align-items: center;
+    column-gap: var(--lib-col-gap);
+    min-height: 19px;
+    padding: 0 var(--lib-row-pad);
+}
+.lib-thc {
+    display: flex;
+    min-width: 0;
+}
+.lib-thc[data-align="end"] {
+    justify-content: flex-end;
+}
+.lib-th {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 19px;
+}
+.lib-th > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lib-th > svg {
+    flex: none;
+}
+button.lib-th:hover,
+.lib-th[data-sorted] {
+    color: var(--foreground);
+}
+button.lib-th:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+    border-radius: 2px;
+}
+
+/* ── rows ── */
+.lib-opt {
+    overflow: hidden;
+    background: var(--card);
+}
+.lib-opt[data-odd] {
+    background: color-mix(in oklab, var(--foreground) 3%, var(--card));
+}
+.lib-opt:hover {
+    background: color-mix(in oklab, var(--foreground) 7%, var(--card));
+}
+/* Selected: 2 px ON bar + a stronger fill (shape and fill, not colour only). */
+.lib-opt[data-selected] {
+    background: color-mix(in oklab, var(--on, var(--primary)) 18%, var(--card));
+    box-shadow: inset 2px 0 0 var(--on, var(--primary));
+}
+.lib-listbox:focus-visible .lib-opt[data-selected] {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+.lib-row {
+    display: grid;
+    align-items: center;
+    column-gap: var(--lib-col-gap);
+    height: 100%;
+    padding: 0 var(--lib-row-pad);
+    color: var(--foreground);
+    font-size: 11px;
+    line-height: 1.2;
+}
+.lib-row > * {
+    min-width: 0;
+}
+.lib-title {
+    font-size: 12px;
+    font-weight: 600;
+}
+/* Compact / icon tiers: title + artist in one cell. The artist gives way first, then the title truncates. */
+.lib-titlecell {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.lib-titlecell > .lib-title {
+    flex: 0 1 auto;
+}
+.lib-titlecell > .lib-dim {
+    flex: 1 1 0;
+}
+.lib-dim {
+    color: var(--muted-foreground);
+}
+.lib-num {
+    font-size: 11px;
+    font-weight: 500;
+    text-align: right;
+}
+/* Played tonight: the whole row steps down to the third text level (plus a ✓ in the status cell). */
+.lib-row[data-played] {
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-row[data-played] :is(.lib-dim, .lib-title) {
+    color: inherit;
+}
+.lib-row[data-played] .lib-title {
+    font-weight: 500;
+}
+.lib-row[data-played] .lib-previewcell {
+    opacity: 0.55;
+}
+.lib-opt[data-selected] .lib-row[data-played] {
+    color: var(--muted-foreground);
+}
+
+.lib-status {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow: hidden;
+}
+.lib-status-item {
+    display: inline-flex;
+    flex: none;
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-previewcell {
+    display: flex;
+    align-items: center;
+    height: calc(var(--lib-row-h) - 6px);
+    color: var(--muted-foreground);
+}
+.lib-preview {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.lib-preview-none {
+    display: block;
+    width: 12px;
+    height: 1px;
+    background: var(--fg-faint, var(--muted-foreground));
+    opacity: 0.7;
+}
+.lib-bpm {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 6px;
+}
+/* ±% against the match deck, in that deck's colour (the sign and the number carry the value). */
+.lib-diff {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--deck-a);
+}
+.lib-diff[data-deck="b"] {
+    color: var(--deck-b);
+}
+.lib-diff[data-deck="c"] {
+    color: var(--deck-c);
+}
+.lib-diff[data-deck="d"] {
+    color: var(--deck-d);
+}
+/* Outside the ±6 % window (only shown when the list is not filtered by it): third text level. */
+.lib-diff[data-in="false"] {
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-keycell {
+    display: flex;
+    align-items: center;
+}
+.lib-energy {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.lib-energy-bar {
+    display: flex;
+    flex: none;
+    gap: 1px;
+}
+.lib-energy-bar > i {
+    width: 4px;
+    height: 9px;
+    background: var(--secondary);
+}
+.lib-energy-bar > i[data-f="1"] {
+    background: var(--muted-foreground);
+}
+.lib-energy-bar > i[data-f="0.5"] {
+    background: linear-gradient(to top, var(--muted-foreground) 50%, var(--secondary) 50%);
+}
+.lib-ratecell {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+}
+.lib-fav {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: calc(var(--lib-row-h) - 2px);
+    border-radius: var(--ctl-radius, 6px);
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-fav:hover {
+    color: var(--foreground);
+}
+/* Favourite = filled heart in the ON colour (fill + colour). */
+.lib-fav[aria-pressed="true"] {
+    color: var(--on, var(--primary));
+}
+.lib-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    color: var(--muted-foreground);
+}
+.lib-acts {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+}
+/* Row buttons: quiet until the row is hovered or selected (the deck letters stay visible). */
+.lib-row .dk-btn {
+    width: 24px;
+    min-width: 24px;
+    min-height: 0;
+    height: calc(var(--lib-row-h) - 2px);
+    padding: 0;
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted-foreground);
+}
+.lib-opt:hover .lib-row .dk-btn,
+.lib-opt[data-selected] .lib-row .dk-btn {
+    background: var(--secondary);
+    border-color: var(--line, var(--border));
+}
+.lib-row .dk-btn:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--secondary) 80%, var(--foreground));
+    color: var(--foreground);
+}
+.lib-row :is(.dk-btn, .lib-fav):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+.lib-pct {
+    font-size: 9px;
+    letter-spacing: -0.02em;
+}
+
+/* ── states (checking, offline, not paired, loading, empty, error, local file) ── */
+.lib-state {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.3;
+    text-align: center;
+}
+.lib-state-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    color: var(--foreground);
+    font-size: 12px;
+    font-weight: 600;
+}
+.lib-state-title > svg {
+    flex: none;
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.lib-state[data-tone="warning"] .lib-state-title > svg {
+    color: var(--warning);
+}
+.lib-state[data-tone="error"] .lib-state-title > svg {
+    color: var(--destructive);
+}
+.lib-state-detail {
+    max-width: min(100%, 56ch);
+}
+.lib-state-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+.lib-state[data-tier="icon"] {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+}
+.lib-state[data-tier="icon"] .lib-state-title {
+    flex: 1 1 0;
+}
+.lib-state[data-tier="icon"] .lib-state-actions {
+    flex: none;
+    flex-wrap: nowrap;
+    margin-top: 0;
+}
+
+/* ── "Library options" popover (portalled: no .lib-root ancestor) ── */
+.lib-pop-sec {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.lib-pop-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.lib-pop-row > .lib-group {
+    flex-wrap: wrap;
+    flex: 0 1 auto;
+}
+.lib-pop-title {
+    flex: 1 1 100%;
+    font-size: 12px;
+    font-weight: 600;
+}

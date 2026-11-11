@@ -1,4 +1,8 @@
-/** Polite live region + small transient toast for shell announcements (layout switches, controllers). */
+/**
+ * Polite live region + small transient chip for shell announcements (layout switches,
+ * controllers). The chip sits just above the status bar (shell.css `.mixai-toast`); screen
+ * readers get the text from the live region, so the chip itself is `aria-hidden`.
+ */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useAnnounce } from "./shell-hotkeys";
@@ -28,10 +32,10 @@ export function StatusRegion() {
                         key={at}
                         aria-hidden
                         className="mixai-toast"
-                        initial={motionOK ? { opacity: 0, y: 8, scale: 0.98 } : false}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={motionOK ? { opacity: 0, y: 8 } : { opacity: 0 }}
-                        transition={{ duration: motionOK ? 0.18 : 0 }}
+                        initial={motionOK ? { opacity: 0, y: 4 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={motionOK ? { opacity: 0, y: 4 } : { opacity: 0 }}
+                        transition={{ duration: motionOK ? 0.12 : 0 }}
                     >
                         {text}
                     </motion.div>

@@ -9,6 +9,33 @@
 import { engine } from "@/bridge/engine";
 import type { DeckId, LibraryTrack } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
+import { parseBandWave, useWaveStore } from "@/state/wave-store";
+
+/**
+ * After a load the engine rejected: the deck still holds its previous track, but the loader
+ * emptied the peaks first, which makes the wave sync drop the deck's band wave and wait for peaks
+ * that never come. A caller that saved the peaks puts them back (the sync then fetches the wave
+ * itself); when there were none to save (the track was loaded before a UI reload, or by another
+ * window) this takes a fresh engine snapshot (the optimistic metadata of the failed load goes
+ * away with it) and fetches the wave of the track the engine holds. `current()` = false when a
+ * newer load owns the deck. Never rejects.
+ */
+export async function restoreDeckWave(deck: DeckId, current: () => boolean = () => true): Promise<void> {
+    try {
+        const snap = await engine.getState();
+        if (!snap || !current()) return;
+        useMixerStore.getState().hydrate(snap);
+        const held = snap.decks.find((d) => d.id === deck);
+        if (!held?.loaded) return;
+        const buf = await engine.waveformBands(deck);
+        const store = useMixerStore.getState();
+        // A newer load, another track, or peaks that came back (the sync fetches then): not ours.
+        if (!current() || store.deck(deck).trackId !== held.trackId || store.waveforms[deck].length > 0) return;
+        useWaveStore.getState().setBands(deck, parseBandWave(buf, held.trackId));
+    } catch {
+        // The wave stays empty until the next load; the failed load itself is reported by the caller.
+    }
+}
 
 /**
  * Load `t` onto `deck`: optimistic metadata, decode (local first, stream

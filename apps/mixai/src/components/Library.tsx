@@ -1,56 +1,81 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ChevronDown, ChevronUp, FolderOpen, Link2Off, MoreVertical, Search, Sparkles, WifiOff } from "lucide-react";
-import {
-    Button,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuLabel,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    EmptyState,
-    ErrorState,
-    Input,
-    NoResultsState,
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-    SkeletonText,
-    ToggleGroup,
-    ToggleGroupItem,
-    cn,
-} from "@mmo/ui";
+import { FolderOpen, Heart, Link2Off, ListX, Music, SearchX, Settings, Sparkles, TriangleAlert, WifiOff } from "lucide-react";
 import { engine } from "@/bridge/engine";
-import type { DeckId, DeckState, LibraryTrack } from "@/bridge/types";
+import type { DeckId, LibraryTrack } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
 import { useUiStore } from "@/state/ui-store";
-import { parseCamelot, transitionScore } from "@/lib/harmonic";
-import type { TransitionScore } from "@/lib/harmonic";
 import { useAutoMixStore } from "@/state/auto-mix-store";
-import { useT, type Translate } from "@/i18n";
+import { playedTonight, useHistoryStore } from "@/state/history-store";
+import { usePerfStore } from "@/state/perf-store";
+import { loadLibraryTrack, restoreDeckWave } from "@/lib/load-track";
+import { keyMatch } from "@/components/KeyChip";
+import { separateStems, useStemJobs } from "@/components/deck-tabs/stem-jobs";
+import { useLocale, useT, type Translate } from "@/i18n";
 import { usePanelTier } from "@/layout/panel-tier";
 import type { Tier } from "@/layout/types";
 import { ScrolllessList } from "@/library/ScrolllessList";
-import { keyAction, useSettledValue, useWheelRows, useWindowedList, type WindowedList } from "@/library/useWindowedList";
+import { keyAction, useTouchMode, useWindowedList } from "@/library/useWindowedList";
 import { libraryNav } from "@/library/library-nav";
+import { ColumnHeader, DeckDot, DeckLetter, TrackRow, stemsView, trackTitle, type StemJobState } from "@/library/LibraryRows";
+import { StateBlock } from "@/library/LibraryStates";
+import {
+    FilterChips,
+    NO_FILTERS,
+    OptionsPopover,
+    PopSection,
+    SearchField,
+    SortButtons,
+    SourceTabs,
+    activeFilterCount,
+    type Filters,
+    type Source,
+} from "@/library/LibraryToolbar";
+import {
+    DEFAULT_SORT,
+    ICON_COLUMNS,
+    byScore,
+    compactColumns,
+    decodeDecks,
+    encodeDecks,
+    filterTracks,
+    fmtBpm,
+    freeDeck,
+    fullColumns,
+    nextSort,
+    pluralCategory,
+    rankMatches,
+    sortTracks,
+    type MatchRef,
+    type Ranked,
+    type SortKey,
+    type SortState,
+} from "@/library/track-view";
 
 /**
  * Library browser. Two sources:
- *   - **Companion** — browse the mixai.ro library served by the local MMO
+ *   - **Companion**: browse the mixai.ro library served by the local MMO
  *     Server (`server/`) over HTTP, proxied through Rust. Tracks live on the
  *     same machine, so loading uses the row's local `filepath` directly.
- *   - **Local** — pick any audio file from disk (Tauri dialog).
+ *   - **Local**: pick any audio file from disk (Tauri dialog).
+ *
+ * "Pro" table (Decks 1.5): 22 px zebra rows, a sortable header, a status dot for tracks on a
+ * deck, dimmed rows for tracks played tonight, an overview-waveform preview, key chips with
+ * the match against the master deck, and filter chips ("matches deck", "not played tonight",
+ * favourites). Pieces live in `@/library/*`; the pure logic in `@/library/track-view`.
  *
  * Zero scroll: the track list is a scroll-less virtualised window
  * (`@/library/ScrolllessList`) that shows exactly the rows that fit and moves
  * row by row (wheel, keys, touch, controller via `libraryNav`). Layout follows
- * the panel tier: full (toolbar + columns), compact (search + short rows +
- * menu), icon (selected track + prev/next + search popover).
+ * the panel tier: full (toolbar + header + columns), compact (search + short rows),
+ * icon (search + title list + load buttons). Whatever a tier cannot show inline sits in
+ * the "Library options" popover (also opened with Shift+F10 from the list).
  */
 
-type Source = "companion" | "local";
+/** Width of the position-thumb slot / horizontal row padding per tier: keep in step with library.css. */
+const ROW_PAD: Record<Tier, number> = { full: 8, compact: 6, icon: 4 };
+/** The companion serves 100 tracks per page; pages are fetched until this many tracks are loaded. */
+const PAGE_SIZE = 100;
+const MAX_TRACKS = 2000;
 
 interface SourceProps {
     tier: Tier;
@@ -63,230 +88,259 @@ export function Library() {
     const [source, setSource] = useState<Source>("companion");
     const props = { tier, source, setSource };
     return (
-        <div
-            className={cn("panel grid h-full min-h-0 min-w-0 overflow-hidden", tier === "icon" ? "gap-1 p-1.5" : "gap-2 p-2")}
-            data-tier={tier}
-        >
+        <div className="panel lib-root" data-tier={tier}>
             {source === "companion" ? <CompanionLibrary {...props} /> : <LocalFiles {...props} />}
         </div>
     );
 }
 
-/** Shared track-load helper: patches deck metadata then decodes via the core. */
-function useLoadToDeck() {
-    const patchDeck = useMixerStore((s) => s.patchDeck);
-    const setWaveform = useMixerStore((s) => s.setWaveform);
-
-    return useCallback(
-        async (deck: DeckId, t: { id: string; title: string; artist: string; bpm: number; source: string }) => {
-            patchDeck(deck, {
-                trackId: t.id,
-                title: t.title,
-                artist: t.artist,
-                bpm: t.bpm,
-                loaded: true,
-                position: 0,
-            });
-            setWaveform(deck, []);
-            const peaks = await engine.loadTrack({
-                deck,
-                source: t.source,
-                trackId: t.id,
-                title: t.title,
-                artist: t.artist,
-                bpm: t.bpm,
-            });
-            if (peaks) setWaveform(deck, peaks);
-        },
-        [patchDeck, setWaveform],
+/** The source switch as a popover section (tiers without the inline tabs). */
+function SourceSection({ t, source, setSource }: { t: Translate; source: Source; setSource: (s: Source) => void }) {
+    return (
+        <PopSection label={t("libraryui.source")}>
+            {(["companion", "local"] as const).map((s) => (
+                <button key={s} type="button" className="dk-btn" aria-pressed={source === s} onClick={() => setSource(s)}>
+                    {t(s === "companion" ? "library.companion" : "library.local")}
+                </button>
+            ))}
+        </PopSection>
     );
-}
-
-/** Enter target: the deck that is not playing (A unless only A plays). */
-function freeDeck(decks: readonly DeckState[]): DeckId {
-    const a = decks.find((d) => d.id === "a");
-    const b = decks.find((d) => d.id === "b");
-    return a?.playing && !b?.playing ? "b" : "a";
 }
 
 // ─── Companion ──────────────────────────────────────────────────────────────
 
-type Ranked = { t: LibraryTrack; match: TransitionScore | null };
-type StemJob = { state: string; progress: number };
+type Status = "checking" | "offline" | "unconfigured" | "ready";
 
 function CompanionLibrary({ tier, source, setSource }: SourceProps) {
     const t = useT();
+    const locale = useLocale();
+    const touch = useTouchMode();
     const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
-    const patchDeck = useMixerStore((s) => s.patchDeck);
-    const setWaveform = useMixerStore((s) => s.setWaveform);
-    const setDeckKey = useMixerStore((s) => s.setDeckKey);
-    const decks = useMixerStore((s) => s.decks);
+    // One string for all the library needs from the decks: it changes when a deck loads, starts /
+    // stops or changes tempo, not on every engine snapshot (idle and playback stay free).
+    const deckKey = useMixerStore((s) => encodeDecks(s.decks));
+    const decks = useMemo(() => decodeDecks(deckKey), [deckKey]);
     const deckKeys = useMixerStore((s) => s.deckKeys);
+    const clockSource = usePerfStore((s) => s.clock?.source ?? null);
+    const played = useHistoryStore((s) => s.played);
     const setPool = useAutoMixStore((s) => s.setPool);
+
     const [query, setQuery] = useState("");
     const [tracks, setTracks] = useState<LibraryTrack[]>([]);
-    const [status, setStatus] = useState<"checking" | "offline" | "unconfigured" | "ready">("checking");
+    const [total, setTotal] = useState(0);
+    const [status, setStatus] = useState<Status>("checking");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // Harmonic mix-assist: when set to a deck, rank tracks by transition score
-    // against that deck's playing track (key + BPM compatibility).
-    const [assistDeck, setAssistDeck] = useState<DeckId | null>(null);
-    // Per-track stem-separation job progress (keyed by track id).
-    const [stemJob, setStemJob] = useState<Record<number, StemJob>>({});
-    const [searchOpen, setSearchOpen] = useState(false);
+    const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+    const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+    // With a "matches deck" filter the best transition comes first, until a column is clicked.
+    const [scoreOrder, setScoreOrder] = useState(true);
+    // Stem-separation jobs by track id: the store the deck's STEMS tab uses, so a remount of the
+    // library keeps the progress and a track never gets a second job.
+    const stemJob: Record<string, StemJobState | undefined> = useStemJobs((s) => s.jobs);
+    const [menuOpen, setMenuOpen] = useState(false);
+    // Last load that failed (file not reachable from this machine, decode error): the row and the toolbar say so.
+    const [loadError, setLoadError] = useState<{ id: number; deck: DeckId; title: string; message: string } | null>(null);
+    const loadSeq = useRef<Partial<Record<DeckId, number>>>({});
     const searchRef = useRef<HTMLInputElement | null>(null);
+    const listRef = useRef<HTMLDivElement | null>(null);
 
     // Probe the companion on mount.
     useEffect(() => {
-        void (async () => {
-            const st = await engine.companionStatus();
-            if (!st || !st.online) setStatus("offline");
-            else if (!st.authed) setStatus("unconfigured");
-            else setStatus("ready");
-        })();
+        let live = true;
+        engine.companionStatus().then(
+            (st) => {
+                if (!live) return;
+                if (!st || !st.online) setStatus("offline");
+                else if (!st.authed) setStatus("unconfigured");
+                else setStatus("ready");
+            },
+            // A probe that fails is an unreachable companion, not "checking" forever.
+            () => {
+                if (live) setStatus("offline");
+            },
+        );
+        return () => {
+            live = false;
+        };
     }, []);
 
-    const fetchTracks = useCallback(async (search: string) => {
+    // Newest request wins; an older one that resolves late is dropped.
+    const reqRef = useRef(0);
+    /**
+     * Fetch the library in the companion's `sort` order, page after page (up to `MAX_TRACKS`).
+     * `progressive` shows each page as it arrives (first load, search); a re-sort swaps the
+     * list once, when complete (the rows on screen are already re-sorted locally).
+     */
+    const fetchTracks = useCallback(async (search: string, by: SortState, progressive: boolean) => {
+        const req = ++reqRef.current;
         setLoading(true);
         setError(null);
         try {
-            const page = await engine.companionTracks({ search });
-            if (page) setTracks(page.tracks);
+            const opts = { search, sort: by.key, order: by.dir };
+            const first = await engine.companionTracks(opts);
+            if (req !== reqRef.current) return;
+            if (first) {
+                const seen = new Set<number>();
+                let acc = first.tracks.filter((x) => !seen.has(x.id) && seen.add(x.id));
+                if (progressive) setTracks(acc);
+                setTotal(first.total);
+                const pages = Math.min(first.totalPages, Math.ceil(MAX_TRACKS / PAGE_SIZE));
+                for (let page = 2; page <= pages; page++) {
+                    const next = await engine.companionTracks({ ...opts, page });
+                    if (req !== reqRef.current) return;
+                    if (!next || next.tracks.length === 0) break;
+                    acc = acc.concat(next.tracks.filter((x) => !seen.has(x.id) && seen.add(x.id)));
+                    if (progressive) setTracks(acc);
+                }
+                if (!progressive) setTracks(acc);
+            }
         } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
+            if (req === reqRef.current) setError(e instanceof Error ? e.message : String(e));
         } finally {
-            setLoading(false);
+            if (req === reqRef.current) setLoading(false);
         }
     }, []);
 
-    // Load tracks once ready, and debounce on query change.
+    // Load tracks once ready; debounce on query change. A sort change re-queries in that order
+    // without blanking the list.
+    const fetched = useRef<{ query: string } | null>(null);
     useEffect(() => {
         if (status !== "ready") return;
-        const id = setTimeout(() => void fetchTracks(query), 250);
+        const progressive = fetched.current?.query !== query;
+        const id = setTimeout(() => {
+            fetched.current = { query };
+            void fetchTracks(query, sort, progressive);
+        }, 250);
         return () => clearTimeout(id);
-    }, [status, query, fetchTracks]);
+    }, [status, query, sort, fetchTracks]);
 
-    // Keep the auto-mix candidate pool in sync with the visible library so the
+    // Keep the auto-mix candidate pool in sync with the loaded library so the
     // "AI DJ" can auto-queue the next harmonic match.
     useEffect(() => {
         setPool(tracks);
     }, [tracks, setPool]);
 
-    const load = useCallback(
-        async (deck: DeckId, tr: LibraryTrack) => {
-            const title = tr.title ?? tr.filename;
-            const artist = tr.artist ?? "Unknown";
-            // Optimistic UI: reflect metadata immediately.
-            patchDeck(deck, { trackId: String(tr.id), title, artist, bpm: tr.bpm ?? 0, loaded: true, position: 0 });
-            setWaveform(deck, []);
-            setDeckKey(deck, tr.keyCamelot ?? null);
-            // Try a direct local decode first (companion on this machine). If the
-            // file isn't on local disk (remote companion / tunnel), stream it.
-            let peaks: number[] | null = null;
-            try {
-                peaks = await engine.loadTrack({
-                    deck,
-                    source: tr.filepath,
-                    trackId: String(tr.id),
-                    title,
-                    artist,
-                    bpm: tr.bpm ?? 0,
-                });
-            } catch {
-                peaks = await engine.loadTrackStream({
-                    deck,
-                    trackId: tr.id,
-                    title,
-                    artist,
-                    bpm: tr.bpm ?? 0,
-                });
-            }
-            if (peaks) setWaveform(deck, peaks);
-            // If the companion has separated stems, attach them so the deck's
-            // stem controls light up immediately.
-            if (tr.stemsStatus === "ready") {
-                try {
-                    const s = await engine.companionTrackStems(tr.id);
-                    if (s && (s.vocals || s.drums || s.bass || s.melody)) {
-                        await engine.loadStems(deck, {
-                            vocals: s.vocals,
-                            drums: s.drums,
-                            bass: s.bass,
-                            melody: s.melody,
-                        });
-                    }
-                } catch {
-                    /* stems are best-effort; ignore failures */
-                }
-            }
-        },
-        [patchDeck, setWaveform, setDeckKey],
-    );
-
-    // Request stem separation for a track and poll until ready.
-    const generateStems = useCallback(async (tr: LibraryTrack) => {
-        setStemJob((j) => ({ ...j, [tr.id]: { state: "running", progress: 0 } }));
-        try {
-            const jobId = await engine.companionRequestStems(tr.id);
-            if (!jobId) throw new Error("no job id");
-            // Poll every 1.5s until done/error.
-            for (;;) {
-                await new Promise((r) => setTimeout(r, 1500));
-                const job = await engine.companionStemJob(jobId);
-                if (!job) continue;
-                setStemJob((j) => ({ ...j, [tr.id]: { state: job.state, progress: job.progress } }));
-                if (job.state === "done") {
-                    setTracks((prev) => prev.map((x) => (x.id === tr.id ? { ...x, stemsStatus: "ready" } : x)));
-                    break;
-                }
-                if (job.state === "error") break;
-            }
-        } catch {
-            setStemJob((j) => ({ ...j, [tr.id]: { state: "error", progress: 0 } }));
-        }
+    const load = useCallback((deck: DeckId, tr: LibraryTrack) => {
+        const mixer = useMixerStore.getState();
+        const before = { key: mixer.deckKeys[deck], wave: mixer.waveforms[deck] };
+        const seq = (loadSeq.current[deck] ?? 0) + 1;
+        loadSeq.current[deck] = seq;
+        setLoadError((e) => (e && e.deck === deck ? null : e));
+        loadLibraryTrack(deck, tr).catch((err: unknown) => {
+            // A newer load on this deck owns its state now.
+            if (loadSeq.current[deck] !== seq) return;
+            // The loader is optimistic (key + empty waveform set before the decode): the deck still
+            // holds its previous track, so put both back, or the key chips and "matches deck" would
+            // compare against a track that never loaded. Only what the loader left behind is undone:
+            // a load from elsewhere (auto-mix, the deck's own picker) may have replaced it meanwhile.
+            const m = useMixerStore.getState();
+            if (m.deckKeys[deck] === (tr.keyCamelot ?? null)) m.setDeckKey(deck, before.key);
+            if (m.waveforms[deck].length === 0) m.setWaveform(deck, before.wave);
+            // No peaks to put back (track loaded before a UI reload): fetch the held track's wave again.
+            if (before.wave.length === 0) void restoreDeckWave(deck, () => loadSeq.current[deck] === seq);
+            setLoadError({ id: tr.id, deck, title: trackTitle(tr), message: err instanceof Error ? err.message : String(err) });
+        });
     }, []);
 
-    // Reference track for harmonic assist (the playing track on the chosen deck).
-    const refDeck = assistDeck ? decks.find((d) => d.id === assistDeck) : null;
-    const refKeyLabel = assistDeck ? deckKeys[assistDeck] : null;
-    const refBpm = refDeck?.bpm ?? 0;
+    const toggleFav = useCallback((tr: LibraryTrack) => {
+        const put = (v: boolean | null) => setTracks((prev) => prev.map((x) => (x.id === tr.id ? { ...x, isFavorite: v } : x)));
+        put(tr.isFavorite !== true);
+        engine.companionToggleFavorite(tr.id).then(
+            (v) => {
+                if (typeof v === "boolean") put(v);
+            },
+            () => put(tr.isFavorite),
+        );
+    }, []);
 
-    // Rank tracks by transition score when assist is on; otherwise keep the
-    // library's natural order with no match badge.
-    const ranked = useMemo<Ranked[]>(() => {
-        const refKey = parseCamelot(refKeyLabel);
-        const base = tracks.map((tr) => ({ t: tr, match: null as TransitionScore | null }));
-        if (!assistDeck || (!refKey && refBpm <= 0)) return base;
-        return base
-            .map(({ t: tr }) => ({
-                t: tr,
-                match: transitionScore({ key: refKey, bpm: refBpm }, { key: parseCamelot(tr.keyCamelot), bpm: tr.bpm ?? 0 }),
-            }))
-            .sort((a, b) => (b.match?.score ?? 0) - (a.match?.score ?? 0));
-    }, [tracks, assistDeck, refKeyLabel, refBpm]);
+    // Request stem separation for a track (the shared job store polls, with a limit on unanswered polls).
+    const requestStems = useCallback((tr: LibraryTrack) => separateStems(null, String(tr.id)), []);
+    // A finished job makes its row "stems ready" (also for a job started from a deck's STEMS tab).
+    useEffect(() => {
+        const done = new Set<number>();
+        for (const [id, job] of Object.entries(stemJob)) if (job?.state === "done") done.add(Number(id));
+        if (done.size === 0) return;
+        setTracks((prev) => (prev.some((x) => done.has(x.id) && x.stemsStatus !== "ready") ? prev.map((x) => (done.has(x.id) && x.stemsStatus !== "ready" ? { ...x, stemsStatus: "ready" } : x)) : prev));
+    }, [stemJob, tracks]);
 
-    const items = useMemo(() => (error ? [] : ranked), [error, ranked]);
-    const list = useWindowedList(items.length, tier === "icon" ? 1 : undefined);
+    // ── derived view ──
+    const playedIds = useMemo(() => {
+        const now = Date.now();
+        const ids = new Set<string>();
+        for (const [id, at] of Object.entries(played)) if (playedTonight(at, now)) ids.add(id);
+        return ids;
+    }, [played]);
+
+    const loadedOn = useMemo(() => {
+        const map = new Map<string, DeckId[]>();
+        for (const d of decks) {
+            if (!d.trackId) continue;
+            const on = map.get(d.trackId);
+            if (on) on.push(d.id);
+            else map.set(d.trackId, [d.id]);
+        }
+        return map;
+    }, [decks]);
+
+    const matchDeck = filters.matchDeck;
+    const matchRef = useMemo<MatchRef | null>(() => {
+        if (!matchDeck) return null;
+        const d = decks.find((x) => x.id === matchDeck);
+        return { key: deckKeys[matchDeck], bpm: d?.loaded ? d.bpm : 0, trackId: d?.trackId ?? null };
+    }, [matchDeck, decks, deckKeys]);
+
+    // Key the chips are compared against: the match deck, else the playing (master) deck.
+    const masterKey = useMemo(() => {
+        if (matchDeck) return deckKeys[matchDeck];
+        const playing = decks.filter((d) => d.loaded && d.playing);
+        const master = playing.find((d) => d.id === clockSource) ?? playing[0];
+        return master ? deckKeys[master.id] : null;
+    }, [matchDeck, decks, deckKeys, clockSource]);
+
+    const sorted = useMemo(() => sortTracks(tracks, sort), [tracks, sort]);
+    const byScoreNow = matchRef !== null && scoreOrder;
+    const items = useMemo<Ranked[]>(() => {
+        if (error) return [];
+        const kept = filterTracks(sorted, filters, (id) => playedIds.has(id));
+        if (!matchRef) return kept.map((tr) => ({ t: tr, match: null }));
+        const ranked = rankMatches(kept, matchRef, (k) => {
+            const m = keyMatch(k, matchRef.key);
+            return m === null ? null : m !== "clash";
+        });
+        // Stable: equal scores keep the column order.
+        return byScoreNow ? [...ranked].sort(byScore) : ranked;
+    }, [error, sorted, filters, playedIds, matchRef, byScoreNow]);
+
+    const list = useWindowedList(items.length);
     const { dispatch } = list;
     const cursor = list.state.cursor;
     const selected = items[cursor]?.t ?? null;
 
-    // New search / ranking → back to the top, like a hardware browser.
+    // New search / order / filter → back to the top, like a hardware browser.
     useEffect(() => {
         dispatch({ type: "home" });
-    }, [query, assistDeck, dispatch]);
+    }, [query, sort, filters, scoreOrder, dispatch]);
 
     const activate = useCallback(
         (index: number, opts: { shift: boolean }) => {
             const tr = items[index]?.t;
-            if (tr) void load(opts.shift ? "b" : freeDeck(decks), tr);
+            if (tr) load(opts.shift ? "b" : freeDeck(decks), tr);
         },
         [items, load, decks],
     );
 
+    const select = useCallback(
+        (index: number, focus: boolean) => {
+            dispatch({ type: "jumpTo", index });
+            if (focus) listRef.current?.focus({ preventScroll: true });
+        },
+        [dispatch],
+    );
+
     // Controller / shortcut browse API (see @/library/library-nav).
-    const navRef = useRef({ dispatch, selected, load, tier });
-    navRef.current = { dispatch, selected, load, tier };
+    const navRef = useRef({ dispatch, selected, load });
+    navRef.current = { dispatch, selected, load };
     useEffect(
         () =>
             libraryNav.subscribe((cmd) => {
@@ -294,9 +348,8 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
                 if (cmd.type === "move") n.dispatch({ type: "move", n: cmd.delta });
                 else if (cmd.type === "page") n.dispatch({ type: "page", dir: cmd.dir });
                 else if (cmd.type === "load") {
-                    if (n.selected) void n.load(cmd.deck, n.selected);
-                } else if (n.tier === "icon") setSearchOpen(true);
-                else searchRef.current?.focus();
+                    if (n.selected) n.load(cmd.deck, n.selected);
+                } else searchRef.current?.focus();
             }),
         [],
     );
@@ -315,771 +368,404 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
         dispatch(a);
     };
 
-    const assist: AssistProps = { decks, deckKeys, assistDeck, setAssistDeck };
-    const menu = <LibraryMenu source={source} setSource={setSource} assist={status === "ready" ? assist : undefined} />;
+    const onSort = useCallback((key: SortKey) => {
+        setScoreOrder(false);
+        setSort((cur) => nextSort(cur, key));
+    }, []);
+    const onMatch = useCallback((deck: DeckId | null) => {
+        setScoreOrder(true);
+        setFilters((f) => ({ ...f, matchDeck: deck }));
+    }, []);
+    const onToggle = useCallback((key: "notPlayed" | "favorites") => setFilters((f) => ({ ...f, [key]: !f[key] })), []);
+
+    const full = tier === "full";
+    const icon = tier === "icon";
+    const btn = touch ? 44 : 24;
+    const contentW = list.width - 2 * ROW_PAD[tier];
+    const diff = matchRef !== null && matchRef.bpm > 0;
+    const cols = useMemo(
+        () => (tier === "full" ? fullColumns(contentW, { diff, btn }) : tier === "compact" ? compactColumns(contentW, { btn }) : ICON_COLUMNS),
+        [tier, contentW, diff, btn],
+    );
+    const dateFmt = useMemo(() => new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "2-digit" }), [locale]);
+    const intFmt = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+
+    const sourceSection = <SourceSection t={t} source={source} setSource={setSource} />;
 
     // ── Non-ready states ──
     if (status !== "ready") {
-        if (tier === "icon") {
-            return (
-                <div className="flex min-h-0 min-w-0 items-start gap-1 overflow-hidden">
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                        <StatusLine status={status} t={t} onSettings={() => setSettingsOpen(true)} />
-                    </div>
-                    {menu}
+        return (
+            <>
+                <div className="lib-toolbar">
+                    {full ? (
+                        <SourceTabs t={t} source={source} setSource={setSource} />
+                    ) : (
+                        <>
+                            <span className="dk-label lib-c lib-spacer">{t("library.companion")}</span>
+                            <OptionsPopover label={t("libraryui.menu")} open={menuOpen} onOpenChange={setMenuOpen}>
+                                {sourceSection}
+                            </OptionsPopover>
+                        </>
+                    )}
                 </div>
-            );
-        }
-        return (
-            <div className="grid min-h-0 min-w-0 gap-2 overflow-hidden" style={{ gridTemplateRows: "auto minmax(0, 1fr)" }}>
-                {tier === "full" ? <SourceSwitch source={source} setSource={setSource} /> : <div className="flex justify-end">{menu}</div>}
-                {status === "checking" ? (
-                    <div className="min-h-0 overflow-hidden p-2" aria-busy="true">
-                        <SkeletonText lines={4} />
-                    </div>
-                ) : status === "offline" ? (
-                    <EmptyState
-                        variant="inline"
-                        tone="warning"
-                        icon={<WifiOff aria-hidden />}
-                        title={t("library.offline")}
-                        description={t("library.offlineDetail")}
-                        className="min-h-0 overflow-hidden p-2"
-                    />
-                ) : (
-                    <EmptyState
-                        variant="inline"
-                        icon={<Link2Off aria-hidden />}
-                        title={t("library.unconfigured")}
-                        description={t("library.unconfiguredDetail")}
-                        actions={
-                            <Button size="sm" onClick={() => setSettingsOpen(true)}>
-                                {t("library.openSettings")}
-                            </Button>
-                        }
-                        className="min-h-0 overflow-hidden p-2"
-                    />
-                )}
-            </div>
+                <div className="lib-statewrap">
+                    {status === "checking" ? (
+                        <StateBlock tier={tier} busy title={t("common.loading")} />
+                    ) : status === "offline" ? (
+                        <StateBlock tier={tier} tone="warning" icon={<WifiOff size={14} aria-hidden />} title={t("library.offline")} detail={t("library.offlineDetail")} />
+                    ) : (
+                        <StateBlock
+                            tier={tier}
+                            icon={<Link2Off size={14} aria-hidden />}
+                            title={t("library.unconfigured")}
+                            detail={t("library.unconfiguredDetail")}
+                            action={
+                                icon ? (
+                                    // Icon tier (200 px): the text button would squeeze the title to "Neas…".
+                                    <button type="button" className="dk-btn dk-btn-xs" aria-label={t("library.openSettings")} title={t("library.openSettings")} onClick={() => setSettingsOpen(true)}>
+                                        <Settings size={12} aria-hidden />
+                                    </button>
+                                ) : (
+                                    <button type="button" className="dk-btn" onClick={() => setSettingsOpen(true)}>
+                                        {t("library.openSettings")}
+                                    </button>
+                                )
+                            }
+                        />
+                    )}
+                </div>
+            </>
         );
     }
 
-    const placeholder = (
-        <ListPlaceholder
+    // ── Ready ──
+    const filterCount = activeFilterCount(filters);
+    const shown = items.length;
+    const base = Math.max(total, tracks.length);
+    const countWord = (n: number) => t(`libraryui.count.${pluralCategory(n, locale)}`, { n: intFmt.format(n) });
+    const countLong = shown === base ? countWord(base) : `${t("libraryui.countOf", { shown: intFmt.format(shown), total: intFmt.format(base) })} (${countWord(base)})`;
+    const countText = shown === base ? countWord(base) : t("libraryui.countOf", { shown: intFmt.format(shown), total: intFmt.format(base) });
+    const countShort = shown === base ? intFmt.format(base) : `${intFmt.format(shown)}/${intFmt.format(base)}`;
+    // Text chips need ~430 px; below that they are icon chips (same names, as tooltips).
+    const wide = full && list.width >= 900;
+    const chips = (labels: boolean) => <FilterChips t={t} decks={decks} filters={filters} labels={labels} onMatch={onMatch} onToggle={onToggle} />;
+
+    const placeholder = error ? (
+        <StateBlock
             tier={tier}
-            t={t}
-            error={error}
-            loading={loading}
-            hasQuery={query.trim().length > 0}
-            onRetry={() => void fetchTracks(query)}
+            tone="error"
+            icon={<TriangleAlert size={14} aria-hidden />}
+            title={t("library.error")}
+            detail={error}
+            detailOneLine
+            action={
+                <button type="button" className="dk-btn dk-btn-xs" onClick={() => void fetchTracks(query, sort, true)}>
+                    {t("common.retry")}
+                </button>
+            }
         />
+    ) : tracks.length === 0 && loading ? (
+        <StateBlock tier={tier} busy title={t("library.loading")} />
+    ) : tracks.length > 0 ? (
+        <StateBlock
+            tier={tier}
+            icon={<ListX size={14} aria-hidden />}
+            title={t("libraryui.noFiltered")}
+            detail={t("libraryui.noFilteredDetail")}
+            action={
+                <button type="button" className="dk-btn dk-btn-xs" onClick={() => setFilters(NO_FILTERS)}>
+                    {t("libraryui.clearFilters")}
+                </button>
+            }
+        />
+    ) : query.trim().length > 0 ? (
+        <StateBlock tier={tier} icon={<SearchX size={14} aria-hidden />} title={t("library.noResults")} detail={t("library.noResultsDetail")} />
+    ) : (
+        <StateBlock tier={tier} icon={<Music size={14} aria-hidden />} title={t("library.empty")} detail={t("library.emptyDetail")} />
     );
 
-    const searchInput = (
-        <Input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onSearchKey}
-            placeholder={t("library.search")}
-            size="sm"
-            type="search"
-            aria-label={t("library.search")}
-            title={t("libraryui.keysHint")}
-            className="min-w-0"
-        />
-    );
+    const rowLabel = ({ t: tr }: Ranked) => {
+        const id = String(tr.id);
+        const parts = [trackTitle(tr), tr.artist?.trim() || t("libraryui.unknownArtist")];
+        if (tr.bpm && tr.bpm > 0) parts.push(`${fmtBpm(tr.bpm)} BPM`);
+        if (tr.keyCamelot) parts.push(tr.keyCamelot);
+        for (const deck of loadedOn.get(id) ?? []) parts.push(t("libraryui.onDeck", { deck: deck.toUpperCase() }));
+        if (playedIds.has(id)) parts.push(t("libraryui.played"));
+        if (loadError?.id === tr.id) parts.push(t("libraryui.loadFailedShort"));
+        return parts.join(", ");
+    };
 
-    // ── Icon tier: one selected track + prev/next ──
-    if (tier === "icon") {
-        return (
-            <IconBrowser
-                t={t}
-                list={list}
-                selected={selected}
-                placeholder={placeholder}
-                menu={menu}
-                onLoad={(deck) => {
-                    if (selected) void load(deck, selected);
-                }}
-                onActivate={(shift) => activate(cursor, { shift })}
-                search={
-                    <Popover open={searchOpen} onOpenChange={(open) => setSearchOpen(open)}>
-                        <PopoverTrigger render={<Button size="icon-xs" variant="ghost" aria-label={t("library.search")} />}>
-                            <Search aria-hidden />
-                        </PopoverTrigger>
-                        <PopoverContent side="top" className="w-64 p-2" initialFocus={searchRef}>
-                            {searchInput}
-                        </PopoverContent>
-                    </Popover>
-                }
-            />
-        );
-    }
-
-    const full = tier === "full";
-    const cols = full ? fullColumns(list.width) : COMPACT_COLUMNS;
-    const fmtPos = (key: "libraryui.position" | "libraryui.positionLive") => (from: number, to: number, total: number) =>
-        t(key, { from: fmtInt(from), to: fmtInt(to), total: fmtInt(total) });
+    const menuLabel = !full && filterCount > 0 ? `${t("libraryui.menu")} · ${t("libraryui.filtersOn", { n: filterCount })}` : t("libraryui.menu");
+    const loadFailedText = loadError ? t("libraryui.loadFailed", { title: loadError.title, deck: loadError.deck.toUpperCase() }) : "";
 
     return (
-        <div
-            className="grid min-h-0 min-w-0 gap-2 overflow-hidden"
-            style={{ gridTemplateRows: full ? "auto auto minmax(0, 1fr)" : "auto minmax(0, 1fr)" }}
-        >
-            <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-                {full && <SourceSwitch source={source} setSource={setSource} className="w-44 shrink-0" />}
-                <div className="min-w-0 flex-1">{searchInput}</div>
-                {!full && menu}
+        <>
+            <div className="lib-toolbar">
+                {full && <SourceTabs t={t} source={source} setSource={setSource} />}
+                <SearchField t={t} value={query} onChange={setQuery} onKeyDown={onSearchKey} inputRef={searchRef} />
+                {full && chips(wide)}
+                {full && <span className="lib-spacer" />}
+                {loadError && (
+                    <button
+                        type="button"
+                        className="dk-btn dk-btn-xs lib-loaderr"
+                        aria-label={`${loadFailedText}. ${t("libraryui.dismiss")}`}
+                        title={`${loadFailedText}\n${loadError.message}`}
+                        onClick={() => setLoadError(null)}
+                    >
+                        <TriangleAlert size={12} aria-hidden />
+                        {wide && <span className="lib-c">{t("libraryui.loadFailedShort")}</span>}
+                    </button>
+                )}
+                <span className="sr-only" role="alert">
+                    {loadFailedText}
+                </span>
+                {icon ? (
+                    (["a", "b"] as const).map((deck) => {
+                        const label = selected ? t("libraryui.loadTo", { title: trackTitle(selected), deck: deck.toUpperCase() }) : t("libraryui.loadDeck", { deck: deck.toUpperCase() });
+                        return (
+                            <button
+                                key={deck}
+                                type="button"
+                                className="dk-btn dk-btn-xs"
+                                aria-label={label}
+                                title={label}
+                                disabled={!selected}
+                                onClick={() => {
+                                    if (selected) load(deck, selected);
+                                }}
+                            >
+                                <DeckLetter deck={deck} />
+                            </button>
+                        );
+                    })
+                ) : (
+                    <>
+                        <span className="dk-num lib-count" aria-hidden title={countLong}>
+                            {full && list.width >= 620 ? countText : countShort}
+                        </span>
+                        {/* Announced once, when the list is complete: the count grows with every page while it loads. */}
+                        <span className="sr-only" role="status">
+                            {loading ? "" : countLong}
+                        </span>
+                    </>
+                )}
+                <OptionsPopover label={menuLabel} open={menuOpen} onOpenChange={setMenuOpen} active={!full && filterCount > 0}>
+                    {!full && sourceSection}
+                    {!full && <PopSection label={t("libraryui.filters")}>{chips(true)}</PopSection>}
+                    <PopSection label={t("libraryui.sort")}>
+                        <SortButtons t={t} sort={sort} scoreOrder={byScoreNow} canScore={matchRef !== null} onSort={onSort} onScore={() => setScoreOrder(true)} />
+                    </PopSection>
+                    {selected ? (
+                        <SelectedActions t={t} tr={selected} stemJob={stemJob[selected.id]} onLoad={load} onFav={toggleFav} onStems={requestStems} />
+                    ) : (
+                        <PopSection label={t("libraryui.selected")}>
+                            <span className="lib-dim">{t("libraryui.noSelection")}</span>
+                        </PopSection>
+                    )}
+                </OptionsPopover>
             </div>
-            {full && <MixAssistBar {...assist} />}
             <ScrolllessList
                 items={items}
                 getKey={(r) => r.t.id}
+                getLabel={rowLabel}
                 list={list}
+                listRef={listRef}
                 label={t("libraryui.list")}
                 placeholder={placeholder}
                 onActivate={activate}
-                formatPosition={fmtPos("libraryui.position")}
-                formatLive={fmtPos("libraryui.positionLive")}
-                header={full ? <ColumnHeader t={t} cols={cols} /> : undefined}
-                renderRow={({ t: tr, match }) =>
-                    full ? (
-                        <FullRow
-                            t={t}
-                            tr={tr}
-                            match={match}
-                            cols={cols}
-                            stemJob={stemJob[tr.id]}
-                            onStems={() => void generateStems(tr)}
-                            onLoad={(deck) => void load(deck, tr)}
-                        />
-                    ) : (
-                        <CompactRow t={t} tr={tr} onLoad={(deck) => void load(deck, tr)} />
-                    )
-                }
+                onMenuKey={() => setMenuOpen(true)}
+                formatLive={(from, to, n) => t("libraryui.positionLive", { from: intFmt.format(from), to: intFmt.format(to), total: intFmt.format(n) })}
+                header={full ? <ColumnHeader t={t} cols={cols} sort={byScoreNow ? null : sort} onSort={onSort} /> : undefined}
+                renderRow={({ t: tr, match }, { index }) => (
+                    <TrackRow
+                        t={t}
+                        tr={tr}
+                        match={match}
+                        cols={cols}
+                        index={index}
+                        loadedOn={loadedOn.get(String(tr.id))}
+                        played={playedIds.has(String(tr.id))}
+                        failed={loadError?.id === tr.id}
+                        masterKey={masterKey}
+                        matchDeck={matchRef ? matchDeck : null}
+                        refBpm={matchRef?.bpm ?? 0}
+                        stemJob={stemJob[tr.id]}
+                        dateFmt={dateFmt}
+                        listRef={listRef}
+                        onSelect={select}
+                        onLoad={load}
+                        onFav={toggleFav}
+                        onStems={requestStems}
+                    />
+                )}
             />
-        </div>
+        </>
+    );
+}
+
+/** Actions on the selected track at full target size (the dense row controls are smaller than 24 px). */
+function SelectedActions({
+    t,
+    tr,
+    stemJob,
+    onLoad,
+    onFav,
+    onStems,
+}: {
+    t: Translate;
+    tr: LibraryTrack;
+    stemJob: StemJobState | undefined;
+    onLoad: (deck: DeckId, tr: LibraryTrack) => void;
+    onFav: (tr: LibraryTrack) => void;
+    onStems: (tr: LibraryTrack) => void;
+}) {
+    const title = trackTitle(tr);
+    const fav = tr.isFavorite === true;
+    const stems = stemsView(t, tr, stemJob);
+    return (
+        <PopSection label={t("libraryui.selected")}>
+            <span className="lib-c lib-pop-title" title={title}>
+                {title}
+            </span>
+            {(["a", "b"] as const).map((deck) => (
+                <button key={deck} type="button" className="dk-btn" aria-label={t("libraryui.loadTo", { title, deck: deck.toUpperCase() })} onClick={() => onLoad(deck, tr)}>
+                    <DeckDot deck={deck} />
+                    {t(deck === "a" ? "library.loadA" : "library.loadB")}
+                </button>
+            ))}
+            <button type="button" className="dk-btn" aria-pressed={fav} aria-label={t(fav ? "libraryui.favRemove" : "libraryui.favAdd", { title })} onClick={() => onFav(tr)}>
+                <Heart size={12} aria-hidden fill={fav ? "currentColor" : "none"} />
+                {t("libraryui.favorite")}
+            </button>
+            <button type="button" className="dk-btn" disabled={stems.kind === "ready" || stems.kind === "running"} aria-label={stems.label} title={stems.label} onClick={() => onStems(tr)}>
+                <Sparkles size={12} aria-hidden />
+                {t("libraryui.stems")}
+                {stems.kind === "running" && <span className="dk-num">{stems.pct}%</span>}
+            </button>
+        </PopSection>
     );
 }
 
 // ─── Local files ─────────────────────────────────────────────────────────────
 
+/**
+ * Local-file load: patches deck metadata then decodes via the core. Optimistic like the
+ * companion loader (`load` above): the key is cleared (a local file carries none, and the
+ * previous track's key must not stay on the chip) and the waveform emptied before the decode.
+ * A rejected load puts back what this call left behind (the deck still holds its previous
+ * track) and rethrows, so the caller can say so. `current()` = false when a newer load on the
+ * deck owns its state.
+ */
+async function loadLocalFile(deck: DeckId, t: { id: string; title: string; artist: string; bpm: number; source: string }, current: () => boolean): Promise<void> {
+    const store = useMixerStore.getState();
+    const before = { key: store.deckKeys[deck], wave: store.waveforms[deck] };
+    store.patchDeck(deck, {
+        trackId: t.id,
+        title: t.title,
+        artist: t.artist,
+        bpm: t.bpm,
+        loaded: true,
+        position: 0,
+    });
+    store.setWaveform(deck, []);
+    store.setDeckKey(deck, null);
+    try {
+        const peaks = await engine.loadTrack({
+            deck,
+            source: t.source,
+            trackId: t.id,
+            title: t.title,
+            artist: t.artist,
+            bpm: t.bpm,
+        });
+        if (peaks && current()) useMixerStore.getState().setWaveform(deck, peaks);
+    } catch (err) {
+        if (current()) {
+            const m = useMixerStore.getState();
+            if (m.deckKeys[deck] === null) m.setDeckKey(deck, before.key);
+            if (m.waveforms[deck].length === 0) m.setWaveform(deck, before.wave);
+            // No peaks to put back (track loaded before a UI reload): fetch the held track's wave again.
+            if (before.wave.length === 0) void restoreDeckWave(deck, current);
+        }
+        throw err;
+    }
+}
+
 function LocalFiles({ tier, source, setSource }: SourceProps) {
     const t = useT();
-    const loadToDeck = useLoadToDeck();
+    const [menuOpen, setMenuOpen] = useState(false);
+    // Last local load that failed (unreadable file, decode error): the tile says so until the next try.
+    const [loadError, setLoadError] = useState<{ deck: DeckId; title: string; message: string } | null>(null);
+    const loadSeq = useRef<Partial<Record<DeckId, number>>>({});
 
     const openFileTo = async (deck: DeckId) => {
-        const path = await engine.pickAudioFile();
-        if (!path) return;
-        const file = path.replace(/\\/g, "/").split("/").pop() ?? path;
-        const title = file.replace(/\.[^.]+$/, "");
-        await loadToDeck(deck, { id: path, title, artist: "Local file", bpm: 0, source: path });
+        let title = "";
+        // The sequence is taken after the picker returns: a dialog left open (or cancelled) must
+        // not make a load that started meanwhile on this deck look stale.
+        let seq = -1;
+        const current = () => loadSeq.current[deck] === seq;
+        try {
+            const path = await engine.pickAudioFile();
+            if (!path) return;
+            seq = (loadSeq.current[deck] ?? 0) + 1;
+            loadSeq.current[deck] = seq;
+            const file = path.replace(/\\/g, "/").split("/").pop() ?? path;
+            title = file.replace(/\.[^.]+$/, "");
+            setLoadError((e) => (e && e.deck === deck ? null : e));
+            await loadLocalFile(deck, { id: path, title, artist: t("library.local"), bpm: 0, source: path }, current);
+        } catch (err) {
+            // A newer load on this deck owns its state (and its message) now.
+            if (seq !== -1 && !current()) return;
+            setLoadError({ deck, title: title || t("library.local"), message: err instanceof Error ? err.message : String(err) });
+        }
     };
 
     const full = tier === "full";
-    const buttons = (
-        <div className="flex shrink-0 items-center gap-1">
-            <DeckButton deck="a" label={t("libraryui.loadPickTo", { deck: "A" })} onClick={() => void openFileTo("a")} wide={full}>
-                {full ? t("library.loadA") : "A"}
-            </DeckButton>
-            <DeckButton deck="b" label={t("libraryui.loadPickTo", { deck: "B" })} onClick={() => void openFileTo("b")} wide={full}>
-                {full ? t("library.loadB") : "B"}
-            </DeckButton>
-        </div>
-    );
-    const hint = (
-        <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 truncate text-[11px]" style={{ color: "var(--fg-dim)" }}>
-            <FolderOpen className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">{t("library.pickFile")}</span>
-        </span>
-    );
-
-    if (!full) {
-        return (
-            <div className="flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden">
-                <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                    {hint}
-                    <LibraryMenu source={source} setSource={setSource} />
-                </div>
-                {buttons}
-            </div>
-        );
-    }
+    const icon = tier === "icon";
+    const buttons: ReactNode = (["a", "b"] as const).map((deck) => (
+        <button
+            key={deck}
+            type="button"
+            className={icon ? "dk-btn dk-btn-xs" : "dk-btn"}
+            aria-label={t("libraryui.loadPickTo", { deck: deck.toUpperCase() })}
+            title={t("libraryui.loadPickTo", { deck: deck.toUpperCase() })}
+            onClick={() => void openFileTo(deck)}
+        >
+            {icon ? <DeckLetter deck={deck} /> : <DeckDot deck={deck} />}
+            {!icon && t(deck === "a" ? "library.loadA" : "library.loadB")}
+        </button>
+    ));
 
     return (
-        <div className="grid min-h-0 min-w-0 gap-2 overflow-hidden" style={{ gridTemplateRows: "auto auto minmax(0, 1fr)" }}>
-            <SourceSwitch source={source} setSource={setSource} />
-            <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-                {hint}
-                {buttons}
-            </div>
-            <EmptyState
-                variant="inline"
-                icon={<FolderOpen aria-hidden />}
-                title={t("library.local")}
-                description={t("library.localHint")}
-                className="min-h-0 overflow-hidden p-2"
-            />
-        </div>
-    );
-}
-
-// ─── Icon tier ───────────────────────────────────────────────────────────────
-
-function IconBrowser({
-    t,
-    list,
-    selected,
-    placeholder,
-    menu,
-    search,
-    onLoad,
-    onActivate,
-}: {
-    t: Translate;
-    list: WindowedList;
-    selected: LibraryTrack | null;
-    placeholder: ReactNode;
-    menu: ReactNode;
-    search: ReactNode;
-    onLoad: (deck: DeckId) => void;
-    onActivate: (shift: boolean) => void;
-}) {
-    const { state, dispatch, rowHeight } = list;
-    const [node, setNode] = useState<HTMLDivElement | null>(null);
-    const visibleRef = useRef(1);
-    useWheelRows(node, dispatch, rowHeight, visibleRef);
-    const title = selected ? (selected.title ?? selected.filename) : "";
-    const live = useSettledValue(selected ? `${title} · ${state.cursor + 1} / ${state.total}` : "", 700);
-
-    const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter") {
-            e.preventDefault();
-            onActivate(e.shiftKey);
-            return;
-        }
-        const a = keyAction(e.key);
-        if (!a) return;
-        e.preventDefault();
-        dispatch(a);
-    };
-
-    return (
-        <div className="grid min-h-0 min-w-0 gap-1 overflow-hidden" style={{ gridTemplateRows: "minmax(0, 1fr) auto" }}>
-            <div
-                ref={setNode}
-                tabIndex={0}
-                role="group"
-                aria-label={t("libraryui.selected")}
-                title={t("libraryui.keysHint")}
-                onKeyDown={onKeyDown}
-                onDoubleClick={(e) => onActivate(e.shiftKey)}
-                className="min-h-0 min-w-0 overflow-hidden rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            >
-                {selected ? (
-                    <>
-                        <div className="truncate text-xs font-semibold leading-tight">{title}</div>
-                        <div className="mono flex min-w-0 items-center gap-1.5 text-[10px] leading-tight" style={{ color: "var(--fg-dim)" }}>
-                            <span>{selected.bpm ? selected.bpm.toFixed(0) : "--"} BPM</span>
-                            {selected.keyCamelot && <span style={{ color: "var(--accent-2)" }}>{selected.keyCamelot}</span>}
-                            <span className="ml-auto tabular-nums">
-                                {fmtInt(state.cursor + 1)}/{fmtInt(state.total)}
-                            </span>
-                        </div>
-                    </>
+        <>
+            <div className="lib-toolbar">
+                {full ? (
+                    <SourceTabs t={t} source={source} setSource={setSource} />
                 ) : (
-                    <div className="truncate text-[11px]" style={{ color: "var(--fg-dim)" }}>
-                        {placeholder}
-                    </div>
-                )}
-                <span className="sr-only" aria-live="polite" aria-atomic="true">
-                    {live}
-                </span>
-            </div>
-            <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label={t("libraryui.prev")}
-                    disabled={state.total === 0 || state.cursor === 0}
-                    onClick={() => dispatch({ type: "move", n: -1 })}
-                >
-                    <ChevronUp aria-hidden />
-                </Button>
-                <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label={t("libraryui.next")}
-                    disabled={state.total === 0 || state.cursor >= state.total - 1}
-                    onClick={() => dispatch({ type: "move", n: 1 })}
-                >
-                    <ChevronDown aria-hidden />
-                </Button>
-                {search}
-                <span className="flex-1" />
-                <DeckButton deck="a" label={t("libraryui.loadTo", { title, deck: "A" })} onClick={() => onLoad("a")} disabled={!selected}>
-                    A
-                </DeckButton>
-                <DeckButton deck="b" label={t("libraryui.loadTo", { title, deck: "B" })} onClick={() => onLoad("b")} disabled={!selected}>
-                    B
-                </DeckButton>
-                {menu}
-            </div>
-        </div>
-    );
-}
-
-// ─── Rows ────────────────────────────────────────────────────────────────────
-
-interface Columns {
-    template: string;
-    genre: boolean;
-    time: boolean;
-}
-
-const COMPACT_COLUMNS: Columns = { template: "minmax(0, 1fr) auto auto", genre: false, time: false };
-
-/** Wider panels get Genre and Time columns. */
-function fullColumns(width: number): Columns {
-    const wide = width >= 760;
-    const parts = [
-        "minmax(0, 1.4fr)",
-        "minmax(0, 1fr)",
-        ...(wide ? ["minmax(0, 0.7fr)", "3rem"] : []),
-        "2.75rem",
-        "2.5rem",
-        "2.75rem",
-        "1.75rem",
-        "3.25rem",
-    ];
-    return { template: parts.join(" "), genre: wide, time: wide };
-}
-
-function ColumnHeader({ t, cols }: { t: Translate; cols: Columns }) {
-    return (
-        <div
-            aria-hidden
-            className="grid h-5 items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em]"
-            style={{ gridTemplateColumns: cols.template, color: "var(--fg-dim)" }}
-        >
-            <span className="truncate">{t("libraryui.colTitle")}</span>
-            <span className="truncate">{t("libraryui.colArtist")}</span>
-            {cols.genre && <span className="truncate">{t("libraryui.colGenre")}</span>}
-            {cols.time && <span className="truncate text-right">{t("libraryui.colTime")}</span>}
-            <span className="truncate text-right">{t("libraryui.colBpm")}</span>
-            <span className="truncate">{t("libraryui.colKey")}</span>
-            <span className="truncate text-right">{t("libraryui.colMatch")}</span>
-            <span className="truncate text-center">{t("libraryui.colStems")}</span>
-            <span className="truncate text-center">{t("libraryui.colLoad")}</span>
-        </div>
-    );
-}
-
-function FullRow({
-    t,
-    tr,
-    match,
-    cols,
-    stemJob,
-    onStems,
-    onLoad,
-}: {
-    t: Translate;
-    tr: LibraryTrack;
-    match: TransitionScore | null;
-    cols: Columns;
-    stemJob?: StemJob;
-    onStems: () => void;
-    onLoad: (deck: DeckId) => void;
-}) {
-    const title = tr.title ?? tr.filename;
-    return (
-        <div className="grid h-full items-center gap-1.5 px-2" style={{ gridTemplateColumns: cols.template }}>
-            <span className="truncate text-[13px] font-semibold">{title}</span>
-            <span className="truncate text-[11px]" style={{ color: "var(--fg-dim)" }}>
-                {tr.artist ?? t("libraryui.unknownArtist")}
-            </span>
-            {cols.genre && (
-                <span className="truncate text-[11px]" style={{ color: "var(--fg-dim)" }}>
-                    {tr.genre ?? ""}
-                </span>
-            )}
-            {cols.time && (
-                <span className="mono text-right text-[11px] tabular-nums" style={{ color: "var(--fg-dim)" }}>
-                    {fmtDuration(tr.duration)}
-                </span>
-            )}
-            <span className="mono text-right text-[11px] tabular-nums" style={{ color: "var(--fg-dim)" }}>
-                {tr.bpm ? tr.bpm.toFixed(0) : "--"}
-            </span>
-            <span className="mono truncate text-[11px]" style={{ color: "var(--accent-2)" }}>
-                {tr.keyCamelot ?? ""}
-            </span>
-            <span className="flex justify-end">{match ? <MatchBadge match={match} /> : null}</span>
-            <span className="flex justify-center">
-                <StemsCell t={t} ready={tr.stemsStatus === "ready"} job={stemJob} onStems={onStems} />
-            </span>
-            <LoadPair t={t} title={title} onLoad={onLoad} />
-        </div>
-    );
-}
-
-function CompactRow({ t, tr, onLoad }: { t: Translate; tr: LibraryTrack; onLoad: (deck: DeckId) => void }) {
-    const title = tr.title ?? tr.filename;
-    const artist = tr.artist ?? t("libraryui.unknownArtist");
-    return (
-        <div className="grid h-full items-center gap-1.5 px-2" style={{ gridTemplateColumns: COMPACT_COLUMNS.template }}>
-            <span className="min-w-0 overflow-hidden leading-tight">
-                <span className="block truncate text-xs font-semibold">{title}</span>
-                <span className="block truncate text-[10px] [[data-density=compact]_&]:hidden" style={{ color: "var(--fg-dim)" }}>
-                    {artist}
-                </span>
-            </span>
-            <span className="mono flex flex-col items-end text-[10px] leading-tight tabular-nums" style={{ color: "var(--fg-dim)" }}>
-                <span>{tr.bpm ? tr.bpm.toFixed(0) : "--"}</span>
-                {tr.keyCamelot && <span style={{ color: "var(--accent-2)" }}>{tr.keyCamelot}</span>}
-            </span>
-            <LoadPair t={t} title={title} onLoad={onLoad} />
-        </div>
-    );
-}
-
-function LoadPair({ t, title, onLoad }: { t: Translate; title: string; onLoad: (deck: DeckId) => void }) {
-    return (
-        <span className="flex items-center justify-center gap-1">
-            <DeckButton deck="a" inRow label={t("libraryui.loadTo", { title, deck: "A" })} onClick={() => onLoad("a")}>
-                A
-            </DeckButton>
-            <DeckButton deck="b" inRow label={t("libraryui.loadTo", { title, deck: "B" })} onClick={() => onLoad("b")}>
-                B
-            </DeckButton>
-        </span>
-    );
-}
-
-/** ≥ 24 px deck-coloured load button. Inside list rows it is skipped by Tab (Enter / Shift+Enter load instead). */
-function DeckButton({
-    deck,
-    label,
-    onClick,
-    children,
-    inRow,
-    wide,
-    disabled,
-}: {
-    deck: "a" | "b";
-    label: string;
-    onClick: () => void;
-    children: ReactNode;
-    inRow?: boolean;
-    wide?: boolean;
-    disabled?: boolean;
-}) {
-    const color = deck === "a" ? "var(--accent-deck-a)" : "var(--accent-deck-b)";
-    return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            tabIndex={inRow ? -1 : undefined}
-            disabled={disabled}
-            onClick={(e) => {
-                e.stopPropagation();
-                onClick();
-            }}
-            onDoubleClick={(e) => e.stopPropagation()}
-            className={cn(
-                "inline-flex h-6 shrink-0 items-center justify-center rounded-md border text-[11px] font-bold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40",
-                wide ? "px-2.5" : "w-6",
-            )}
-            style={{ color, borderColor: color, background: "var(--bg-elev-2)" }}
-        >
-            {children}
-        </button>
-    );
-}
-
-function StemsCell({ t, ready, job, onStems }: { t: Translate; ready: boolean; job?: StemJob; onStems: () => void }) {
-    if (ready) {
-        return (
-            <span title={t("libraryui.stemsReady")} className="inline-flex" style={{ color: "var(--accent)" }}>
-                <Sparkles className="size-3.5" aria-hidden />
-                <span className="sr-only">{t("libraryui.stemsReady")}</span>
-            </span>
-        );
-    }
-    if (job && job.state !== "done" && job.state !== "error") {
-        const pct = job.state === "running" ? Math.round((job.progress || 0) * 100) : 0;
-        return (
-            <span className="mono text-[10px] tabular-nums" style={{ color: "var(--fg-dim)" }} title={t("libraryui.stemsProgress", { pct })}>
-                {job.state === "running" ? `${pct}%` : "…"}
-            </span>
-        );
-    }
-    return (
-        <button
-            type="button"
-            tabIndex={-1}
-            aria-label={t("libraryui.stemsGenerate")}
-            title={t("libraryui.stemsGenerate")}
-            onClick={(e) => {
-                e.stopPropagation();
-                onStems();
-            }}
-            onDoubleClick={(e) => e.stopPropagation()}
-            className="inline-flex size-6 items-center justify-center rounded-md border outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-            style={{ color: "var(--fg-dim)", borderColor: "var(--border)", background: "var(--bg-elev-2)" }}
-        >
-            <Sparkles className="size-3" aria-hidden />
-        </button>
-    );
-}
-
-/** Compact match badge: a coloured score chip + key hint. */
-function MatchBadge({ match }: { match: TransitionScore }) {
-    const pct = Math.round(match.score * 100);
-    // Green ≥80, amber ≥55, dim otherwise.
-    const color = match.score >= 0.8 ? "var(--success)" : match.score >= 0.55 ? "var(--warning)" : "var(--fg-dim)";
-    const adj = match.bpmAdjustPct;
-    const adjLabel = Math.abs(adj) < 0.05 ? "±0%" : `${adj > 0 ? "+" : ""}${adj.toFixed(1)}%`;
-    return (
-        <span title={`${match.key.label} · tempo ${adjLabel}`} className="mono inline-flex flex-col items-end text-[9px] font-bold leading-[1.1]" style={{ color }}>
-            <span>{pct}%</span>
-            <span className="opacity-80">{match.key.label}</span>
-        </span>
-    );
-}
-
-// ─── Toolbar bits ────────────────────────────────────────────────────────────
-
-function SourceSwitch({ source, setSource, className }: { source: Source; setSource: (s: Source) => void; className?: string }) {
-    const t = useT();
-    return (
-        <ToggleGroup
-            value={[source]}
-            onValueChange={(v) => {
-                const next = v[0];
-                if (next === "companion" || next === "local") setSource(next);
-            }}
-            variant="outline"
-            size="sm"
-            aria-label={t("libraryui.source")}
-            className={cn("w-full", className)}
-        >
-            <ToggleGroupItem value="companion" className="flex-1 text-[11px] font-bold uppercase tracking-[0.06em]">
-                {t("library.companion")}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="local" className="flex-1 text-[11px] font-bold uppercase tracking-[0.06em]">
-                {t("library.local")}
-            </ToggleGroupItem>
-        </ToggleGroup>
-    );
-}
-
-interface AssistProps {
-    decks: readonly DeckState[];
-    deckKeys: Record<DeckId, string | null>;
-    assistDeck: DeckId | null;
-    setAssistDeck: (d: DeckId | null) => void;
-}
-
-/** Compact / icon tiers: the source switch and mix assist collapse into this menu. */
-function LibraryMenu({ source, setSource, assist }: { source: Source; setSource: (s: Source) => void; assist?: AssistProps }) {
-    const t = useT();
-    const loaded = assist ? assist.decks.filter((d) => d.loaded) : [];
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger render={<Button size="icon-xs" variant="ghost" aria-label={t("libraryui.menu")} />}>
-                <MoreVertical aria-hidden />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                    <DropdownMenuLabel>{t("libraryui.source")}</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup
-                        value={source}
-                        onValueChange={(v: unknown) => {
-                            if (v === "companion" || v === "local") setSource(v);
-                        }}
-                    >
-                        <DropdownMenuRadioItem value="companion">{t("library.companion")}</DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="local">{t("library.local")}</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                </DropdownMenuGroup>
-                {assist && (
                     <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                            <DropdownMenuLabel>{t("library.mixAssist")}</DropdownMenuLabel>
-                            <DropdownMenuRadioGroup
-                                value={assist.assistDeck ?? "off"}
-                                onValueChange={(v: unknown) => {
-                                    if (v === "off") assist.setAssistDeck(null);
-                                    else if (v === "a" || v === "b" || v === "c" || v === "d") assist.setAssistDeck(v);
-                                }}
-                            >
-                                <DropdownMenuRadioItem value="off">{t("libraryui.assistOff")}</DropdownMenuRadioItem>
-                                {loaded.map((d) => (
-                                    <DropdownMenuRadioItem key={d.id} value={d.id}>
-                                        {t("libraryui.assistDeck", { deck: d.id.toUpperCase() })}
-                                    </DropdownMenuRadioItem>
-                                ))}
-                            </DropdownMenuRadioGroup>
-                            {loaded.length === 0 && <DropdownMenuLabel>{t("libraryui.assistNone")}</DropdownMenuLabel>}
-                        </DropdownMenuGroup>
+                        <span className="dk-label lib-c lib-spacer">{t("library.local")}</span>
+                        <OptionsPopover label={t("libraryui.menu")} open={menuOpen} onOpenChange={setMenuOpen}>
+                            <SourceSection t={t} source={source} setSource={setSource} />
+                        </OptionsPopover>
                     </>
                 )}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
-
-/**
- * Harmonic mix-assist toggle bar (full tier). Pick a deck to rank library
- * tracks by how well they'd mix into that deck's playing track (Camelot key + BPM).
- */
-function MixAssistBar({ decks, deckKeys, assistDeck, setAssistDeck }: AssistProps) {
-    const t = useT();
-    const loaded = decks.filter((d) => d.loaded);
-    const ref = assistDeck ? decks.find((d) => d.id === assistDeck) : null;
-    return (
-        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden rounded-md px-2 py-0.5" style={{ background: "var(--bg-elev-2)" }}>
-            <span className="mr-auto inline-flex min-w-0 items-center gap-1 truncate text-[10px] tracking-[0.1em]" style={{ color: "var(--fg-dim)" }}>
-                <Sparkles className="size-2.5 shrink-0" aria-hidden />
-                <span className="truncate">{t("library.mixAssist")}</span>
-                {ref && (
-                    <span className="mono ml-2 truncate" style={{ color: "var(--accent-2)" }}>
-                        → {deckKeys[ref.id] ?? "?"} · {ref.bpm > 0 ? ref.bpm.toFixed(0) : "--"} BPM
-                    </span>
+            </div>
+            <div className="lib-statewrap">
+                {loadError ? (
+                    <StateBlock
+                        tier={tier}
+                        tone="error"
+                        icon={<TriangleAlert size={14} aria-hidden />}
+                        title={t("libraryui.loadFailed", { title: loadError.title, deck: loadError.deck.toUpperCase() })}
+                        detail={loadError.message}
+                        detailOneLine
+                        action={buttons}
+                    />
+                ) : (
+                    <StateBlock tier={tier} icon={<FolderOpen size={14} aria-hidden />} title={t("library.pickFile")} detail={t("library.localHint")} action={buttons} />
                 )}
-            </span>
-            <AssistPill active={assistDeck === null} onClick={() => setAssistDeck(null)} title={t("libraryui.assistOffHint")}>
-                {t("libraryui.assistOff")}
-            </AssistPill>
-            {loaded.length === 0 && (
-                <span className="truncate text-[10px]" style={{ color: "var(--fg-dim)" }}>
-                    {t("libraryui.assistNone")}
-                </span>
-            )}
-            {loaded.map((d) => (
-                <AssistPill
-                    key={d.id}
-                    active={assistDeck === d.id}
-                    onClick={() => setAssistDeck(d.id)}
-                    title={t("libraryui.assistDeck", { deck: d.id.toUpperCase() }) + (d.title ? ` (${d.title})` : "")}
-                >
-                    {d.id.toUpperCase()}
-                </AssistPill>
-            ))}
-        </div>
-    );
-}
-
-function AssistPill({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: ReactNode }) {
-    return (
-        <button
-            type="button"
-            aria-pressed={active}
-            title={title}
-            onClick={onClick}
-            className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md border px-2 text-[10px] font-bold uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            style={{
-                background: active ? "var(--accent)" : "var(--bg-elev)",
-                color: active ? "var(--accent-fg)" : "var(--fg-dim)",
-                borderColor: "var(--border)",
-            }}
-        >
-            {children}
-        </button>
-    );
-}
-
-// ─── States ──────────────────────────────────────────────────────────────────
-
-function StatusLine({ status, t, onSettings }: { status: "checking" | "offline" | "unconfigured"; t: Translate; onSettings: () => void }) {
-    if (status === "checking") {
-        return (
-            <div aria-busy="true" className="p-1">
-                <SkeletonText lines={2} />
             </div>
-        );
-    }
-    const offline = status === "offline";
-    return (
-        <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
-            <span
-                className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold"
-                style={{ color: offline ? "var(--warning)" : undefined }}
-                title={t(offline ? "library.offlineDetail" : "library.unconfiguredDetail")}
-            >
-                {offline ? <WifiOff className="size-3.5 shrink-0" aria-hidden /> : <Link2Off className="size-3.5 shrink-0" aria-hidden />}
-                <span className="truncate">{t(offline ? "library.offline" : "library.unconfigured")}</span>
-            </span>
-            {!offline && (
-                <Button size="xs" variant="outline" className="self-start" onClick={onSettings}>
-                    {t("library.openSettings")}
-                </Button>
-            )}
-        </div>
+        </>
     );
-}
-
-function ListPlaceholder({
-    tier,
-    t,
-    error,
-    loading,
-    hasQuery,
-    onRetry,
-}: {
-    tier: Tier;
-    t: Translate;
-    error: string | null;
-    loading: boolean;
-    hasQuery: boolean;
-    onRetry: () => void;
-}) {
-    if (tier !== "full") {
-        if (error)
-            return (
-                <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px]">
-                    <span className="truncate" style={{ color: "var(--destructive)" }} title={error}>
-                        {t("library.error")}
-                    </span>
-                    <Button size="xs" variant="ghost" onClick={onRetry}>
-                        {t("common.retry")}
-                    </Button>
-                </span>
-            );
-        const key = loading ? "library.loading" : hasQuery ? "library.noResults" : "library.empty";
-        return (
-            <span className="truncate text-[11px]" style={{ color: "var(--fg-dim)" }} aria-busy={loading || undefined}>
-                {t(key)}
-            </span>
-        );
-    }
-    if (error) return <ErrorState variant="inline" title={t("library.error")} detail={error} onRetry={onRetry} className="overflow-hidden p-2" />;
-    if (loading)
-        return (
-            <div className="w-full p-2" aria-busy="true">
-                <SkeletonText lines={3} />
-            </div>
-        );
-    if (hasQuery) return <NoResultsState title={t("library.noResults")} description={t("library.noResultsDetail")} className="overflow-hidden p-2" />;
-    return <EmptyState variant="inline" title={t("library.empty")} description={t("library.emptyDetail")} className="overflow-hidden p-2" />;
-}
-
-// ─── Format helpers ──────────────────────────────────────────────────────────
-
-const intFmt = new Intl.NumberFormat("ro-RO");
-
-function fmtInt(n: number): string {
-    return intFmt.format(n);
-}
-
-function fmtDuration(sec: number | null): string {
-    if (!sec || sec <= 0) return "";
-    const s = Math.round(sec);
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }

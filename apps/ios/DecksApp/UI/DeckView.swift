@@ -3,7 +3,9 @@ import SwiftUI
 
 /// One deck at a layout tier (WP19-34). Full: header (title, BPM, key, time), phase meter, jog, transport, hot
 /// cues, loops, beat jump, tempo, key, sync / quantize / slip. Compact: no jog, no key / tempo column. Icon:
-/// header + transport + sync only. Each tier fits the `PANEL_SPECS` minimum (deck 460×560, 340×330, 220×150 pt).
+/// header + transport + sync only. This is still the Decks 1.4 content: it needs 460×560 (full) and 340×330
+/// (compact) pt, more than the 1.5 `PANEL_SPECS` minimums (480×250, 340×190, 220×110), so `LayoutHost` passes the
+/// tier `ContentTiers` found room for, not the solver's.
 struct DeckView: View {
     let index: Int
     var tier: LayoutTier = .full

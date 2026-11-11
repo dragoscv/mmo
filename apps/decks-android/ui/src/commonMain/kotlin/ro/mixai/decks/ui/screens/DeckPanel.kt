@@ -39,8 +39,10 @@ import ro.mixai.decks.ui.theme.LocalDecksType
 
 /**
  * One deck at a layout tier (WP19-34): [PanelTier.Full] = everything + jog wheel, [PanelTier.Compact]
- * = no jog and no key/mode row, [PanelTier.Icon] = title, BPM and the transport only. Each tier
- * fits the `PANEL_SPECS` minimum of presets.ts (deck: 460×560, 340×330, 220×150 dp).
+ * = no jog and no key/mode row, [PanelTier.Icon] = title, BPM and the transport only. This is still
+ * the Decks 1.4 content: it needs 460×560 (full) and 340×330 (compact) dp, more than the 1.5
+ * `PANEL_SPECS` minimums of presets.ts (480×250, 340×190, 220×110), so the tier passed in is the
+ * one [contentTier] found room for, not the solver's.
  */
 @Composable
 fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, tier: PanelTier = PanelTier.Full) {
@@ -48,6 +50,9 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, t
     val d: DeckState = ctl.deck(index) ?: DeckState(index)
     val c = ctl.controls[index]
     val color = DecksColors.deck(index)
+    // Look roles (look.css): PLAY = the skin's play colour (else the deck colour), CUE = the cue-button colour,
+    // one ON colour for every latched toggle. The classic look keeps its 1.x pick (the deck colour).
+    val onColor = if (DecksColors.skin.signature) DecksColors.on else color
     val type = LocalDecksType.current
     val deckName = str(if (index == 0) Str.DeckA else Str.DeckB)
     val on = str(Str.On)
@@ -103,19 +108,19 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, t
                         PadButton(
                             if (d.playing) "❚❚" else "▶",
                             "${str(if (d.playing) Str.Pause else Str.Play)} $deckName",
-                            Modifier.weight(1f), active = d.playing, accent = color, enabled = d.loaded,
+                            Modifier.weight(1f), active = d.playing, accent = DecksColors.play(index), enabled = d.loaded,
                         ) { ctl.togglePlay(index) }
                         PadButton(
                             str(Str.Cue).uppercase(), "${str(Str.Cue)} $deckName", Modifier.weight(1f),
-                            accent = DecksColors.warning, enabled = d.loaded,
+                            accent = DecksColors.cueButton, enabled = d.loaded,
                             onPress = { ctl.cue(index, true) }, onRelease = { ctl.cue(index, false) },
                         )
                         PadButton(
                             str(Str.Sync).uppercase(), "${str(Str.Sync)} $deckName", Modifier.weight(1f),
-                            active = d.syncLock, accent = color, enabled = d.loaded, state = st(d.syncLock),
+                            active = d.syncLock, accent = onColor, enabled = d.loaded, state = st(d.syncLock),
                         ) { ctl.syncTap(index) }
                         PadButton(
-                            "🔒", "${str(Str.SyncLock)} $deckName", active = d.syncLock, accent = color, enabled = d.loaded,
+                            "🔒", "${str(Str.SyncLock)} $deckName", active = d.syncLock, accent = onColor, enabled = d.loaded,
                             state = st(d.syncLock),
                         ) { ctl.syncLock(index) }
                     }
@@ -126,11 +131,11 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, t
                             PadButton(
                                 "${slot + 1}",
                                 str(if (set) Str.HotCue else Str.HotCueEmpty, slot + 1) + " $deckName",
-                                Modifier.weight(1f), active = set, accent = DecksColors.deck(slot), enabled = d.loaded,
+                                Modifier.weight(1f), active = set, accent = DecksColors.cue(slot), enabled = d.loaded,
                             ) { ctl.hotCue(index, slot) }
                         }
                         PadButton("✕", "${str(Str.HotCueDelete)} $deckName", active = c.hotCueDeleteMode,
-                            accent = DecksColors.danger, state = st(c.hotCueDeleteMode)) { ctl.toggleHotCueDelete(index) }
+                            accent = DecksColors.alert, state = st(c.hotCueDeleteMode)) { ctl.toggleHotCueDelete(index) }
                     }
                     // Loops + beat jump
                     ButtonRow {
@@ -153,13 +158,13 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, t
                         PadButton(str(Str.KeyMatch), "${str(Str.KeyMatch)} $deckName", Modifier.weight(1f), enabled = d.loaded) {
                             ctl.keyMatch(index)
                         }
-                        PadButton("KL", "${str(Str.KeyLock)} $deckName", active = d.keyLock, accent = color, state = st(d.keyLock)) {
+                        PadButton("KL", "${str(Str.KeyLock)} $deckName", active = d.keyLock, accent = onColor, state = st(d.keyLock)) {
                             ctl.toggleKeyLock(index)
                         }
-                        PadButton("Q", "${str(Str.Quantize)} $deckName", active = d.quantize, accent = color, state = st(d.quantize)) {
+                        PadButton("Q", "${str(Str.Quantize)} $deckName", active = d.quantize, accent = onColor, state = st(d.quantize)) {
                             ctl.toggleQuantize(index)
                         }
-                        PadButton(str(Str.Slip).uppercase(), "${str(Str.Slip)} $deckName", active = d.slip, accent = color,
+                        PadButton(str(Str.Slip).uppercase(), "${str(Str.Slip)} $deckName", active = d.slip, accent = onColor,
                             state = st(d.slip)) { ctl.toggleSlip(index) }
                     }
                 }
@@ -192,6 +197,7 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, t
 private fun DeckIcon(ctl: DecksController, index: Int, d: DeckState, deckName: String, modifier: Modifier) {
     val type = LocalDecksType.current
     val color = DecksColors.deck(index)
+    val onColor = if (DecksColors.skin.signature) DecksColors.on else color
     Panel(modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -208,16 +214,16 @@ private fun DeckIcon(ctl: DecksController, index: Int, d: DeckState, deckName: S
             ButtonRow {
                 PadButton(
                     if (d.playing) "❚❚" else "▶", "${str(if (d.playing) Str.Pause else Str.Play)} $deckName",
-                    Modifier.weight(1f), active = d.playing, accent = color, enabled = d.loaded,
+                    Modifier.weight(1f), active = d.playing, accent = DecksColors.play(index), enabled = d.loaded,
                 ) { ctl.togglePlay(index) }
                 PadButton(
                     str(Str.Cue).uppercase(), "${str(Str.Cue)} $deckName", Modifier.weight(1f),
-                    accent = DecksColors.warning, enabled = d.loaded,
+                    accent = DecksColors.cueButton, enabled = d.loaded,
                     onPress = { ctl.cue(index, true) }, onRelease = { ctl.cue(index, false) },
                 )
                 PadButton(
                     str(Str.Sync).uppercase(), "${str(Str.Sync)} $deckName", Modifier.weight(1f),
-                    active = d.syncLock, accent = color, enabled = d.loaded,
+                    active = d.syncLock, accent = onColor, enabled = d.loaded,
                     state = str(if (d.syncLock) Str.On else Str.Off),
                 ) { ctl.syncTap(index) }
             }

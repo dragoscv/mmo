@@ -45,12 +45,45 @@ pub enum CrossfaderAssign {
     B,
 }
 
+impl CrossfaderAssign {
+    /// Wire name (`"a"` / `"thru"` / `"b"`, as serialised) → value; `None` for anything else.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "a" => Some(Self::A),
+            "thru" => Some(Self::Thru),
+            "b" => Some(Self::B),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CrossfaderCurve {
     Linear,
     Smooth,
     Sharp,
+}
+
+impl CrossfaderCurve {
+    /// Wire name (`"linear"` / `"smooth"` / `"sharp"`, as serialised) → value; `None` for anything else.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "linear" => Some(Self::Linear),
+            "smooth" => Some(Self::Smooth),
+            "sharp" => Some(Self::Sharp),
+            _ => None,
+        }
+    }
+
+    /// Gain-law index understood by `dsp::crossfader_gain`.
+    pub fn law(self) -> u8 {
+        match self {
+            Self::Linear => 0,
+            Self::Smooth => 1,
+            Self::Sharp => 2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -162,6 +195,13 @@ pub struct MixerState {
     /// Frames per audio callback (fixed or observed; `None` until known).
     #[serde(default)]
     pub buffer_frames: Option<u32>,
+    /// Audio callback time / buffer period (0..4; 1.0 = the callback used the whole period).
+    #[serde(default)]
+    pub dsp_load: f32,
+    /// Audio callbacks that overran their buffer period since the engine started (the count
+    /// carries over an output device switch).
+    #[serde(default)]
+    pub overruns: u32,
 }
 
 impl MixerState {
@@ -177,6 +217,8 @@ impl MixerState {
             latency_ms: 0.0,
             channels: 0,
             buffer_frames: None,
+            dsp_load: 0.0,
+            overruns: 0,
         }
     }
 }

@@ -10,8 +10,25 @@ import { settingsMessages } from "./messages-settings";
 import { packMessages } from "./messages-pack";
 import { libraryMessages } from "./messages-library";
 import { deckMessages } from "./messages-deck";
+import { lookMessages } from "./messages-look";
+import { wavesMessages } from "./messages-waves";
+import { mixerMessages } from "./messages-mixer";
+import { deckTabsMessages } from "./messages-decktabs";
+import { skinsMessages } from "./messages-skins";
 
-export const catalogs = [appMessages, shellMessages, settingsMessages, packMessages, libraryMessages, deckMessages] as const;
+export const catalogs = [
+    appMessages,
+    shellMessages,
+    settingsMessages,
+    packMessages,
+    libraryMessages,
+    deckMessages,
+    lookMessages,
+    wavesMessages,
+    mixerMessages,
+    deckTabsMessages,
+    skinsMessages,
+] as const;
 
 type Merge<T extends readonly { en: Record<string, string> }[]> = T extends readonly [infer H, ...infer R]
     ? (H extends { en: infer E } ? E : never) & (R extends readonly { en: Record<string, string> }[] ? Merge<R> : unknown)

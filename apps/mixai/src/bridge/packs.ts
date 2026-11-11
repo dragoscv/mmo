@@ -9,13 +9,17 @@
  * anything is stored; the UI only ever sees validated JSON.
  */
 
+import type { PackStyle } from "../look/style-vars.ts";
+
+export type { PackStyle };
+
 export type PackKind = "skin" | "layout" | "bundle" | "controller";
 
 export type PackTrust = "official" | "verified" | "community" | "unsigned";
 
 export interface PackManifest {
-    /** Schema version. */
-    v: 1;
+    /** Schema version. 2 = the pack may carry a `style` block (needs Decks >= 1.5). */
+    v: 1 | 2;
     /** Reverse-DNS-ish slug, e.g. "ro.mixai.skin.neon". */
     id: string;
     name: string;
@@ -49,6 +53,8 @@ export interface PackTokens {
     fontBody?: string;
     /** Optional background image asset path. */
     background?: string;
+    /** Look, shapes, waveform and cue colours (manifest v2; see look/style-vars.ts). */
+    style?: PackStyle;
 }
 
 export interface PackInfo {
@@ -94,4 +100,28 @@ export const packs = {
     remove: (id: string) => invoke<void>("pack_remove", { id }),
     /** Pick a .mixaipack file from disk and return its bytes. */
     pickFile: () => invoke<ArrayBuffer>("pack_pick_file").then(pickedBytes),
+    /**
+     * Build an unsigned `.mixaipack` (manifest v2 + tokens.json) from a skin made in the skin
+     * editor and save it where the user picks. Rust validates manifest and tokens with the same
+     * rules as install. Resolves with the saved path, or null when the dialog was cancelled
+     * (or outside Tauri). Throws a readable error string on refusal.
+     */
+    exportSkin: (req: PackExportRequest) => invoke<string | null>("pack_export", { req }),
+    /**
+     * Build the same unsigned `.mixaipack` in memory and return its bytes (no dialog), so the
+     * skin editor can install the skin it just made (`usePackStore.install(bytes)`). Null
+     * outside Tauri. Throws a readable error string on refusal.
+     */
+    buildSkin: (req: PackExportRequest) => invoke<ArrayBuffer>("pack_build", { req }).then(pickedBytes),
 };
+
+/** Input of `pack_export`: what the skin editor produced. */
+export interface PackExportRequest {
+    /** Reverse-DNS-ish id, e.g. "user.skin.my-booth". */
+    id: string;
+    name: string;
+    author: string;
+    description: string;
+    version: string;
+    tokens: PackTokens;
+}

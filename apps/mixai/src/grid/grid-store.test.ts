@@ -84,21 +84,24 @@ test("an edit after a load sends only the new track's grid to the engine", async
     assert.equal(bridge.sent[0]!.bpm, 128);
 });
 
-test("both engine load paths reset the deck's grid", async () => {
+test("both engine load paths reset the deck's grid, without a seed: an untouched grid follows the engine", async () => {
     // The bridge is the engine module itself; import it lazily so the store keeps the fake.
     const { engine } = await import("../bridge/engine.ts");
     setGridBridge(bridge); // engine.ts installs itself on import — put the fake back.
 
     useGridStore.getState().setGrid("a", "old", { bpm: 120, firstBeat: 0, markers: [{ sec: 8, bpm: 130 }], fixed: false });
     await engine.loadTrack({ deck: "a", source: "x.mp3", trackId: "new", bpm: 124 });
-    assert.equal(useGridStore.getState().grids.a?.trackId, "new");
-    assert.equal(useGridStore.getState().grids.a?.grid.markers.length, 0);
-    assert.equal(useGridStore.getState().grids.a?.grid.bpm, 124);
+    // No stored grid: a seed from the request (first beat 0, 20 BPM without a library BPM) hid
+    // the BPM and first beat the engine detected. Readers fall back to the deck snapshot.
+    assert.equal(useGridStore.getState().grids.a, undefined);
+    const shown = deckGridOr("a", "new", 129.2, 0.046);
+    assert.equal(shown.bpm, 129.2);
+    assert.equal(shown.firstBeat, 0.046);
+    assert.equal(shown.markers.length, 0);
 
     useGridStore.getState().setGrid("b", "old", { bpm: 120, firstBeat: 0, markers: [{ sec: 8, bpm: 130 }], fixed: false });
     await engine.loadTrackStream({ deck: "b", trackId: 42, bpm: 126 });
-    assert.equal(useGridStore.getState().grids.b?.trackId, "42");
-    assert.equal(useGridStore.getState().grids.b?.grid.markers.length, 0);
+    assert.equal(useGridStore.getState().grids.b, undefined);
 });
 
 // ── P1-13: optimistic IPC is rolled back ─────────────────────────────────────

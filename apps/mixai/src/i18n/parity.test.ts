@@ -7,8 +7,25 @@ import { settingsMessages } from "./messages-settings.ts";
 import { packMessages } from "./messages-pack.ts";
 import { libraryMessages } from "./messages-library.ts";
 import { deckMessages } from "./messages-deck.ts";
+import { lookMessages } from "./messages-look.ts";
+import { wavesMessages } from "./messages-waves.ts";
+import { mixerMessages } from "./messages-mixer.ts";
+import { deckTabsMessages } from "./messages-decktabs.ts";
+import { skinsMessages } from "./messages-skins.ts";
 
-const all = { appMessages, shellMessages, settingsMessages, packMessages, libraryMessages, deckMessages };
+const all = {
+    appMessages,
+    shellMessages,
+    settingsMessages,
+    packMessages,
+    libraryMessages,
+    deckMessages,
+    lookMessages,
+    wavesMessages,
+    mixerMessages,
+    deckTabsMessages,
+    skinsMessages,
+};
 
 test("every catalogue has the same keys in en and ro, and no empty strings", () => {
     for (const [name, c] of Object.entries(all)) {

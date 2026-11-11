@@ -73,7 +73,9 @@ object DesktopDecks {
     /** Skin persisted in java.util.prefs (`ro/mixai/decks` → `skin`); `-Ddecks.skin=<id>` overrides. */
     fun skinState(): SkinState {
         val prefs = java.util.prefs.Preferences.userRoot().node("ro/mixai/decks")
-        val initial = System.getProperty("decks.skin")?.let { DecksSkin.decode("id=$it") } ?: DecksSkin.decode(prefs.get("skin", null))
+        // The override names a preset; a bare `id=` string would read as a Decks 1.4 save (no look key) in decode().
+        val initial = System.getProperty("decks.skin")?.let { id -> DecksSkin.presets.firstOrNull { it.id == id } ?: DecksSkin.default }
+            ?: DecksSkin.decode(prefs.get("skin", null))
         return SkinState(initial) { prefs.put("skin", it.encode()) }
     }
 

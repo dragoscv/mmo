@@ -3,6 +3,7 @@ import { usePerfStore } from "@/state/perf-store";
 import { useT, type MessageKey } from "@/i18n";
 import { cn } from "@mmo/ui";
 import { Knob } from "./Knob";
+import { useTouchMode } from "./deck-tabs/use-fit";
 
 const KINDS: readonly { kind: ColorFxKind; label: MessageKey }[] = [
     { kind: "none", label: "fx.color.none" },
@@ -19,21 +20,7 @@ export function ColorFxSelect({ deckId, className }: { deckId: DeckId; className
     const kind = usePerfStore((s) => s.decks[deckId].colorFx);
     const setColorFx = usePerfStore((s) => s.setColorFx);
     return (
-        <select
-            value={kind}
-            onChange={(e) => setColorFx(deckId, e.target.value as ColorFxKind)}
-            aria-label={t("fx.color.selectAria", { id: deckId.toUpperCase() })}
-            className={cn("min-h-6 min-w-0", className)}
-            style={{
-                background: "var(--bg-elev-2)",
-                color: "var(--fg)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                padding: "0 6px",
-                fontSize: 11,
-                fontWeight: 700,
-            }}
-        >
+        <select value={kind} onChange={(e) => setColorFx(deckId, e.target.value as ColorFxKind)} aria-label={t("fx.color.selectAria", { id: deckId.toUpperCase() })} className={cn("mx-select", className)}>
             {KINDS.map((k) => (
                 <option key={k.kind} value={k.kind}>
                     {t(k.label)}
@@ -44,19 +31,7 @@ export function ColorFxSelect({ deckId, className }: { deckId: DeckId; className
 }
 
 /** Colour FX bipolar amount knob (−1..1). The value line is shown only when there is no label and `showValue`. */
-export function ColorFxKnob({
-    deckId,
-    accent,
-    size = 38,
-    label,
-    showValue = true,
-}: {
-    deckId: DeckId;
-    accent: string;
-    size?: number;
-    label?: string;
-    showValue?: boolean;
-}) {
+export function ColorFxKnob({ deckId, accent, size = 34, label, showValue = true }: { deckId: DeckId; accent: string; size?: number; label?: string; showValue?: boolean }) {
     const t = useT();
     const kind = usePerfStore((s) => s.decks[deckId].colorFx);
     const param = usePerfStore((s) => s.decks[deckId].colorParam);
@@ -79,16 +54,20 @@ export function ColorFxKnob({
     );
 }
 
-/** Per-deck colour FX (WP19-10): one selector + one bipolar knob (−1..1). `compact`: 30 px knob, no value line. */
+/**
+ * Per-deck colour FX (WP19-10): one selector + one bipolar knob (−1..1). `compact`: 28 px knob,
+ * no value line. Touch mode: 44 px knob (the select grows in mixer.css).
+ */
 export function ColorFx({ deckId, accent, compact = false }: { deckId: DeckId; accent: string; compact?: boolean }) {
     const t = useT();
+    const touch = useTouchMode();
     return (
-        <div className="flex min-w-0 items-center gap-2">
-            <label className="grid min-w-0 flex-1 gap-0.5">
-                <span className="text-[10px] tracking-[0.12em] text-[var(--fg-dim)]">{t("fx.color.title")}</span>
+        <div className="mx-colorfx">
+            <label className="mx-field mx-field-grow">
+                <span className="dk-label">{t("fx.color.title")}</span>
                 <ColorFxSelect deckId={deckId} />
             </label>
-            <ColorFxKnob deckId={deckId} accent={accent} size={compact ? 30 : 38} showValue={!compact} />
+            <ColorFxKnob deckId={deckId} accent={accent} size={touch ? 44 : compact ? 28 : 34} showValue={!compact} />
         </div>
     );
 }

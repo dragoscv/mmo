@@ -15,7 +15,7 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogH
 import { layoutEditorBridge } from "./editor-bridge";
 import { useLayoutStore } from "./layout-store";
 import { minimumSize, solve, validateLayout } from "./solver";
-import { PANEL_SPECS } from "./presets";
+import { PANEL_SPECS, layoutName } from "./presets";
 import { PANEL_IDS, type LayoutArea, type LayoutDoc, type PanelId } from "./types";
 import { placeArea, resizeArea, setTrackCount } from "./editor-ops";
 import { localLayoutId } from "@/packs/pack-layouts";
@@ -48,7 +48,7 @@ export function LayoutEditor() {
             const active = useLayoutStore.getState().active();
             const builtin = !useLayoutStore.getState().user.some((u) => u.id === active.id);
             // Pack layouts carry `<packId>/<id>`; a fork gets a plain slug from the local part.
-            setDraft({ ...structuredClone(active), id: builtin ? `${localLayoutId(active.id)}-custom` : active.id, name: builtin ? `${active.name} +` : active.name });
+            setDraft({ ...structuredClone(active), id: builtin ? `${localLayoutId(active.id)}-custom` : active.id, name: builtin ? `${layoutName(t, active)} +` : active.name });
             setErrors([]);
             setSelected(null);
             setOpen(true);
@@ -56,7 +56,7 @@ export function LayoutEditor() {
         return () => {
             layoutEditorBridge.open = () => {};
         };
-    }, []);
+    }, [t]);
 
     const preview = useMemo(() => {
         if (!draft) return null;

@@ -11,7 +11,10 @@ package ro.mixai.decks.ui.engine
  */
 enum class PanelId(val key: String) {
     DeckA("deckA"), DeckB("deckB"), DeckC("deckC"), DeckD("deckD"), Clock("clock"), Mixer("mixer"),
-    Crossfader("crossfader"), Library("library"), Automix("automix"), Sampler("sampler"), Plugins("plugins");
+    Crossfader("crossfader"), Library("library"), Automix("automix"), Sampler("sampler"), Plugins("plugins"),
+
+    /** Scrolling waveforms of every deck in the layout (Decks 1.5); same order as `PANEL_IDS` of types.ts. */
+    Waves("waves");
 
     companion object {
         fun of(key: String): PanelId? = entries.firstOrNull { it.key == key }
@@ -68,6 +71,20 @@ data class PanelPlacement(val panel: PanelId, val rect: PanelRect, val tier: Pan
 
 data class LayoutSolution(val placements: List<PanelPlacement>, val docked: List<PanelId>, val dock: PanelRect?)
 
+/**
+ * The `style` block of a manifest-v2 skin (`PackStyle` of src/look/style-vars.ts), already validated
+ * and resolved by decks-packs. [colors] = style colour key (`well`, `waveLow`, `cue1`, …) → 0xAARRGGBB;
+ * [sizes] = style size key (`panelGap`, `controlRadius`, `wavePlayedAlpha`, …) → number.
+ */
+data class PackStyleUi(
+    val look: String? = null,
+    val platter: Boolean? = null,
+    val layout: String? = null,
+    val waves: String? = null,
+    val colors: Map<String, Long> = emptyMap(),
+    val sizes: Map<String, Double> = emptyMap(),
+)
+
 /** A verified pack, flattened for the UI. [colors] = pack token key → 0xRRGGBB (alpha in the high byte). */
 data class PackSummaryUi(
     val id: String,
@@ -80,11 +97,17 @@ data class PackSummaryUi(
     val accent: String?,
     val colors: Map<String, Long>,
     val layouts: List<LayoutDoc>,
+    /** Manifest schema version: 1, or 2 when the pack may carry a [style] block (Decks 1.5). */
+    val manifestV: Int = 1,
+    val style: PackStyleUi? = null,
 )
 
 interface PackPort {
     /** Built-in presets plus every installed pack layout (ids `<packId>/<layoutId>`). */
     fun layouts(): List<LayoutDoc>
+
+    /** Id of the layout a fresh install starts on (`DEFAULT_LAYOUT` of presets.ts). */
+    fun defaultLayoutId(): String = DemoPacks.DEFAULT_LAYOUT_ID
 
     /** Solve [layout] for a [w] × [h] dp container; panels outside [available] always go to the dock. */
     fun solve(layout: LayoutDoc, w: Double, h: Double, available: Set<PanelId>): LayoutSolution
@@ -116,16 +139,21 @@ object DemoPacks : PackPort {
     const val DEFAULT_GAP = 12.0
     const val FIT_TOLERANCE = 0.5
 
-    private val deck = PanelSpec(460.0 to 560.0, 340.0 to 330.0, 220.0 to 150.0, true)
+    /** `DEFAULT_LAYOUT.id` of presets.ts (Decks 1.5: Pro; it was Classic up to 1.4). */
+    const val DEFAULT_LAYOUT_ID = "pro"
+
+    // Decks 1.5: a deck is a wide, short strip; the mixer puts its knobs beside the fader when short.
+    private val deck = PanelSpec(480.0 to 250.0, 340.0 to 190.0, 220.0 to 110.0, true)
     val specs: Map<PanelId, PanelSpec> = mapOf(
         PanelId.DeckA to deck, PanelId.DeckB to deck, PanelId.DeckC to deck, PanelId.DeckD to deck,
         PanelId.Clock to PanelSpec(220.0 to 72.0, 160.0 to 40.0, 90.0 to 28.0, false),
-        PanelId.Mixer to PanelSpec(240.0 to 440.0, 200.0 to 260.0, 150.0 to 150.0, true),
-        PanelId.Crossfader to PanelSpec(220.0 to 100.0, 180.0 to 56.0, 140.0 to 36.0, true),
+        PanelId.Mixer to PanelSpec(240.0 to 250.0, 200.0 to 190.0, 150.0 to 110.0, true),
+        PanelId.Crossfader to PanelSpec(220.0 to 84.0, 180.0 to 40.0, 140.0 to 28.0, true),
         PanelId.Library to PanelSpec(520.0 to 240.0, 320.0 to 160.0, 200.0 to 96.0, false),
         PanelId.Automix to PanelSpec(230.0 to 230.0, 190.0 to 130.0, 120.0 to 56.0, false),
         PanelId.Sampler to PanelSpec(270.0 to 250.0, 200.0 to 140.0, 120.0 to 56.0, false),
         PanelId.Plugins to PanelSpec(220.0 to 160.0, 160.0 to 96.0, 96.0 to 48.0, false),
+        PanelId.Waves to PanelSpec(480.0 to 110.0, 320.0 to 64.0, 200.0 to 36.0, false),
     )
 
     private fun a(p: PanelId, c: Int, r: Int, cs: Int = 1, rs: Int = 1) = LayoutArea(p, c, r, cs, rs)
@@ -133,6 +161,16 @@ object DemoPacks : PackPort {
 
     /** Same order and content as `BUILTIN_LAYOUTS` + `STAGE` of presets.ts (and decks-layout `all_presets`). */
     val presets: List<LayoutDoc> = listOf(
+        // Pro (default): waveform band on top, decks around the mixer, library below.
+        LayoutDoc("pro", "Pro", d(16, 7, 16), d(7, 12, 2, 19), listOf(
+            a(PanelId.Waves, 0, 0, cs = 3), a(PanelId.DeckA, 0, 1, rs = 2), a(PanelId.Mixer, 1, 1), a(PanelId.Crossfader, 1, 2),
+            a(PanelId.DeckB, 2, 1, rs = 2), a(PanelId.Library, 0, 3, cs = 3),
+        )),
+        // Vertical waves: tall parallel waveforms between the decks; the mixer sits beside the library.
+        LayoutDoc("pro-vertical", "Vertical waves", d(16, 7, 9, 7), d(19, 2, 19), listOf(
+            a(PanelId.DeckA, 0, 0, rs = 2), a(PanelId.Waves, 1, 0), a(PanelId.Crossfader, 1, 1),
+            a(PanelId.DeckB, 2, 0, cs = 2, rs = 2), a(PanelId.Library, 0, 2, cs = 3), a(PanelId.Mixer, 3, 2),
+        )),
         LayoutDoc("classic", "Classic", d(5, 3, 5), d(1, 9, 2, 6), listOf(
             a(PanelId.DeckA, 0, 0, rs = 3), a(PanelId.Clock, 1, 0), a(PanelId.Mixer, 1, 1), a(PanelId.Crossfader, 1, 2),
             a(PanelId.DeckB, 2, 0, rs = 3), a(PanelId.Library, 0, 3, cs = 2), a(PanelId.Automix, 2, 3),

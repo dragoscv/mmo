@@ -18,7 +18,7 @@ import ro.mixai.decks.ui.i18n.DesktopStrings
  * MixAI Decks desktop entry point. System properties:
  *  - `decks.lang` (en | ro, default = OS locale), `decks.reducedMotion` (true/false, default = OS)
  *  - `decks.waveform` (native | headless | compose), `decks.ffi.path` (host decks_ffi library)
- *  - `decks.skin` (nocturne | club | booth | studio | emerald; default = last used)
+ *  - `decks.skin` (signature | mainroom | crate | pilot | glass-classic | club | booth | studio | emerald; default = last used)
  */
 fun main() {
     val backend = DesktopDecks.createBackend()

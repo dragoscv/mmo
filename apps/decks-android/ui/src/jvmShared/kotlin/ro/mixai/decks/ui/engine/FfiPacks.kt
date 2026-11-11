@@ -14,6 +14,7 @@ import ro.mixai.decks.ffi.LayoutPanel
 import ro.mixai.decks.ffi.LayoutTier
 import ro.mixai.decks.ffi.PackSummary
 import ro.mixai.decks.ffi.PackTrustLevel
+import ro.mixai.decks.ffi.layoutDefaultId
 import ro.mixai.decks.ffi.layoutMinimumSize
 import ro.mixai.decks.ffi.layoutPresetsJson
 import ro.mixai.decks.ffi.layoutSolve
@@ -34,6 +35,9 @@ class FfiPacks private constructor(private val store: FfiPackStore?) : PackPort 
         val extra = runCatching { store?.layoutsJson()?.let(::parseLayouts) }.getOrNull().orEmpty()
         return presets + extra
     }
+
+    /** `layout_default_id` of decks-layout (`pro`); the Kotlin constant when the call fails. */
+    override fun defaultLayoutId(): String = runCatching { layoutDefaultId() }.getOrDefault(DemoPacks.DEFAULT_LAYOUT_ID)
 
     override fun solve(layout: LayoutDoc, w: Double, h: Double, available: Set<PanelId>): LayoutSolution = runCatching {
         val s = layoutSolve(layout.toJson(), w, h, available.map { it.ffi() })
@@ -124,6 +128,7 @@ class FfiPacks private constructor(private val store: FfiPackStore?) : PackPort 
             PanelId.Automix -> LayoutPanel.AUTOMIX
             PanelId.Sampler -> LayoutPanel.SAMPLER
             PanelId.Plugins -> LayoutPanel.PLUGINS
+            PanelId.Waves -> LayoutPanel.WAVES
         }
 
         private fun LayoutPanel.ui(): PanelId = when (this) {
@@ -138,6 +143,7 @@ class FfiPacks private constructor(private val store: FfiPackStore?) : PackPort 
             LayoutPanel.AUTOMIX -> PanelId.Automix
             LayoutPanel.SAMPLER -> PanelId.Sampler
             LayoutPanel.PLUGINS -> PanelId.Plugins
+            LayoutPanel.WAVES -> PanelId.Waves
         }
 
         private fun LayoutTier.ui(): PanelTier = when (this) {
@@ -145,6 +151,9 @@ class FfiPacks private constructor(private val store: FfiPackStore?) : PackPort 
             LayoutTier.COMPACT -> PanelTier.Compact
             LayoutTier.ICON -> PanelTier.Icon
         }
+
+        /** 0xAARRGGBB from a resolved pack colour (`rgb` = 0xRRGGBB, alpha 0..1). */
+        private fun argb(rgb: UInt, alpha: Float): Long = ((alpha.coerceIn(0f, 1f) * 255f + 0.5f).toLong() shl 24) or rgb.toLong()
 
         private fun PackSummary.ui() = PackSummaryUi(
             id = id, name = name, version = version, kind = kind, author = author,
@@ -155,8 +164,16 @@ class FfiPacks private constructor(private val store: FfiPackStore?) : PackPort 
                 PackTrustLevel.UNSIGNED -> "unsigned"
             },
             mode = mode, accent = accent,
-            colors = colors.associate { c -> c.key to (((c.alpha.coerceIn(0f, 1f) * 255f + 0.5f).toLong() shl 24) or c.rgb.toLong()) },
+            colors = colors.associate { c -> c.key to argb(c.rgb, c.alpha) },
             layouts = parseLayouts(layoutsJson),
+            manifestV = manifestV.toInt(),
+            style = style?.let { s ->
+                PackStyleUi(
+                    look = s.look, platter = s.platter, layout = s.layout, waves = s.waves,
+                    colors = s.colors.associate { c -> c.key to argb(c.rgb, c.alpha) },
+                    sizes = s.sizes.associate { it.key to it.value },
+                )
+            },
         )
     }
 }

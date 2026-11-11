@@ -1,0 +1,567 @@
+/*
+ * MixAI Decks look layer (Decks only; the shared design tokens are untouched).
+ *
+ * `<html data-look="signature">` (default) = flat, dense, black-green "MixAI Signature".
+ * `<html data-look="classic">` = the 1.x glass look (built-in skin "Glass (classic)"): nothing
+ * in this file applies and the shared tokens show through.
+ *
+ * Cascade contract (keep it, skins depend on it):
+ *   tokens.css  ->  this file (same specificity as tokens, later = wins)  ->  <style id="mixai-skin">
+ *   `:root[data-skin] { ... }` (same specificity, injected later = wins).
+ * So every rule that sets a variable here must stay at specificity (0,2,0) or lower: use
+ * `:where()` for extra conditions.
+ *
+ * Variables a skin `style` block may set are listed in ./style-vars.ts (single list for the
+ * validator, the applier and the skin editor).
+ */
+
+/* ── fonts (bundled, SIL OFL 1.1: @fontsource-variable/inter, /jetbrains-mono) ── */
+:root[data-look="signature"] {
+    --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-heading: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+/* ── geometry ── */
+:root[data-look="signature"] {
+    --titlebar-h: 36px;
+    --shell-pad: 4px;
+    --statusbar-h: 22px;
+    /* Unitless: read by the layout solver (JS) and by CSS through calc(). */
+    --panel-gap: 2;
+    --panel-radius: 2px;
+    --panel-pad: 8px;
+    --ctl-radius: 3px;
+    --pad-radius: 3px;
+    --ctl-h: 24px;
+    /* Multiplier for the numeric readouts (booth mode raises it). */
+    --readout-scale: 1;
+    /* Flat: no blur, no glow, no drop shadow. */
+    --surface-alpha: 1;
+    --surface-blur: 0px;
+    --surface-border-alpha: 0;
+    --surface-shadow: none;
+    --surface-glow: none;
+    --glow: 0 0 0;
+}
+/* The shared radius scale (buttons, menus, dialogs of @mmo/ui) follows the look. */
+:root[data-look="signature"]:where([data-radius="sm"]) {
+    --radius: 0.1875rem;
+}
+:root[data-look="signature"]:where([data-radius="md"]) {
+    --radius: 0.3125rem;
+}
+:root[data-look="signature"]:where([data-radius="lg"]) {
+    --radius: 0.5rem;
+}
+
+/* ── colour: black-green, one accent for every ON state, colour reserved for data ── */
+.dark[data-look="signature"] {
+    --background: oklch(0.1 0.008 165);
+    --foreground: oklch(0.96 0.006 165);
+    --card: oklch(0.165 0.01 165);
+    --card-foreground: oklch(0.96 0.006 165);
+    --popover: oklch(0.195 0.012 165);
+    --popover-foreground: oklch(0.96 0.006 165);
+    --secondary: oklch(0.24 0.012 165);
+    --secondary-foreground: oklch(0.96 0.006 165);
+    --muted: oklch(0.24 0.012 165);
+    --muted-foreground: oklch(0.74 0.012 165);
+    --border: oklch(0.285 0.012 165);
+    --input: oklch(0.32 0.012 165);
+    --primary: oklch(0.8 0.19 var(--accent-h));
+    --primary-foreground: oklch(0.16 0.04 var(--accent-h));
+    --accent: oklch(0.27 0.055 var(--accent-h));
+    --accent-foreground: oklch(0.92 0.09 var(--accent-h));
+    --ring: oklch(0.8 0.19 var(--accent-h));
+    /* Recessed wells (pads, readout blocks, lists) and the waveform backdrop. */
+    --well: oklch(0.125 0.008 165);
+    --wave-bg: oklch(0.07 0.006 165);
+    /* Third text level: micro labels, column headers. >= 4.5:1 on --card and --secondary. */
+    --fg-faint: oklch(0.65 0.012 165);
+}
+.light[data-look="signature"] {
+    --well: oklch(0.955 0.006 165);
+    --wave-bg: oklch(0.98 0.004 165);
+    --fg-faint: oklch(0.46 0.02 165);
+}
+
+/* ── semantic control colours (skins may override) ── */
+:root[data-look="signature"] {
+    --line: var(--border);
+    /* ON state of toggles, tabs, sync, selected cells. */
+    --on: var(--primary);
+    --on-fg: var(--primary-foreground);
+    /* Transport. Outside a deck PLAY uses the accent; inside one, the deck colour (below). */
+    --play: var(--skin-play, var(--primary));
+    --play-fg: var(--background);
+    --cue-btn: var(--warning);
+    /* Beatgrid + playhead on every waveform. */
+    --wave-grid: var(--foreground);
+    --wave-downbeat: var(--foreground);
+    --wave-playhead: var(--foreground);
+    --wave-playhead-cap: var(--destructive);
+    --wave-played-alpha: 0.4;
+    /* Hot cues 1..8 (red, orange, blue, yellow, green, magenta, cyan, purple). */
+    --cue-1: oklch(0.64 0.21 25);
+    --cue-2: oklch(0.74 0.17 55);
+    --cue-3: oklch(0.6 0.19 258);
+    --cue-4: oklch(0.86 0.17 95);
+    --cue-5: oklch(0.7 0.19 145);
+    --cue-6: oklch(0.65 0.22 345);
+    --cue-7: oklch(0.76 0.12 205);
+    --cue-8: oklch(0.58 0.21 300);
+    /* End-of-track alert. */
+    --alert: var(--destructive);
+}
+/* Colour-blind-safe hot cues (Okabe–Ito hues + two luminance steps); independent of the skin. */
+:root[data-cue-palette="safe"] {
+    --cue-1: oklch(0.63 0.2 40);
+    --cue-2: oklch(0.78 0.15 75);
+    --cue-3: oklch(0.56 0.13 250);
+    --cue-4: oklch(0.92 0.17 105);
+    --cue-5: oklch(0.65 0.13 165);
+    --cue-6: oklch(0.7 0.13 345);
+    --cue-7: oklch(0.8 0.1 230);
+    --cue-8: oklch(0.96 0 0);
+}
+
+/*
+ * Waveform band colours. Default = three tones of the deck colour, so they are declared on
+ * the element that carries `--deck` (class `dk-wave`), not on :root. A skin that wants fixed
+ * band colours sets `--skin-wave-low|mid|high` on :root.
+ */
+.dk-wave {
+    --wave-low: var(--skin-wave-low, color-mix(in oklab, var(--deck, var(--primary)) 52%, black));
+    --wave-mid: var(--skin-wave-mid, var(--deck, var(--primary)));
+    --wave-high: var(--skin-wave-high, color-mix(in oklab, var(--deck, var(--primary)) 42%, white));
+    background: var(--wave-bg, var(--bg-elev));
+}
+/*
+ * Same reason for PLAY: a custom property declared on :root resolves `var(--deck)` at :root,
+ * so the deck colour is picked up here, on the element that carries `--deck` (`.deck-card`,
+ * or any element with `data-deck-scope`). A skin fixes it with `--skin-play`.
+ */
+:root[data-look="signature"] :where(.deck-card, [data-deck-scope]) {
+    --play: var(--skin-play, var(--deck, var(--primary)));
+}
+
+/* ── booth mode: big readouts, stronger contrast (dark booth / daylight) ── */
+:root[data-look="signature"]:where([data-booth="on"]) {
+    --readout-scale: 1.3;
+    --ctl-h: 28px;
+}
+.dark[data-look="signature"]:where([data-booth="on"]) {
+    --muted-foreground: oklch(0.86 0.008 165);
+    --fg-faint: oklch(0.78 0.01 165);
+    --border: oklch(0.4 0.012 165);
+}
+
+/* ── shell chrome ── */
+:root[data-look="signature"] body {
+    background: var(--background);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss03";
+}
+:root[data-look="signature"] .mixai-shell {
+    grid-template-rows: var(--titlebar-h) minmax(0, 1fr) var(--statusbar-h);
+    /* The status bar is the bottom edge: no padding under it. */
+    padding: 0 var(--shell-pad) 0;
+}
+:root[data-look="signature"] .mixai-statusbar {
+    margin: 0 calc(-1 * var(--shell-pad));
+    padding: 0 8px;
+    border-top: 1px solid var(--line);
+    background: var(--background);
+}
+:root[data-look="signature"] .mixai-titlebar {
+    height: var(--titlebar-h);
+    gap: 0.375rem;
+}
+:root[data-look="signature"] .mixai-titlebar::after {
+    inset: auto 0 0 0;
+    background: var(--line);
+    opacity: 1;
+    transform: none;
+}
+:root[data-look="signature"] .panel {
+    background-color: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 0;
+    border-radius: var(--panel-radius);
+    box-shadow: none;
+}
+:root[data-look="signature"] .mixai-panel-box {
+    border-radius: var(--panel-radius);
+}
+:root[data-look="signature"] .mixai-dock {
+    background-color: var(--card);
+    border: 0;
+}
+/* Deck identity = a 2 px line in the deck colour; brighter while playing, never a glow. */
+:root[data-look="signature"] .deck-card {
+    box-shadow: none;
+}
+:root[data-look="signature"] .deck-card::before {
+    background: var(--deck);
+    opacity: 0.45;
+}
+:root[data-look="signature"] .deck-card[data-playing="true"] {
+    box-shadow: none;
+}
+:root[data-look="signature"] .deck-card[data-playing="true"]::before {
+    opacity: 1;
+}
+:root[data-look="signature"] .mixai-beat-cell {
+    height: 6px;
+    border-radius: 1px;
+    border: 0;
+    background: var(--secondary);
+}
+:root[data-look="signature"] .mixai-beat-cell[data-on="true"] {
+    background: var(--on);
+}
+:root[data-look="signature"] .mixai-beat-cell[data-on="true"][data-downbeat="true"] {
+    background: var(--alert);
+}
+
+/* ══ component vocabulary (works in both looks; the classic look keeps its own values) ══ */
+
+/* Micro label: 9 px bold caps. */
+.dk-label {
+    font-size: 9px;
+    line-height: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-faint, var(--muted-foreground));
+    white-space: nowrap;
+}
+
+/* Numeric readouts: tabular figures in the UI face, sized by role. */
+.dk-num {
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "tnum", "zero", "cv11";
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+.dk-num-xl {
+    font-size: calc(28px * var(--readout-scale, 1));
+    line-height: 1;
+    font-weight: 700;
+}
+.dk-num-lg {
+    font-size: calc(20px * var(--readout-scale, 1));
+    line-height: 1;
+    font-weight: 700;
+}
+.dk-num-md {
+    font-size: calc(13px * var(--readout-scale, 1));
+    line-height: 1.1;
+    font-weight: 600;
+}
+.dk-num-sm {
+    font-size: 11px;
+    line-height: 1.1;
+    font-weight: 600;
+}
+/* The fraction of a two-size readout (126.00 -> ".00", 03:12.4 -> ".4"). */
+.dk-num-frac {
+    font-size: 0.58em;
+    font-weight: 600;
+}
+
+/* Recessed well. */
+.dk-well {
+    background: var(--well, var(--bg-elev));
+    border-radius: var(--ctl-radius, 6px);
+}
+
+/* Control button. ON = `aria-pressed="true"` or `data-on="true"`; never colour only: the ON
+   state also gets a 1 px inner line, and callers keep a text/icon change where one exists. */
+.dk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: var(--ctl-h, 24px);
+    min-width: 24px;
+    padding: 0 8px;
+    flex-shrink: 0;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--secondary);
+    color: var(--foreground);
+    border: 1px solid var(--line, var(--border));
+    font-size: 10px;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition:
+        background-color var(--dur-fast) var(--ease-out),
+        border-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out);
+}
+.dk-btn:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--secondary) 86%, var(--foreground));
+}
+.dk-btn:active:not(:disabled) {
+    background: color-mix(in oklab, var(--secondary) 74%, var(--foreground));
+}
+.dk-btn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+.dk-btn:disabled,
+.dk-btn[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.dk-btn[aria-pressed="true"],
+.dk-btn[data-on="true"] {
+    background: var(--on, var(--primary));
+    border-color: var(--on, var(--primary));
+    color: var(--on-fg, var(--primary-foreground));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--on-fg, var(--primary-foreground)) 35%, transparent);
+}
+/* Classic look: a chip keeps the accent its caller passed (deck colour on deck toggles). */
+:root[data-look="classic"] .dk-btn[aria-pressed="true"] {
+    background: var(--chip-accent, var(--primary));
+    border-color: var(--chip-accent, var(--primary));
+}
+/* Tone: the deck colour instead of the accent (deck-scoped toggles). */
+.dk-btn[data-tone="deck"][aria-pressed="true"],
+.dk-btn[data-tone="deck"][data-on="true"] {
+    background: var(--deck);
+    border-color: var(--deck);
+    color: var(--play-fg, var(--background));
+}
+.dk-btn-xs {
+    padding: 0 5px;
+    font-size: 9px;
+}
+.dk-btn-icon {
+    padding: 0;
+    width: var(--ctl-h, 24px);
+}
+/* Transport. PLAY lit = solid `--play`; CUE = outlined in `--cue-btn`, solid while held/lit. */
+.dk-btn-play,
+.dk-btn-cue {
+    min-height: 32px;
+    font-size: 11px;
+}
+.dk-btn-play[data-on="true"] {
+    background: var(--play);
+    border-color: var(--play);
+    color: var(--play-fg, var(--background));
+    box-shadow: none;
+}
+.dk-btn-cue {
+    color: var(--cue-btn);
+    border-color: color-mix(in oklab, var(--cue-btn) 55%, transparent);
+}
+.dk-btn-cue[data-on="true"] {
+    background: var(--cue-btn);
+    border-color: var(--cue-btn);
+    color: var(--background);
+    box-shadow: none;
+}
+
+/* Segmented mode tabs (HOT CUE · LOOP · …): text + a 2 px underline in the ON colour. */
+.dk-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+    padding: 0 2px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-faint, var(--muted-foreground));
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+}
+.dk-tab:hover {
+    color: var(--foreground);
+}
+.dk-tab[aria-selected="true"],
+.dk-tab[aria-pressed="true"],
+.dk-tab[data-on="true"] {
+    color: var(--foreground);
+    border-bottom-color: var(--on, var(--primary));
+}
+.dk-tab:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+
+/* Performance pad: a well with a colour bar (`--pad-color`); empty pads are dashed. */
+.dk-pad {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    min-height: 24px;
+    min-width: 24px;
+    padding: 0 6px 3px;
+    overflow: hidden;
+    border-radius: var(--pad-radius, 6px);
+    background: var(--well, var(--bg-elev-2));
+    border: 1px solid transparent;
+    color: var(--muted-foreground);
+    font-size: 10px;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+}
+.dk-pad::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: var(--pad-color, transparent);
+}
+.dk-pad > b {
+    color: var(--foreground);
+    font-weight: 800;
+}
+.dk-pad[data-set="false"] {
+    background: none;
+    border: 1px dashed var(--line, var(--border));
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.dk-pad:hover:not(:disabled) {
+    border-color: var(--pad-color, var(--line, var(--border)));
+}
+.dk-pad:active:not(:disabled),
+.dk-pad[data-on="true"] {
+    background: color-mix(in oklab, var(--pad-color, var(--on)) 28%, var(--well, var(--bg-elev-2)));
+}
+.dk-pad:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+.dk-pad:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Small cell (loop sizes, beat-jump sizes): selected = 2 px outline, no fill. */
+.dk-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    min-width: 24px;
+    padding: 0 4px;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--well, var(--bg-elev-2));
+    color: var(--muted-foreground);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.dk-cell[aria-pressed="true"],
+.dk-cell[data-on="true"] {
+    color: var(--foreground);
+    outline: 2px solid var(--on, var(--primary));
+    outline-offset: -2px;
+}
+.dk-cell:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+.dk-cell:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Key chip: Camelot hue (`--key`) at low fill, text at full tone; the dot is the match
+   against the master deck (`data-match`): the dot shape differs too, never colour only. */
+.dk-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: var(--ctl-radius, 6px);
+    background: color-mix(in oklab, var(--key, var(--muted-foreground)) 22%, transparent);
+    color: color-mix(in oklab, var(--key, var(--foreground)) 70%, var(--foreground));
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.dk-key-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+}
+.dk-key-dot[data-match="near"] {
+    background: var(--warning);
+    border-radius: 1px;
+    transform: rotate(45deg);
+}
+.dk-key-dot[data-match="clash"] {
+    background: none;
+    border-radius: 0;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--destructive);
+}
+
+/* Segmented LED meter cell row (beat keeper, VU). */
+.dk-led {
+    background: var(--secondary);
+    border-radius: 1px;
+}
+.dk-led[data-on="true"] {
+    background: var(--led, var(--on, var(--primary)));
+}
+
+/* Remaining time: `data-warn="soon"` (<= 30 s) turns to the alert colour, `"now"` (<= 15 s)
+   flashes at 2 Hz. Under reduced motion it becomes a solid chip instead of flashing. */
+.dk-time[data-warn="soon"],
+.dk-time[data-warn="now"] {
+    color: var(--alert, var(--destructive));
+}
+.dk-time[data-warn="now"] {
+    animation: dk-blink 0.5s steps(2, jump-none) infinite;
+}
+@keyframes dk-blink {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.35;
+    }
+}
+:root[data-motion="reduced"] .dk-time[data-warn="now"] {
+    animation: none;
+    background: var(--alert, var(--destructive));
+    color: var(--background);
+    border-radius: var(--ctl-radius, 6px);
+    padding: 0 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .dk-time[data-warn="now"] {
+        animation: none;
+        background: var(--alert, var(--destructive));
+        color: var(--background);
+        border-radius: var(--ctl-radius, 6px);
+        padding: 0 4px;
+    }
+}
+
+/* Hairline separators inside a panel. */
+.dk-sep-b {
+    border-bottom: 1px solid var(--line, var(--border));
+}
+.dk-sep-t {
+    border-top: 1px solid var(--line, var(--border));
+}

@@ -1,278 +1,491 @@
-import { Suspense, lazy } from "react";
+import { memo, useId, useMemo } from "react";
 import { motion } from "motion/react";
-import { Grid3x3, Layers, Lock, LockOpen, Minus, Pause, Play, Plus, Repeat, SlidersHorizontal, Sparkles, Target } from "lucide-react";
-import { Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, cn } from "@mmo/ui";
+import { AlertTriangle, Grid3x3, Layers, Lock, LockOpen, Minus, Pause, Play, Plus, Repeat, RotateCcw, SlidersHorizontal, Sparkles, Target } from "lucide-react";
+import { cn } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { DeckId, DeckState } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
+import { usePerfStore } from "@/state/perf-store";
 import { usePanelTier } from "@/layout/panel-tier";
 import { useT } from "@/i18n";
+import { remainWarn, remainingSec, splitTime, type RemainWarn } from "@/lib/deck-time";
+import { useClockPoll } from "@/lib/use-clock-poll";
+import { usePlatter } from "@/look/look";
+import { useShellPrefs } from "@/shell/shell-prefs";
 import { Waveform } from "./Waveform";
-import { HotCuePads, LoopEditRow, LoopRow } from "./PerformancePads";
-import { BeatJump, DeckPerformance, KeyControls, MasterBadge, ModeToggles, SyncButton, useDeckKey } from "./DeckPerformance";
-import { ColorFx } from "./ColorFx";
-import { MorePopover, iconBtn, tierLayout, useMotionOK } from "./panel-ui";
-import { useDeckUi, type DeckTab } from "./deck-ui-store";
+import { BeatJump, DeckPerformance, KeyControls, MasterBadge, ModeToggles, SyncButton, useDeckKey, type DeckKeyInfo } from "./DeckPerformance";
+import { DeckTabBody } from "./DeckTabBody";
+import { KeyChip } from "./KeyChip";
+import { MorePopover, iconBtn, tierLayout, useElementSize, useMotionOK } from "./panel-ui";
+import { cuePointFor, useDeckUi, type DeckTab } from "./deck-ui-store";
+import {
+    PLATTER_DEG_PER_SEC,
+    TEMPO_MAX,
+    TEMPO_MIN,
+    TEMPO_STEP,
+    WIDE_MIN_W,
+    clampTempo,
+    deckArrangement,
+    formatClock,
+    formatTempo,
+    playingBpm,
+    progressOf,
+    splitBpm,
+    tempoPosition,
+    tempoShifted,
+} from "./deck/format";
+import { deckNow, useDeckSteady, useDeckValue } from "./deck/use-deck";
 
-// Tab bodies not needed for first paint of the transport.
-const StemControls = lazy(() => import("./StemControls").then((m) => ({ default: m.StemControls })));
-const FxPanel = lazy(() => import("./FxPanel").then((m) => ({ default: m.FxPanel })));
-const GridEditor = lazy(() => import("./GridEditor").then((m) => ({ default: m.GridEditor })));
+/** The main cue counts as "at the cue point" within this many seconds. */
+const AT_CUE_SEC = 0.02;
 
-function fmtTime(sec: number): string {
-    if (!isFinite(sec) || sec < 0) sec = 0;
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-const TEMPO_MIN = 0.5;
-const TEMPO_MAX = 1.5;
-const fmtTempo = (tempo: number) => {
-    const pct = (tempo - 1) * 100;
-    return (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%";
-};
-
-interface DeckCtx {
-    deckId: DeckId;
-    deck: DeckState;
-    accent: string;
-    id: string;
-    keyInfo: ReturnType<typeof useDeckKey>;
-    togglePlay: () => void;
-    cue: (e: React.MouseEvent) => void;
-    setTempo: (t: number) => void;
-    toggleKeyLock: () => void;
-}
-
-/**
- * One deck, rendered for the tier the layout solver gave it (full / compact /
- * icon). The root always fills its box and never scrolls: the waveform and the
- * tab body take the flexible rows, every other row is fixed height. Controls a
- * smaller tier hides stay reachable through popovers.
+/*
+ * Render cost. A playing deck gets a new snapshot ~30 times a second (position, vu). Nothing
+ * here selects the whole deck: the root and every control select the few values they show
+ * (`useDeckValue`), so only the time readouts (and the optional platter) render while a track
+ * plays, at the rate their TEXT changes (tenths of a second). Handlers read the deck when they
+ * fire (`deckNow`), so they need no fresh props either.
  */
-export function Deck({ deckId }: { deckId: DeckId }) {
-    const t = useT();
-    const tier = usePanelTier();
-    const motionOK = useMotionOK();
-    const deck = useMixerStore((s) => s.deck(deckId));
-    const patchDeck = useMixerStore((s) => s.patchDeck);
-    const cuePoint = useDeckUi((s) => s.cuePoint[deckId]);
-    const setCuePoint = useDeckUi((s) => s.setCuePoint);
-    const keyInfo = useDeckKey(deckId);
 
-    // Deck colours are fixed per deck (D9) and never follow the theme accent.
-    const accent = `var(--deck-${deckId})`;
+/* ── actions (read the state at the moment they fire) ──────────────────── */
 
-    const togglePlay = () => {
-        const next = !deck.playing;
-        patchDeck(deckId, { playing: next });
-        if (next) void engine.play(deckId);
-        else void engine.pause(deckId);
-    };
+function patchDeck(deckId: DeckId, patch: Partial<DeckState>): void {
+    useMixerStore.getState().patchDeck(deckId, patch);
+}
 
-    // CDJ-style CUE: while playing → stop and return to the cue point; while
-    // paused → store the current position as the cue point (Shift: return).
-    const cue = (e: React.MouseEvent) => {
-        if (!deck.loaded) return;
-        if (deck.playing || e.shiftKey) {
-            if (deck.playing) {
-                patchDeck(deckId, { playing: false });
-                void engine.pause(deckId);
-            }
-            patchDeck(deckId, { position: cuePoint });
-            void engine.seek(deckId, cuePoint);
-        } else {
-            setCuePoint(deckId, deck.position);
+function togglePlay(deckId: DeckId): void {
+    const next = !deckNow(deckId).playing;
+    patchDeck(deckId, { playing: next });
+    if (next) void engine.play(deckId);
+    else void engine.pause(deckId);
+}
+
+// CDJ-style CUE: while playing → stop and return to the cue point; while
+// paused → store the current position as the cue point (Shift: return).
+function cueAction(deckId: DeckId, shift: boolean): void {
+    const deck = deckNow(deckId);
+    if (!deck.loaded) return;
+    const ui = useDeckUi.getState();
+    // The cue point of THIS track (start of the track until one is set), never past its end.
+    const cuePoint = cuePointFor(ui, deckId, deck.trackId, deck.duration);
+    if (deck.playing || shift) {
+        if (deck.playing) {
+            patchDeck(deckId, { playing: false });
+            void engine.pause(deckId);
         }
-    };
+        patchDeck(deckId, { position: cuePoint });
+        void engine.seek(deckId, cuePoint);
+    } else {
+        ui.setCuePoint(deckId, deck.position, deck.trackId);
+    }
+}
 
-    const setTempo = (v: number) => {
-        const next = Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, v));
-        patchDeck(deckId, { tempo: next });
-        void engine.setTempo(deckId, next);
-    };
+function setTempo(deckId: DeckId, v: number): void {
+    const next = clampTempo(v);
+    patchDeck(deckId, { tempo: next });
+    void engine.setTempo(deckId, next);
+}
 
-    const toggleKeyLock = () => {
-        const next = !deck.keyLock;
-        patchDeck(deckId, { keyLock: next });
-        void engine.setKeyLock(deckId, next);
-    };
-
-    const ctx: DeckCtx = { deckId, deck, accent, id: deckId.toUpperCase(), keyInfo, togglePlay, cue, setTempo, toggleKeyLock };
-    const lay = tierLayout(motionOK, tier, `deck-${deckId}`);
-
-    return (
-        <section
-            aria-label={t("deck.title", { id: ctx.id })}
-            className={cn("panel deck-card deck-tier h-full w-full min-h-0 min-w-0 overflow-hidden", tier === "full" ? "p-3" : "p-2")}
-            data-playing={deck.playing ? "true" : "false"}
-            data-tier={tier}
-            style={{ ["--deck" as string]: accent }}
-        >
-            {tier === "full" && <DeckFull ctx={ctx} lay={lay} />}
-            {tier === "compact" && <DeckCompact ctx={ctx} lay={lay} />}
-            {tier === "icon" && <DeckIcon ctx={ctx} lay={lay} />}
-        </section>
-    );
+function toggleKeyLock(deckId: DeckId): void {
+    const next = !deckNow(deckId).keyLock;
+    patchDeck(deckId, { keyLock: next });
+    void engine.setKeyLock(deckId, next);
 }
 
 type Lay = ReturnType<typeof tierLayout>;
 
-/* ── shared pieces ─────────────────────────────────────────────────────── */
-
-function DeckDot({ accent }: { accent: string }) {
-    return <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: accent, boxShadow: `var(--glow) ${accent}` }} />;
+interface DeckProps {
+    deckId: DeckId;
 }
 
-function bpmText(deck: DeckState) {
-    return deck.bpm > 0 ? (deck.bpm * deck.tempo).toFixed(1) : "--";
+/** What every tier needs from the root. All of it changes rarely (never at snapshot rate). */
+interface TierProps extends DeckProps {
+    /** The deck colour as a CSS value (`var(--deck-a)`). */
+    accent: string;
+    keyInfo: DeckKeyInfo;
+    warn: RemainWarn;
+    lay: Lay;
 }
 
-function PlayButton({ ctx, className, iconSize = 14, showLabel = true }: { ctx: DeckCtx; className?: string; iconSize?: number; showLabel?: boolean }) {
+/**
+ * One deck, rendered for the tier the layout solver gave it (full / compact / icon). The root
+ * always fills its box and never scrolls: every row has a fixed height and only the tab body
+ * flexes (row budget: deck.css). Controls a smaller tier hides stay reachable through popovers.
+ * Touch mode (44 px targets) steps down to a smaller arrangement when the box is too low for
+ * the tier's rows (`deckArrangement`).
+ */
+export function Deck({ deckId }: DeckProps) {
     const t = useT();
-    const { deck, accent } = ctx;
+    const tier = usePanelTier();
+    const motionOK = useMotionOK();
+    // Master badge, sync-lock state and the playing tempo come from the engine clock.
+    useClockPoll();
+    const playing = useDeckValue(deckId, (d) => d.playing);
+    const warn = useDeckValue(deckId, remainWarn);
+    const keyInfo = useDeckKey(deckId);
+    const platter = usePlatter();
+    // Touch mode makes every target 44 px: the wide arrangement (a cell per jump size) cannot fit.
+    const touch = useShellPrefs((s) => s.touch);
+    const [rootRef, size] = useElementSize<HTMLElement>();
+
+    // Deck colours are fixed per deck (D9) and never follow the theme accent.
+    const accent = `var(--deck-${deckId})`;
+    const id = deckId.toUpperCase();
+    const lay = useMemo(() => tierLayout(motionOK, tier, `deck-${deckId}`), [motionOK, tier, deckId]);
+    const arrangement = deckArrangement(tier, touch, size.h);
+    const common: TierProps = { deckId, accent, keyInfo, warn, lay };
+
     return (
-        <button
-            type="button"
-            onClick={ctx.togglePlay}
-            disabled={!deck.loaded}
-            aria-label={t(deck.playing ? "deck.pauseAria" : "deck.playAria", { id: ctx.id })}
-            className={cn(
-                "inline-flex min-h-6 min-w-6 items-center justify-center gap-1.5 rounded-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] disabled:opacity-40",
-                className,
-            )}
-            style={{ background: deck.playing ? accent : "var(--bg-elev-2)", color: deck.playing ? "var(--background)" : "var(--fg)" }}
+        <section
+            ref={rootRef}
+            aria-label={t("deck.title", { id })}
+            className="panel deck-card deck-tier h-full w-full min-h-0 min-w-0 overflow-hidden"
+            data-playing={playing ? "true" : "false"}
+            data-tier={tier}
+            data-arrangement={arrangement}
+            data-warn={warn === "none" ? undefined : warn}
+            style={{ ["--deck" as string]: accent }}
         >
-            {deck.playing ? <Pause size={iconSize} aria-hidden /> : <Play size={iconSize} aria-hidden />}
-            {showLabel && <span className="text-[12px]">{deck.playing ? t("deck.pause") : t("deck.play")}</span>}
-        </button>
+            {arrangement === "full" && <DeckFull {...common} wide={size.w >= WIDE_MIN_W && !touch} platter={platter} motionOK={motionOK} />}
+            {(arrangement === "compact" || arrangement === "bare") && <DeckCompact {...common} bare={arrangement === "bare"} />}
+            {arrangement === "icon" && <DeckIcon {...common} touch={touch} />}
+            {/* Said once when the warning starts: the text stays the same while it lasts. */}
+            <span className="sr-only" aria-live="polite">
+                {warn === "none" ? "" : t("deckui.endingAnnounce", { id })}
+            </span>
+        </section>
     );
 }
 
-function CueButton({ ctx, className }: { ctx: DeckCtx; className?: string }) {
+/* ── shared pieces ─────────────────────────────────────────────────────── */
+
+function DeckBadge({ deckId }: DeckProps) {
+    return (
+        <span aria-hidden className="deck-badge">
+            {deckId.toUpperCase()}
+        </span>
+    );
+}
+
+const DeckTitle = memo(function DeckTitle({ deckId, withArtist = false }: DeckProps & { withArtist?: boolean }) {
     const t = useT();
+    const title = useDeckValue(deckId, (d) => d.title);
+    const artist = useDeckValue(deckId, (d) => d.artist);
+    const full = withArtist ? [title, artist].filter(Boolean).join(" \u2014 ") : (title ?? "");
+    return (
+        <span className="deck-title" data-empty={title ? undefined : "true"} title={full || undefined}>
+            {title ?? t("deck.noTrack")}
+        </span>
+    );
+});
+
+const DeckArtist = memo(function DeckArtist({ deckId }: DeckProps) {
+    const artist = useDeckValue(deckId, (d) => d.artist);
+    return (
+        <span className="deck-artist" title={artist ?? undefined}>
+            {artist ?? ""}
+        </span>
+    );
+});
+
+/** BPM in two sizes ("129" + ".20") in the deck colour. */
+const BpmValue = memo(function BpmValue({ deckId, className }: DeckProps & { className: string }) {
+    // Two decimals: the readout shows no more, and a steadier value means fewer renders.
+    const clockBpm = usePerfStore((s) => {
+        const d = s.clock?.decks.find((x) => x.id === deckId);
+        return d && d.bpm > 0 ? Math.round(d.bpm * 100) / 100 : null;
+    });
+    // Grid tempo × fader; 0 = no track or no grid (then the clock's figure does not count either).
+    const own = useDeckValue(deckId, (d) => playingBpm(d, null));
+    const bpm = splitBpm(own > 0 && clockBpm !== null ? clockBpm : own);
+    return (
+        <span className={cn("dk-num deck-bpm", className)}>
+            {bpm ? (
+                <>
+                    {bpm.main}
+                    <span className="dk-num-frac">.{bpm.frac}</span>
+                </>
+            ) : (
+                "---"
+            )}
+        </span>
+    );
+});
+
+/** "03:12.4" (or "03:12" without tenths); null = no track. A string, so it compares by value. */
+function clockText(sec: number, tenths: boolean): string {
+    const s = splitTime(sec);
+    return tenths ? `${s.main}.${s.frac}` : s.main;
+}
+
+/** Remaining time ("−03:12.4"); `tenths` off = whole seconds (smaller tiers). */
+const RemainValue = memo(function RemainValue({ deckId, className, tenths = true }: DeckProps & { className: string; tenths?: boolean }) {
+    // Renders when the TEXT changes (10 times a second with tenths, once without), not per snapshot.
+    const text = useDeckValue(deckId, (d) => (d.loaded ? clockText(remainingSec(d), tenths) : null));
+    const warn = useDeckValue(deckId, remainWarn);
+    if (text === null) return <span className={cn("dk-num deck-dim", className)}>--:--</span>;
+    const [main, frac] = text.split(".");
+    return (
+        <span className={cn("dk-num dk-time", className)} data-warn={warn === "none" ? undefined : warn}>
+            {"\u2212"}
+            {main}
+            {frac !== undefined && <span className="dk-num-frac">.{frac}</span>}
+        </span>
+    );
+});
+
+const ElapsedValue = memo(function ElapsedValue({ deckId }: DeckProps) {
+    const text = useDeckValue(deckId, (d) => (d.loaded ? clockText(d.position, true) : null));
+    if (text === null) return <span className="dk-num dk-num-sm deck-dim">--:--</span>;
+    const [main, frac] = text.split(".");
+    return (
+        <span className="dk-num dk-num-sm deck-dim">
+            {main}
+            <span className="dk-num-frac">.{frac}</span>
+        </span>
+    );
+});
+
+const TempoPercent = memo(function TempoPercent({ deckId }: DeckProps) {
+    const text = useDeckValue(deckId, (d) => formatTempo(d.tempo));
+    const shifted = useDeckValue(deckId, (d) => tempoShifted(d.tempo));
+    return <span className={cn("dk-num dk-num-md", !shifted && "deck-dim")}>{text}</span>;
+});
+
+/**
+ * End-of-track chip (icon + word) of the full tier's title row. It sits where the artist name
+ * gives way, so the readouts under it never move when the warning starts.
+ */
+function EndingChip() {
+    const t = useT();
+    return (
+        <span aria-hidden className="dk-label deck-ending">
+            <AlertTriangle size={10} aria-hidden />
+            {t("deckui.ending")}
+        </span>
+    );
+}
+
+/** Header row 2 of the full tier: BPM, tempo %, remaining (primary) and elapsed time. */
+const Readouts = memo(function Readouts({ deckId }: DeckProps) {
+    const t = useT();
+    return (
+        <div role="group" aria-label={t("deckui.readoutsAria", { id: deckId.toUpperCase() })} className="deck-readouts">
+            <span className="deck-readout" data-kind="bpm" title={t("deckui.bpmHint")}>
+                <span aria-hidden className="dk-label">
+                    {t("deckui.readBpm")}
+                </span>
+                <BpmValue deckId={deckId} className="dk-num-xl" />
+                <span className="sr-only">{t("deckui.readBpm")}</span>
+            </span>
+            <span className="deck-readout" data-kind="tempo" title={t("deckui.tempoPctHint")}>
+                <span aria-hidden className="dk-label">
+                    {t("deck.tempo")}
+                </span>
+                <span className="sr-only">{t("deck.tempo")}</span>
+                <TempoPercent deckId={deckId} />
+            </span>
+            <span className="deck-readout" data-kind="remain" title={t("deckui.remainHint")}>
+                <span aria-hidden className="dk-label">
+                    {t("deckui.readRemain")}
+                </span>
+                <span className="sr-only">{t("deckui.readRemain")}</span>
+                <RemainValue deckId={deckId} className="dk-num-lg" />
+            </span>
+            <span className="deck-readout" data-kind="elapsed" title={t("deckui.elapsedHint")}>
+                <span aria-hidden className="dk-label">
+                    {t("deckui.readElapsed")}
+                </span>
+                <span className="sr-only">{t("deckui.readElapsed")}</span>
+                <ElapsedValue deckId={deckId} />
+            </span>
+        </div>
+    );
+});
+
+/** BPM + remaining on one line (compact header, icon tier). */
+const MiniReadouts = memo(function MiniReadouts({ deckId, warn, className }: DeckProps & { warn: RemainWarn; className?: string }) {
+    const t = useT();
+    return (
+        <span className={cn("deck-mini", className)}>
+            <span title={t("deckui.bpmHint")}>
+                <BpmValue deckId={deckId} className="deck-num-c" />
+                <span className="sr-only">{t("deckui.readBpm")}</span>
+            </span>
+            {warn !== "none" && <AlertTriangle size={12} aria-hidden className="deck-warn-icon" />}
+            <span title={t("deckui.remainHint")}>
+                <span className="sr-only">{t("deckui.readRemain")}</span>
+                <RemainValue deckId={deckId} className="deck-num-c" tenths={false} />
+            </span>
+        </span>
+    );
+});
+
+/**
+ * Optional virtual platter: the rim fills with the track progress and the marker turns at
+ * 33⅓ rpm with the playhead. Decorative (the readouts carry the same information). With
+ * reduced motion the marker does not spin: it points at the track progress instead.
+ * (The one piece besides the time readouts that follows the position: it is its own leaf.)
+ */
+const Platter = memo(function Platter({ deckId, motionOK }: DeckProps & { motionOK: boolean }) {
+    const position = useDeckValue(deckId, (d) => d.position);
+    const duration = useDeckValue(deckId, (d) => d.duration);
+    const playing = useDeckValue(deckId, (d) => d.playing);
+    const progress = progressOf({ position, duration });
+    // Not wrapped to 0..360: the marker must never unwind a full turn through the transition.
+    const angle = motionOK ? position * PLATTER_DEG_PER_SEC : progress * 360;
+    return (
+        <span aria-hidden className="deck-platter" data-spin={playing && motionOK ? "true" : "false"}>
+            <svg viewBox="0 0 100 100" focusable="false">
+                <circle className="deck-platter-rim" cx="50" cy="50" r="46" />
+                <circle className="deck-platter-arc" cx="50" cy="50" r="46" pathLength={100} strokeDasharray={`${(Math.round(progress * 1000) / 10).toFixed(1)} 100`} transform="rotate(-90 50 50)" />
+            </svg>
+            <span className="deck-platter-arm" style={{ transform: `rotate(${angle.toFixed(1)}deg)` }} />
+            <span className="deck-platter-hub" />
+        </span>
+    );
+});
+
+const PlayButton = memo(function PlayButton({ deckId, iconSize = 14 }: DeckProps & { iconSize?: number }) {
+    const t = useT();
+    const loaded = useDeckValue(deckId, (d) => d.loaded);
+    const playing = useDeckValue(deckId, (d) => d.playing);
     return (
         <button
             type="button"
-            onClick={ctx.cue}
-            disabled={!ctx.deck.loaded}
-            aria-label={t("deckui.cueAria", { id: ctx.id })}
+            onClick={() => togglePlay(deckId)}
+            disabled={!loaded}
+            data-on={playing ? "true" : "false"}
+            aria-label={t(playing ? "deck.pauseAria" : "deck.playAria", { id: deckId.toUpperCase() })}
+            className="dk-btn dk-btn-play deck-play"
+        >
+            {playing ? <Pause size={iconSize} aria-hidden /> : <Play size={iconSize} aria-hidden />}
+            <span className="deck-play-label">{playing ? t("deck.pause") : t("deck.play")}</span>
+        </button>
+    );
+});
+
+const CueButton = memo(function CueButton({ deckId }: DeckProps) {
+    const t = useT();
+    const loaded = useDeckValue(deckId, (d) => d.loaded);
+    const trackId = useDeckValue(deckId, (d) => d.trackId);
+    const duration = useDeckValue(deckId, (d) => d.duration);
+    const cuePoint = useDeckUi((s) => cuePointFor(s, deckId, trackId, duration));
+    // Paused exactly on the main cue point = CUE is lit.
+    const atCue = useDeckValue(deckId, (d) => d.loaded && !d.playing && Math.abs(d.position - cuePoint) < AT_CUE_SEC);
+    return (
+        <button
+            type="button"
+            onClick={(e) => cueAction(deckId, e.shiftKey)}
+            disabled={!loaded}
+            data-on={atCue ? "true" : "false"}
+            aria-label={t("deckui.cueAria", { id: deckId.toUpperCase() })}
             title={t("deckui.cueHint")}
-            className={cn(
-                "inline-flex min-h-6 min-w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-elev-2)] px-2 text-[12px] font-bold text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] disabled:opacity-40",
-                className,
-            )}
+            className="dk-btn dk-btn-cue deck-cue"
         >
             {t("deckui.cue")}
         </button>
     );
-}
+});
 
-function KeyLockButton({ ctx }: { ctx: DeckCtx }) {
+const KeyLockButton = memo(function KeyLockButton({ deckId }: DeckProps) {
     const t = useT();
-    const on = ctx.deck.keyLock;
+    const on = useDeckValue(deckId, (d) => d.keyLock);
     return (
-        <button
-            type="button"
-            onClick={ctx.toggleKeyLock}
-            aria-pressed={on}
-            aria-label={t("deck.keyLockAria", { id: ctx.id })}
-            title={t("deck.keyLockHint")}
-            className="inline-flex min-h-6 min-w-6 shrink-0 items-center gap-1 rounded-lg px-2 text-[10px] font-bold focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
-            style={{ background: on ? "var(--accent)" : "var(--bg-elev-2)", color: on ? "var(--accent-fg)" : "var(--fg)" }}
-        >
+        <button type="button" onClick={() => toggleKeyLock(deckId)} aria-pressed={on} aria-label={t("deck.keyLockAria", { id: deckId.toUpperCase() })} title={t("deck.keyLockHint")} className="dk-btn">
             {on ? <Lock size={12} aria-hidden /> : <LockOpen size={12} aria-hidden />}
             {t("deck.key")}
         </button>
     );
-}
+});
 
-function TempoSlider({ ctx }: { ctx: DeckCtx }) {
+/**
+ * Tempo: −  [flat fader with a centre detent]  +  and a reset. Drag or arrow keys on the
+ * fader, 0.1 % per nudge, double click (or the reset control) returns to the original tempo.
+ * `showValue` puts the value on the reset control (tiers whose header has no tempo readout).
+ *
+ * It selects the tempo only. That matters beyond the render cost: React rewrites the `name` and
+ * `type` attributes of an <input> on every commit that re-renders it, so a fader that rendered
+ * with each snapshot had its attributes rewritten ~30 times a second with unchanged values.
+ */
+const TempoFader = memo(function TempoFader({ deckId, label = false, showValue = false }: DeckProps & { label?: boolean; showValue?: boolean }) {
     const t = useT();
+    const tempo = useDeckValue(deckId, (d) => d.tempo);
+    const text = formatTempo(tempo);
+    const aria = t("deck.tempoAria", { id: deckId.toUpperCase() });
     return (
-        <label className="flex min-h-6 min-w-0 items-center gap-2">
-            <span className="shrink-0 text-[10px] uppercase text-[var(--fg-dim)]">{t("deck.tempo")}</span>
-            <input
-                type="range"
-                min={TEMPO_MIN}
-                max={TEMPO_MAX}
-                step={0.001}
-                value={ctx.deck.tempo}
-                aria-label={t("deck.tempoAria", { id: ctx.id })}
-                aria-valuetext={fmtTempo(ctx.deck.tempo)}
-                onChange={(e) => ctx.setTempo(Number(e.target.value))}
-                onDoubleClick={() => ctx.setTempo(1)}
-                className="min-w-0 flex-1"
-                style={{ accentColor: ctx.accent }}
-            />
-            <span className="mono w-14 shrink-0 text-right text-[11px]">{fmtTempo(ctx.deck.tempo)}</span>
-        </label>
-    );
-}
-
-/** −  +1.2%  +  : tempo as a small numeric control (compact tier). Activating the value resets to 0 %. */
-function TempoStepper({ ctx }: { ctx: DeckCtx }) {
-    const t = useT();
-    const { tempo } = ctx.deck;
-    return (
-        <div role="group" aria-label={t("deck.tempoAria", { id: ctx.id })} className="flex shrink-0 items-center gap-0.5">
-            <button type="button" className={iconBtn} aria-label={t("deckui.tempoDown")} onClick={() => ctx.setTempo(tempo - 0.001)} disabled={tempo <= TEMPO_MIN}>
+        <div role="group" aria-label={aria} className="deck-tempo">
+            {label && (
+                <span aria-hidden className="dk-label">
+                    {t("deck.tempo")}
+                </span>
+            )}
+            <button type="button" className="dk-cell deck-cell-btn" aria-label={t("deckui.tempoDown")} onClick={() => setTempo(deckId, deckNow(deckId).tempo - TEMPO_STEP)} disabled={tempo <= TEMPO_MIN}>
                 <Minus size={12} aria-hidden />
+            </button>
+            <span className="deck-tempo-track" style={{ ["--p" as string]: tempoPosition(tempo).toFixed(4) }}>
+                <span aria-hidden className="deck-tempo-fill" />
+                <input
+                    type="range"
+                    className="deck-tempo-range"
+                    min={TEMPO_MIN}
+                    max={TEMPO_MAX}
+                    step={TEMPO_STEP}
+                    value={tempo}
+                    aria-label={aria}
+                    aria-valuetext={text}
+                    title={t("deckui.tempoHint")}
+                    onChange={(e) => setTempo(deckId, Number(e.target.value))}
+                    onDoubleClick={() => setTempo(deckId, 1)}
+                />
+            </span>
+            <button type="button" className="dk-cell deck-cell-btn" aria-label={t("deckui.tempoUp")} onClick={() => setTempo(deckId, deckNow(deckId).tempo + TEMPO_STEP)} disabled={tempo >= TEMPO_MAX}>
+                <Plus size={12} aria-hidden />
             </button>
             <button
                 type="button"
-                className="mono min-h-6 min-w-12 rounded-md px-1 text-[10px] font-bold focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
-                aria-label={t("deckui.tempoReset", { value: fmtTempo(tempo) })}
+                className={cn("dk-cell deck-cell-btn", showValue && "deck-cell-tempo")}
+                aria-label={t("deckui.tempoReset", { value: text })}
                 title={t("deckui.tempoResetHint")}
-                onClick={() => ctx.setTempo(1)}
+                onClick={() => setTempo(deckId, 1)}
+                disabled={!showValue && !tempoShifted(tempo)}
             >
-                {fmtTempo(tempo)}
+                {showValue ? text : <RotateCcw size={12} aria-hidden />}
             </button>
-            <button type="button" className={iconBtn} aria-label={t("deckui.tempoUp")} onClick={() => ctx.setTempo(tempo + 0.001)} disabled={tempo >= TEMPO_MAX}>
+        </div>
+    );
+});
+
+/** −  +1.2%  +  : tempo as a small numeric control (compact tier). Activating the value resets to 0 %. */
+const TempoStepper = memo(function TempoStepper({ deckId }: DeckProps) {
+    const t = useT();
+    const tempo = useDeckValue(deckId, (d) => d.tempo);
+    const text = formatTempo(tempo);
+    return (
+        <div role="group" aria-label={t("deck.tempoAria", { id: deckId.toUpperCase() })} className="deck-group">
+            <button type="button" className="dk-cell deck-cell-btn" aria-label={t("deckui.tempoDown")} onClick={() => setTempo(deckId, deckNow(deckId).tempo - TEMPO_STEP)} disabled={tempo <= TEMPO_MIN}>
+                <Minus size={12} aria-hidden />
+            </button>
+            <button type="button" className="dk-cell deck-cell-btn deck-cell-tempo" aria-label={t("deckui.tempoReset", { value: text })} title={t("deckui.tempoResetHint")} onClick={() => setTempo(deckId, 1)}>
+                {text}
+            </button>
+            <button type="button" className="dk-cell deck-cell-btn" aria-label={t("deckui.tempoUp")} onClick={() => setTempo(deckId, deckNow(deckId).tempo + TEMPO_STEP)} disabled={tempo >= TEMPO_MAX}>
                 <Plus size={12} aria-hidden />
             </button>
         </div>
     );
-}
+});
 
-function TabBody({ ctx, tab, compact }: { ctx: DeckCtx; tab: DeckTab; compact?: boolean }) {
-    const { deckId, deck, accent } = ctx;
-    if (tab === "cues")
-        return (
-            <div className="grid h-full min-h-0 gap-1.5" style={{ gridTemplateRows: compact ? "minmax(24px, 1fr) 24px" : "minmax(0, 1fr)" }}>
-                <HotCuePads deckId={deckId} deck={deck} accent={accent} count={compact ? 4 : 8} className="h-full" />
-                {compact && <LoopRow deckId={deckId} deck={deck} />}
-            </div>
-        );
-    if (tab === "loops")
-        return (
-            <div className="grid h-full min-h-0 gap-1.5" style={{ gridTemplateRows: "minmax(24px, 1fr) minmax(24px, 1fr)" }}>
-                <LoopRow deckId={deckId} deck={deck} />
-                <LoopEditRow deckId={deckId} deck={deck} />
-            </div>
-        );
-    if (tab === "fx")
-        return (
-            <Suspense fallback={<Skeleton className="h-full w-full" />}>
-                <div className="grid h-full min-h-0 content-start gap-2">
-                    <FxPanel deckId={deckId} deck={deck} accent={accent} />
-                    <ColorFx deckId={deckId} accent={accent} compact />
-                </div>
-            </Suspense>
-        );
-    if (tab === "grid")
-        return (
-            <Suspense fallback={<Skeleton className="h-full w-full" />}>
-                <GridEditor deck={deck} className="h-full min-h-0" />
-            </Suspense>
-        );
-    return (
-        <Suspense fallback={<Skeleton className="h-full w-full" />}>
-            <StemControls deckId={deckId} deck={deck} accent={accent} className="h-full" />
-        </Suspense>
-    );
-}
+/**
+ * Deck fields no tab body shows: the body keeps its deck object while only these change. The grid
+ * editor reads the playhead in its handlers and selects its BPM text itself, so it is no exception.
+ */
+const BODY_IGNORES = ["position", "vu"] as const;
+
+const TabBody = memo(function TabBody({ deckId, accent, tab, compact }: DeckProps & { accent: string; tab: DeckTab; compact?: boolean }) {
+    const deck = useDeckSteady(deckId, BODY_IGNORES);
+    return <DeckTabBody deckId={deckId} deck={deck} accent={accent} tab={tab} compact={compact} />;
+});
 
 const TABS: readonly {
     tab: DeckTab;
@@ -286,219 +499,238 @@ const TABS: readonly {
     { tab: "grid", label: "deckui.tabGrid", Icon: Grid3x3 },
 ];
 
-/** Tabbed lower area: only one of hot cues / loops / FX / stems is visible at a time. */
-function DeckTabs({ ctx, className }: { ctx: DeckCtx; className?: string }) {
+/**
+ * Lower area: HOT CUE · LOOP · FX · STEMS · GRID as a tab list (arrow keys, Home, End move
+ * and select) and the selected tab's body. Renders two rows of the caller's grid.
+ */
+const DeckTabs = memo(function DeckTabs({ deckId, accent, lay }: DeckProps & { accent: string; lay?: Lay }) {
     const t = useT();
-    const tab = useDeckUi((s) => s.tab[ctx.deckId]);
+    const base = useId();
+    const tab = useDeckUi((s) => s.tab[deckId]);
     const setTab = useDeckUi((s) => s.setTab);
+    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const at = TABS.findIndex((x) => x.tab === tab);
+        const next =
+            e.key === "ArrowRight" ? (at + 1) % TABS.length : e.key === "ArrowLeft" ? (at - 1 + TABS.length) % TABS.length : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : -1;
+        if (next < 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const target = TABS[next]!.tab;
+        setTab(deckId, target);
+        e.currentTarget.querySelector<HTMLElement>(`[data-tab="${target}"]`)?.focus();
+    };
     return (
-        <Tabs
-            value={tab}
-            onValueChange={(v) => setTab(ctx.deckId, v as DeckTab)}
-            className={cn("grid min-h-0 gap-1.5", className)}
-            style={{ gridTemplateRows: "24px minmax(0, 1fr)" }}
-        >
-            <TabsList aria-label={t("deckui.tabsAria", { id: ctx.id })} className="h-6 w-full p-0.5">
-                {TABS.map(({ tab: v, label, Icon }) => (
-                    <TabsTrigger key={v} value={v} className="min-h-5 gap-1 px-1.5 text-[10px] font-bold uppercase tracking-[0.06em]">
-                        <Icon className="size-3" aria-hidden />
-                        <span className="truncate">{t(label)}</span>
-                    </TabsTrigger>
+        <>
+            <div role="tablist" aria-label={t("deckui.tabsAria", { id: deckId.toUpperCase() })} className="deck-tabs deck-row" onKeyDown={onKeyDown}>
+                {TABS.map(({ tab: v, label }) => (
+                    <button
+                        key={v}
+                        type="button"
+                        role="tab"
+                        id={`${base}-${v}`}
+                        data-tab={v}
+                        aria-selected={tab === v}
+                        aria-controls={`${base}-panel`}
+                        tabIndex={tab === v ? 0 : -1}
+                        className="dk-tab"
+                        onClick={() => setTab(deckId, v)}
+                    >
+                        {t(label)}
+                    </button>
                 ))}
-            </TabsList>
-            <TabsContent value={tab} className="min-h-0 overflow-hidden">
-                <TabBody ctx={ctx} tab={tab} />
-            </TabsContent>
-        </Tabs>
+            </div>
+            <motion.div {...(lay ? lay("lower") : {})} role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-${tab}`} className="deck-tabbody deck-row">
+                <TabBody deckId={deckId} accent={accent} tab={tab} />
+            </motion.div>
+        </>
+    );
+});
+
+/** Everything a smaller tier hides, in one popover body (it carries the deck colour itself). */
+function DeckMoreBody({ deckId, accent, keyInfo, withTabs, withWave }: DeckProps & { accent: string; keyInfo: DeckKeyInfo; withTabs?: boolean; withWave?: boolean }) {
+    return (
+        <div className="deck-more" data-deck-scope="" style={{ ["--deck" as string]: accent }}>
+            {withWave && (
+                <div className="deck-more-wave">
+                    <Waveform deckId={deckId} accent={accent} />
+                </div>
+            )}
+            <DeckPerformance deckId={deckId} accent={accent} keyInfo={keyInfo} />
+            <div className="deck-more-row">
+                <KeyLockButton deckId={deckId} />
+                <TempoFader deckId={deckId} showValue />
+            </div>
+            {withTabs && (
+                <div className="deck-more-tabs">
+                    <DeckTabs deckId={deckId} accent={accent} />
+                </div>
+            )}
+        </div>
     );
 }
 
-/** Everything a smaller tier hides, in one popover body. */
-function DeckMoreBody({ ctx, withTabs }: { ctx: DeckCtx; withTabs?: boolean }) {
+/** A tab body inside a popover (compact tier: FX, stems, grid; touch mode on a low deck: every tab). */
+function TabPopover({ deckId, accent, tab, label, icon }: DeckProps & { accent: string; tab: DeckTab; label: string; icon: React.ReactNode }) {
     return (
-        <div className="grid w-[min(88vw,22rem)] gap-2">
-            <DeckPerformance deckId={ctx.deckId} deck={ctx.deck} accent={ctx.accent} keyInfo={ctx.keyInfo} />
-            <div className="flex items-center gap-2">
-                <KeyLockButton ctx={ctx} />
-                <div className="min-w-0 flex-1">
-                    <TempoSlider ctx={ctx} />
+        <MorePopover label={label} icon={icon} side="top">
+            <div className="deck-pop" data-tab={tab} data-deck-scope="" style={{ ["--deck" as string]: accent }}>
+                <div className="deck-tabbody">
+                    <TabBody deckId={deckId} accent={accent} tab={tab} />
                 </div>
             </div>
-            {withTabs && <DeckTabs ctx={ctx} className="h-56" />}
-        </div>
+        </MorePopover>
     );
 }
 
 /* ── tiers ─────────────────────────────────────────────────────────────── */
 
-function DeckFull({ ctx, lay }: { ctx: DeckCtx; lay: Lay }) {
+function DeckFull({ deckId, accent, keyInfo, warn, lay, wide, platter, motionOK }: TierProps & { wide: boolean; platter: boolean; motionOK: boolean }) {
     const t = useT();
-    const { deck, deckId, accent, keyInfo } = ctx;
     return (
-        <div
-            className="grid h-full min-h-0 min-w-0 gap-1.5"
-            style={{ gridTemplateRows: "auto minmax(48px, 1fr) auto auto auto minmax(140px, 1.1fr)" }}
-        >
-            <motion.header {...lay("header")} className="grid min-w-0 gap-0.5">
-                <div className="flex min-w-0 items-center gap-2">
-                    <DeckDot accent={accent} />
-                    <strong className="shrink-0 tracking-[0.1em]">{t("deck.title", { id: ctx.id })}</strong>
-                    <span className="min-w-0 flex-1 truncate font-semibold" title={deck.title ?? undefined}>
-                        {deck.title ?? t("deck.noTrack")}
-                    </span>
-                    <span className="mono shrink-0 text-[15px] font-extrabold">
-                        {bpmText(deck)}
-                        <span className="ml-0.5 text-[9px] font-normal text-[var(--fg-dim)]">BPM</span>
-                    </span>
+        <div className="deck-full">
+            <motion.header {...lay("header")} className="deck-head deck-row" data-platter={platter ? "true" : undefined}>
+                {platter && <Platter deckId={deckId} motionOK={motionOK} />}
+                <div className="deck-head-top">
+                    <DeckBadge deckId={deckId} />
+                    <DeckTitle deckId={deckId} />
+                    <DeckArtist deckId={deckId} />
+                    {warn !== "none" && <EndingChip />}
+                    <KeyChip keyName={keyInfo.playingKey} against={keyInfo.againstKey} />
+                    <MasterBadge deckId={deckId} />
                 </div>
-                <div className="flex min-w-0 items-center gap-2 text-[11px]">
-                    <span className="min-w-0 flex-1 truncate text-[var(--fg-dim)]">{deck.artist ?? "—"}</span>
-                    <span
-                        className="mono shrink-0 font-bold"
-                        role="img"
-                        aria-label={keyInfo.playingKey ? t("deck.trackKey", { key: keyInfo.playingKey }) : t("deck.unknownKey")}
-                        title={t("deck.trackKeyHint")}
-                    >
-                        {keyInfo.playingKey ?? "—"}
-                    </span>
-                    <MasterBadge deckId={deckId} accent={accent} />
-                    <span className="mono shrink-0">{fmtTime(deck.position)}</span>
-                    <span className="mono shrink-0 text-[var(--fg-dim)]">-{fmtTime(deck.duration - deck.position)}</span>
-                </div>
+                <Readouts deckId={deckId} />
             </motion.header>
 
-            <motion.div {...lay("wave")} className="min-h-0">
-                <Waveform deck={deck} accent={accent} />
+            <motion.div {...lay("wave")} className="deck-row">
+                <Waveform deckId={deckId} accent={accent} />
             </motion.div>
 
-            <motion.div {...lay("transport")} role="group" aria-label={t("deck.perfGroup", { id: ctx.id })} className="flex min-w-0 items-center gap-1">
-                <CueButton ctx={ctx} />
-                <PlayButton ctx={ctx} className="min-w-16 flex-1 self-stretch" />
-                <SyncButton deckId={deckId} deck={deck} accent={accent} />
-                <ModeToggles deckId={deckId} deck={deck} accent={accent} />
-                <KeyLockButton ctx={ctx} />
+            <motion.div {...lay("transport")} role="group" aria-label={t("deck.perfGroup", { id: deckId.toUpperCase() })} className="deck-transport deck-row">
+                <CueButton deckId={deckId} />
+                <PlayButton deckId={deckId} />
+                <SyncButton deckId={deckId} accent={accent} />
+                <ModeToggles deckId={deckId} accent={accent} />
+                <KeyLockButton deckId={deckId} />
+                <span aria-hidden className="deck-spacer" />
+                {wide && <KeyControls deckId={deckId} keyInfo={keyInfo} showKey={false} />}
             </motion.div>
 
-            <div className="flex min-w-0 items-center justify-between gap-2">
-                <BeatJump deckId={deckId} deck={deck} />
-                <KeyControls deckId={deckId} deck={deck} keyInfo={keyInfo} showKey={false} />
+            <div className="deck-util deck-row">
+                <BeatJump deckId={deckId} cells={wide} label={wide} />
+                {!wide && <KeyControls deckId={deckId} keyInfo={keyInfo} showKey={false} />}
+                <TempoFader deckId={deckId} label={wide} />
             </div>
 
-            <TempoSlider ctx={ctx} />
-
-            <motion.div {...lay("lower")} className="min-h-0">
-                <DeckTabs ctx={ctx} className="h-full" />
-            </motion.div>
+            <DeckTabs deckId={deckId} accent={accent} lay={lay} />
         </div>
     );
 }
 
-function DeckCompact({ ctx, lay }: { ctx: DeckCtx; lay: Lay }) {
+/**
+ * Compact arrangement. `bare` (touch mode on a deck too low for a 44 px tab body): the lower
+ * area is gone, every tab opens as a popover from the tab row and the overview takes the space.
+ */
+function DeckCompact({ deckId, accent, keyInfo, warn, lay, bare }: TierProps & { bare: boolean }) {
     const t = useT();
-    const { deck, deckId, accent } = ctx;
+    const id = deckId.toUpperCase();
     const tab = useDeckUi((s) => s.tab[deckId]);
     const setTab = useDeckUi((s) => s.setTab);
     const inlineTab: DeckTab = tab === "loops" ? "loops" : "cues";
     return (
-        <div className="grid h-full min-h-0 min-w-0 gap-1.5" style={{ gridTemplateRows: "24px minmax(36px, 1fr) 28px minmax(84px, 0.8fr)" }}>
-            <motion.header {...lay("header")} className="flex min-w-0 items-center gap-1.5 text-[11px]">
-                <DeckDot accent={accent} />
-                <strong className="shrink-0 tracking-[0.08em]">{ctx.id}</strong>
-                <span className="min-w-0 flex-1 truncate font-semibold" title={[deck.title, deck.artist].filter(Boolean).join(" — ") || undefined}>
-                    {deck.title ?? t("deck.noTrack")}
-                </span>
-                <span className="mono shrink-0 font-bold">{ctx.keyInfo.playingKey ?? "—"}</span>
-                <span className="mono shrink-0 font-extrabold">{bpmText(deck)}</span>
-                <span className="mono shrink-0 text-[var(--fg-dim)]">-{fmtTime(deck.duration - deck.position)}</span>
+        <div className="deck-compact" data-bare={bare ? "true" : undefined}>
+            <motion.header {...lay("header")} className="deck-chead deck-row">
+                <DeckBadge deckId={deckId} />
+                <DeckTitle deckId={deckId} withArtist />
+                <KeyChip keyName={keyInfo.playingKey} against={keyInfo.againstKey} />
+                <MiniReadouts deckId={deckId} warn={warn} />
             </motion.header>
 
-            <motion.div {...lay("wave")} className="min-h-0">
-                <Waveform deck={deck} accent={accent} />
+            <motion.div {...lay("wave")} className="deck-row">
+                <Waveform deckId={deckId} accent={accent} />
             </motion.div>
 
-            <motion.div {...lay("transport")} className="flex min-w-0 items-stretch gap-1">
-                <CueButton ctx={ctx} />
-                <PlayButton ctx={ctx} className="min-w-12 flex-1" />
-                <SyncButton deckId={deckId} deck={deck} accent={accent} />
-                <TempoStepper ctx={ctx} />
-                <MorePopover label={t("deckui.moreDeck", { id: ctx.id })} className="self-center">
-                    <DeckMoreBody ctx={ctx} />
+            <motion.div {...lay("transport")} role="group" aria-label={t("deck.perfGroup", { id })} className="deck-transport deck-row">
+                <CueButton deckId={deckId} />
+                <PlayButton deckId={deckId} />
+                <SyncButton deckId={deckId} accent={accent} />
+                <TempoStepper deckId={deckId} />
+                <MorePopover label={t("deckui.moreDeck", { id })} className="deck-more-btn">
+                    <DeckMoreBody deckId={deckId} accent={accent} keyInfo={keyInfo} />
                 </MorePopover>
             </motion.div>
 
-            <motion.div {...lay("lower")} className="grid min-h-0 gap-1.5" style={{ gridTemplateRows: "24px minmax(0, 1fr)" }}>
-                <div role="toolbar" aria-label={t("deckui.tabsAria", { id: ctx.id })} className="flex items-center gap-1">
-                    {TABS.slice(0, 2).map(({ tab: v, label, Icon }) => (
-                        <button
-                            key={v}
-                            type="button"
-                            aria-pressed={inlineTab === v}
-                            aria-label={t(label)}
-                            title={t(label)}
-                            onClick={() => setTab(deckId, v)}
-                            className={iconBtn}
-                            style={inlineTab === v ? { background: accent, color: "var(--accent-fg)" } : undefined}
-                        >
-                            <Icon size={13} aria-hidden />
-                        </button>
-                    ))}
-                    <MorePopover label={t("deckui.tabFx")} icon={<Sparkles size={13} aria-hidden />} side="top">
-                        <div className="w-[min(88vw,20rem)]">
-                            <TabBody ctx={ctx} tab="fx" />
-                        </div>
-                    </MorePopover>
-                    <MorePopover label={t("deckui.tabStems")} icon={<Layers size={13} aria-hidden />} side="top">
-                        <div className="h-44 w-[min(88vw,18rem)]">
-                            <TabBody ctx={ctx} tab="stems" />
-                        </div>
-                    </MorePopover>
-                    <span className="ml-auto truncate text-[10px] uppercase tracking-[0.1em] text-[var(--fg-dim)]">{t(inlineTab === "loops" ? "deckui.tabLoops" : "deckui.tabCues")}</span>
-                </div>
-                <div className="min-h-0 overflow-hidden">
-                    <TabBody ctx={ctx} tab={inlineTab} compact />
-                </div>
-            </motion.div>
+            <div role="toolbar" aria-label={t("deckui.tabsAria", { id })} className="deck-ctabs deck-row">
+                {bare
+                    ? TABS.map(({ tab: v, label, Icon }) => <TabPopover key={v} deckId={deckId} accent={accent} tab={v} label={t(label)} icon={<Icon size={13} aria-hidden />} />)
+                    : TABS.slice(0, 2).map(({ tab: v, label, Icon }) => (
+                          <button key={v} type="button" aria-pressed={inlineTab === v} aria-label={t(label)} title={t(label)} onClick={() => setTab(deckId, v)} className={iconBtn}>
+                              <Icon size={13} aria-hidden />
+                          </button>
+                      ))}
+                {!bare && TABS.slice(2).map(({ tab: v, label, Icon }) => <TabPopover key={v} deckId={deckId} accent={accent} tab={v} label={t(label)} icon={<Icon size={13} aria-hidden />} />)}
+                {/* Not a <span>: a legacy rule in styles.css hides a trailing span of this toolbar. */}
+                {!bare && (
+                    <b aria-hidden className="dk-label deck-ctab-name">
+                        {t(inlineTab === "loops" ? "deckui.tabLoops" : "deckui.tabCues")}
+                    </b>
+                )}
+            </div>
+
+            {!bare && (
+                <motion.div {...lay("lower")} className="deck-tabbody deck-row">
+                    <TabBody deckId={deckId} accent={accent} tab={inlineTab} compact />
+                </motion.div>
+            )}
         </div>
     );
 }
 
-function DeckIcon({ ctx, lay }: { ctx: DeckCtx; lay: Lay }) {
+/** Track progress of the icon tier: renders per 0.1 % of the track and per second (the spoken value). */
+const IconProgress = memo(function IconProgress({ deckId }: DeckProps) {
     const t = useT();
-    const { deck, accent } = ctx;
-    const progress = deck.duration > 0 ? Math.min(1, Math.max(0, deck.position / deck.duration)) : 0;
+    const permille = useDeckValue(deckId, (d) => Math.round(progressOf(d) * 1000));
+    const valueText = useDeckValue(deckId, (d) => `${formatClock(d.position)} / ${formatClock(d.duration)}`);
     return (
-        <div className="grid h-full min-h-0 min-w-0 gap-1" style={{ gridTemplateRows: "24px auto minmax(28px, 1fr) 4px" }}>
-            <motion.header {...lay("header")} className="flex min-w-0 items-center gap-1.5 text-[11px]">
-                <DeckDot accent={accent} />
-                <strong className="shrink-0">{ctx.id}</strong>
-                <span className="min-w-0 flex-1 truncate font-semibold" title={deck.title ?? undefined}>
-                    {deck.title ?? t("deck.noTrack")}
-                </span>
-                <MorePopover label={t("deckui.moreDeck", { id: ctx.id })} icon={<SlidersHorizontal size={13} aria-hidden />}>
-                    <DeckMoreBody ctx={ctx} withTabs />
-                </MorePopover>
+        <div
+            role="progressbar"
+            aria-label={t("deckui.progress", { id: deckId.toUpperCase() })}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(permille / 10)}
+            aria-valuetext={valueText}
+            className="deck-progress"
+        >
+            <span style={{ transform: `scaleX(${(permille / 1000).toFixed(3)})` }} />
+        </div>
+    );
+});
+
+/**
+ * Icon tier. In touch mode the More button (44 px) joins CUE and PLAY in the one 44 px row and
+ * the readouts move up next to the title, so the 110 px minimum still holds.
+ */
+function DeckIcon({ deckId, accent, keyInfo, warn, lay, touch }: TierProps & { touch: boolean }) {
+    const t = useT();
+    const id = deckId.toUpperCase();
+    const more = (
+        <MorePopover label={t("deckui.moreDeck", { id })} icon={<SlidersHorizontal size={13} aria-hidden />} className={touch ? "deck-more-btn" : undefined}>
+            <DeckMoreBody deckId={deckId} accent={accent} keyInfo={keyInfo} withTabs withWave />
+        </MorePopover>
+    );
+    return (
+        <div className="deck-icon" data-touch={touch ? "true" : undefined}>
+            <motion.header {...lay("header")} className="deck-chead deck-row">
+                <DeckBadge deckId={deckId} />
+                <DeckTitle deckId={deckId} withArtist />
+                {touch ? <MiniReadouts deckId={deckId} warn={warn} /> : more}
             </motion.header>
-            <div className="flex min-w-0 items-baseline justify-between gap-2">
-                <span className="mono text-[14px] font-extrabold">
-                    {bpmText(deck)}
-                    <span className="ml-0.5 text-[9px] font-normal text-[var(--fg-dim)]">BPM</span>
-                </span>
-                <span className="mono text-[11px] text-[var(--fg-dim)]">-{fmtTime(deck.duration - deck.position)}</span>
-            </div>
-            <motion.div {...lay("transport")} className="flex min-h-0 gap-1.5">
-                <CueButton ctx={ctx} className="h-full min-w-14" />
-                <PlayButton ctx={ctx} className="h-full flex-1" iconSize={18} />
+            {!touch && <MiniReadouts deckId={deckId} warn={warn} className="deck-icon-read deck-row" />}
+            <motion.div {...lay("transport")} role="group" aria-label={t("deck.perfGroup", { id })} className="deck-transport deck-row">
+                <CueButton deckId={deckId} />
+                <PlayButton deckId={deckId} iconSize={16} />
+                {touch && more}
             </motion.div>
-            <div
-                role="progressbar"
-                aria-label={t("deckui.progress", { id: ctx.id })}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(progress * 100)}
-                className="h-1 overflow-hidden rounded-full bg-[var(--bg-elev-2)]"
-            >
-                <span className="block h-full origin-left" style={{ background: accent, transform: `scaleX(${progress})` }} />
-            </div>
+            <IconProgress deckId={deckId} />
         </div>
     );
 }

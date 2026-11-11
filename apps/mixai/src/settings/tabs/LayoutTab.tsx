@@ -4,6 +4,7 @@ import { Button, Input, Kbd } from "@mmo/ui";
 import { useT } from "@/i18n";
 import { useAllLayouts, useLayoutStore } from "@/layout/layout-store";
 import { openLayoutEditor } from "@/layout/editor-bridge";
+import { layoutName } from "@/layout/presets";
 import type { LayoutDoc } from "@/layout/types";
 import { cn } from "@mmo/ui";
 import { Section } from "../sections/shared";
@@ -86,7 +87,7 @@ export function LayoutTab() {
                             >
                                 <MiniGrid layout={l} />
                                 <span className="flex items-center justify-between gap-1 font-medium">
-                                    <span className="truncate">{l.name}</span>
+                                    <span className="truncate">{layoutName(t, l)}</span>
                                     {active && (
                                         <span className="inline-flex items-center gap-1 text-xs text-primary">
                                             <Check className="size-3" aria-hidden /> {t("settings.active")}
@@ -120,7 +121,7 @@ export function LayoutTab() {
                                 <option value="">{t("settings.layoutNone")}</option>
                                 {layouts.map((l) => (
                                     <option key={l.id} value={l.id}>
-                                        {l.name}
+                                        {layoutName(t, l)}
                                     </option>
                                 ))}
                             </select>
@@ -157,7 +158,7 @@ export function LayoutTab() {
                                         >
                                             {layouts.map((l) => (
                                                 <option key={l.id} value={l.id}>
-                                                    {l.name}
+                                                    {layoutName(t, l)}
                                                 </option>
                                             ))}
                                         </select>
@@ -182,7 +183,7 @@ export function LayoutTab() {
                         <select className={nativeSelect} value={deviceLayout} onChange={(e) => setDeviceLayout(e.target.value)}>
                             {layouts.map((l) => (
                                 <option key={l.id} value={l.id}>
-                                    {l.name}
+                                    {layoutName(t, l)}
                                 </option>
                             ))}
                         </select>

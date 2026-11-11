@@ -58,7 +58,8 @@ final class AppearanceStore {
         defaults = d
         dark = d.object(forKey: Keys.dark) as? Bool ?? true
         accent = d.string(forKey: Keys.accent) ?? "violet"
-        layoutId = d.string(forKey: Keys.layout) ?? "classic"
+        // Not `layoutDefaultId()` (Pro): see `LayoutHostDefaults.fallbackLayoutId`.
+        layoutId = d.string(forKey: Keys.layout) ?? LayoutHostDefaults.fallbackLayoutId
         packId = d.string(forKey: Keys.pack)
         // Built-in presets and the saved skin are available at once (no pack verification needed);
         // the installed packs are listed off the main actor.
@@ -102,12 +103,14 @@ final class AppearanceStore {
         persistAndApply()
     }
 
-    /// The layout to show: exact id, else a unique pack-local match (Decks 1.3 stored bare ids), else classic.
+    /// The layout to show: exact id, else a unique pack-local match (Decks 1.3 stored bare ids), else the app's
+    /// fallback layout (`LayoutHostDefaults.fallbackLayoutId`).
     var currentLayout: DecksLayoutChoice? {
         if let l = layouts.first(where: { $0.id == layoutId }) { return l }
         let hits = layouts.filter { $0.id.contains("/") && $0.id.split(separator: "/").last.map(String.init) == layoutId }
         if hits.count == 1 { return hits[0] }
-        return layouts.first { $0.id == "classic" } ?? layouts.first
+        let fallback = LayoutHostDefaults.fallbackLayoutId
+        return layouts.first { $0.id == fallback } ?? layouts.first
     }
 
     var skinPacks: [PackSummary] { packs.filter { $0.kind == "skin" || $0.kind == "bundle" } }

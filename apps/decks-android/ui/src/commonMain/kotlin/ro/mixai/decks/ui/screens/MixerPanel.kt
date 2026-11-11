@@ -29,9 +29,9 @@ import ro.mixai.decks.ui.theme.LocalDecksType
 
 /**
  * Two-channel mixer at a layout tier (WP19-34). Full: trim, 3-band EQ, filter, PFL, channel fader,
- * master, headphones. Compact: EQ + filter + faders (no trim, no headphone knobs). Icon: the two
- * channel faders and PFL only. The crossfader is its own layout panel ([CrossfaderPanel]); pass
- * [withCrossfader] when the layout has no crossfader area.
+ * master, headphones. Compact: EQ beside the PFL + channel fader (no trim, no filter, no headphone
+ * knobs), a short strip. Icon: the two channel faders and PFL only. The crossfader is its own
+ * layout panel ([CrossfaderPanel]); pass [withCrossfader] when the layout has no crossfader area.
  */
 @Composable
 fun MixerPanel(ctl: DecksController, modifier: Modifier = Modifier, tier: PanelTier = PanelTier.Full, withCrossfader: Boolean = false) {
@@ -61,12 +61,20 @@ fun MixerPanel(ctl: DecksController, modifier: Modifier = Modifier, tier: PanelT
     }
 }
 
-/** The crossfader as its own layout panel (all tiers: label + fader; icon drops the label). */
+/**
+ * The crossfader as its own layout panel: label + fader ([CROSSFADER_LABELLED_DP] high); the icon
+ * tier is the fader alone with 2 dp above and below, so it fits a [CROSSFADER_FADER_ONLY_DP] slot
+ * (the layouts give this row 2 of ~40 parts of the height).
+ */
 @Composable
 fun CrossfaderPanel(ctl: DecksController, modifier: Modifier = Modifier, tier: PanelTier = PanelTier.Full) {
+    if (tier == PanelTier.Icon) {
+        Panel(modifier, verticalPad = 2.dp) { CrossfaderFader(ctl) }
+        return
+    }
     Panel(modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (tier != PanelTier.Icon) BasicText(str(Str.Crossfader), style = LocalDecksType.current.label)
+            BasicText(str(Str.Crossfader), style = LocalDecksType.current.label)
             CrossfaderFader(ctl)
         }
     }
@@ -87,21 +95,12 @@ private fun Channel(ctl: DecksController, i: Int, tier: PanelTier) {
     val name = str(if (i == 0) Str.DeckA else Str.DeckB)
     val color = DecksColors.deck(i)
     val faderH = when (tier) { PanelTier.Full -> 120.dp; PanelTier.Compact -> 90.dp; PanelTier.Icon -> 64.dp }
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (tier == PanelTier.Full) {
-            Knob(str(Str.Gain), "${str(Str.Gain)} $name", Format.db(c.gainDb), c.gainDb, -12f..12f, 0f, color = color) { ctl.setGain(i, it) }
-        }
-        if (tier != PanelTier.Icon) {
-            val k = if (tier == PanelTier.Full) 44.dp else 32.dp
-            Knob(str(Str.EqHigh), "${str(Str.EqHigh)} $name", Format.db(c.eqHigh), c.eqHigh, -26f..6f, 0f, color = color, size = k) { ctl.setEq(i, Band.HIGH, it) }
-            Knob(str(Str.EqMid), "${str(Str.EqMid)} $name", Format.db(c.eqMid), c.eqMid, -26f..6f, 0f, color = color, size = k) { ctl.setEq(i, Band.MID, it) }
-            Knob(str(Str.EqLow), "${str(Str.EqLow)} $name", Format.db(c.eqLow), c.eqLow, -26f..6f, 0f, color = color, size = k) { ctl.setEq(i, Band.LOW, it) }
-            if (tier == PanelTier.Full) {
-                Knob(str(Str.Filter), "${str(Str.Filter)} $name", Format.fixed(c.filter.toDouble(), 2), c.filter, -1f..1f, 0f, color = color) {
-                    ctl.setFilter(i, it)
-                }
-            }
-        }
+    val eq: @Composable (androidx.compose.ui.unit.Dp) -> Unit = { k ->
+        Knob(str(Str.EqHigh), "${str(Str.EqHigh)} $name", Format.db(c.eqHigh), c.eqHigh, -26f..6f, 0f, color = color, size = k) { ctl.setEq(i, Band.HIGH, it) }
+        Knob(str(Str.EqMid), "${str(Str.EqMid)} $name", Format.db(c.eqMid), c.eqMid, -26f..6f, 0f, color = color, size = k) { ctl.setEq(i, Band.MID, it) }
+        Knob(str(Str.EqLow), "${str(Str.EqLow)} $name", Format.db(c.eqLow), c.eqLow, -26f..6f, 0f, color = color, size = k) { ctl.setEq(i, Band.LOW, it) }
+    }
+    val strip: @Composable () -> Unit = {
         PadButton("🎧", "${str(Str.HeadphoneCue)} $name", active = d?.pfl == true, accent = DecksColors.warning,
             state = str(if (d?.pfl == true) Str.On else Str.Off)) { ctl.togglePfl(i) }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -111,5 +110,26 @@ private fun Channel(ctl: DecksController, i: Int, tier: PanelTier) {
                 Modifier.width(32.dp).height(faderH), color = color,
             ) { ctl.setVolume(i, it) }
         }
+    }
+    if (tier == PanelTier.Compact) {
+        // Short strip: the EQ sits beside the fader instead of above it, so the compact mixer needs about
+        // 190 dp of height (it needed about 320 stacked, more than the mixer row of the layouts gives at 768).
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) { eq(32.dp) }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) { strip() }
+        }
+        return
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (tier == PanelTier.Full) {
+            Knob(str(Str.Gain), "${str(Str.Gain)} $name", Format.db(c.gainDb), c.gainDb, -12f..12f, 0f, color = color) { ctl.setGain(i, it) }
+        }
+        if (tier != PanelTier.Icon) {
+            eq(44.dp)
+            Knob(str(Str.Filter), "${str(Str.Filter)} $name", Format.fixed(c.filter.toDouble(), 2), c.filter, -1f..1f, 0f, color = color) {
+                ctl.setFilter(i, it)
+            }
+        }
+        strip()
     }
 }
