@@ -241,6 +241,10 @@ jobs:
 
             - name: Build + upload Tauri bundles
               uses: tauri-apps/tauri-action@v0
+              # The action uploads the bundles to the draft release itself and refuses to run without a token
+              # (the job grants contents: write). Without this the tag run of 1.6.0 built everything, then failed.
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   projectPath: apps/mixai
                   releaseId: ${{ needs.create-release.outputs.release_id }}
