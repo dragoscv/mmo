@@ -19,6 +19,7 @@ import { linkMessages } from "./messages-link";
 import { practiceMessages } from "./messages-practice";
 import { remoteMessages } from "./messages-remote";
 import { copilotMessages } from "./messages-copilot";
+import { setlogMessages } from "./messages-setlog";
 
 export const catalogs = [
     appMessages,
@@ -36,6 +37,7 @@ export const catalogs = [
     practiceMessages,
     remoteMessages,
     copilotMessages,
+    setlogMessages,
 ] as const;
 
 type Merge<T extends readonly { en: Record<string, string> }[]> = T extends readonly [infer H, ...infer R]

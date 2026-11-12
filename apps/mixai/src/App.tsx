@@ -26,6 +26,7 @@ import { TryBanner } from "./packs/TryBanner";
 import { useLookNumber } from "./look/look";
 import { startWaveSync } from "./state/wave-store";
 import { startPlayHistory } from "./state/history-store";
+import { startSetLog } from "./setlog/setlog-store";
 
 // Overlays and secondary surfaces load on demand so the entry chunk stays small.
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })));
@@ -95,6 +96,8 @@ export function App() {
     useEffect(() => startWaveSync(), []);
     // Play history (library: played rows, "not played tonight").
     useEffect(() => startPlayHistory(), []);
+    // Automatic tracklist of the recorded set (title bar: Tracklist).
+    useEffect(() => startSetLog(), []);
 
     useEffect(() => {
         let cancelled = false;

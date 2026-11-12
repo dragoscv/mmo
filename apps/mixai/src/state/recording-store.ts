@@ -9,6 +9,8 @@ interface RecordingStore {
     recording: boolean;
     busy: boolean;
     startedAt: number;
+    /** Path of the WAV being written (the one picked in the save dialog); null while not recording. */
+    path: string | null;
     toggle: () => Promise<void>;
 }
 
@@ -16,16 +18,17 @@ export const useRecordingStore = create<RecordingStore>((set, get) => ({
     recording: false,
     busy: false,
     startedAt: 0,
+    path: null,
     toggle: async () => {
         if (get().busy) return;
         set({ busy: true });
         try {
             if (get().recording) {
                 await engine.stopRecording();
-                set({ recording: false, startedAt: 0 });
+                set({ recording: false, startedAt: 0, path: null });
             } else {
                 const path = await engine.startRecording();
-                if (path) set({ recording: true, startedAt: Date.now() });
+                if (path) set({ recording: true, startedAt: Date.now(), path });
             }
         } finally {
             set({ busy: false });

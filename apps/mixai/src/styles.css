@@ -23,6 +23,7 @@
 @import "./practice/practice.css";
 @import "./remote/remote.css";
 @import "./copilot/copilot.css";
+@import "./setlog/setlog.css";
 @source "../../../packages/ui/src";
 
 /*

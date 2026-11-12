@@ -39,6 +39,7 @@ import { useAllLayouts, useLayoutStore } from "@/layout/layout-store";
 import { openLayoutEditor } from "@/layout/editor-bridge";
 import { layoutName } from "@/layout/presets";
 import { ProfileSwitcher } from "@/settings/ProfileSwitcher";
+import { SetlogButton } from "@/setlog/SetlogButton";
 import { useT } from "@/i18n";
 import { PerfHud } from "./PerfHud";
 import { useShellPrefs } from "./shell-prefs";
@@ -77,6 +78,7 @@ export function TitleBar() {
             <div data-tauri-drag-region className="tb-drag" />
 
             {native && <RecordButton />}
+            {native && <SetlogButton />}
 
             <LayoutMenu />
 

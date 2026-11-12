@@ -1,0 +1,249 @@
+/* Set tracklist (src/setlog/*). Shared vocabulary: src/look/look.css (dk-*), title bar: shell/shell.css (.tb-*). */
+
+/* ── title-bar button: list icon + "Tracklist" + number of entries ── */
+/* `.dk-btn` sets a display, which would beat the `hidden` attribute. */
+.sl-btn[hidden] {
+    display: none;
+}
+.dk-btn.tb-btn.sl-btn {
+    gap: 5px;
+}
+.sl-btn-count {
+    color: var(--foreground);
+}
+/* While the recording runs the number carries a ring: told by shape, the name says it in words. */
+.sl-btn[data-rec] .sl-btn-count {
+    padding: 1px 4px;
+    border: 1px solid var(--alert, var(--destructive));
+    border-radius: var(--ctl-radius, 3px);
+}
+/* Same step as the other title-bar words (shell.css): the word goes, icon and number stay. */
+@media (max-width: 1180px) {
+    .sl-btn-text {
+        display: none;
+    }
+    .dk-btn.tb-btn.sl-btn {
+        padding: 0 5px;
+    }
+}
+
+/* ── popover: one column; only the list scrolls, so the popover always fits the window ──
+   --sl-min = the smallest control: 24 px, 44 px in touch mode (the app's --dt-min, set on :root by
+   components/deck-tabs.css). Touch mode forces 44 x 44 px on every button (styles.css), so the
+   rows and the action row are sized from this one variable, never from fixed pixels. */
+.sl-pop[data-slot="popover-content"] {
+    --sl-min: var(--dt-min, 24px);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Wide enough for the three buttons on one row in Romanian (163 + 162 + 60 px + gaps). */
+    width: min(92vw, 432px);
+    max-height: min(var(--available-height, 100vh), 520px);
+    padding: 12px;
+    border-radius: var(--ctl-radius, 6px);
+}
+.sl-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+.sl-body p {
+    margin: 0;
+}
+.sl-clip {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Recorded / length / file. */
+.sl-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    margin: 0;
+    flex: none;
+}
+.sl-meta > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.sl-meta-file {
+    grid-column: 1 / -1;
+}
+.sl-meta dd {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground);
+}
+.sl-meta-file dd {
+    -webkit-user-select: text;
+    user-select: text;
+}
+.sl-rec {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--foreground);
+}
+.sl-rec-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--alert, var(--destructive));
+}
+
+/* The entries. Keyboard users scroll it by moving between the remove buttons. */
+.sl-list {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    /* Shrinks before anything else does, down to one row. */
+    min-height: var(--sl-min);
+    flex: 0 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line, var(--border)) transparent;
+}
+/* The start column holds "m:ss" / "mm:ss"; a set that passes one hour needs "h:mm:ss".
+   The number column holds two digits; from the 100th entry it needs three. */
+.sl-list {
+    --sl-time: 4.6ch;
+    --sl-num: 2.2ch;
+}
+.sl-list[data-long] {
+    --sl-time: 6.6ch;
+}
+.sl-list[data-many] {
+    --sl-num: 3.3ch;
+}
+.sl-row {
+    display: grid;
+    grid-template-columns: var(--sl-num) var(--sl-time) minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: var(--sl-min);
+    padding-left: 6px;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--well, var(--secondary));
+    /* Holds the row's screen-reader text (position: absolute): without it the hidden text of the
+       rows scrolled out of view would sit below the popover and stretch its scroll area. */
+    position: relative;
+}
+.sl-n {
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.sl-t {
+    text-align: right;
+    color: var(--foreground);
+}
+.sl-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground);
+}
+/* Deck letter in an outline of the deck colour (the letter is the information). */
+.sl-deck {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--line, var(--border));
+    border-radius: var(--ctl-radius, 3px);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--foreground);
+}
+.sl-deck[data-deck="a"] {
+    border-color: var(--deck-a);
+}
+.sl-deck[data-deck="b"] {
+    border-color: var(--deck-b);
+}
+.sl-deck[data-deck="c"] {
+    border-color: var(--deck-c);
+}
+.sl-deck[data-deck="d"] {
+    border-color: var(--deck-d);
+}
+.sl-row > .sl-rm {
+    width: max(var(--sl-min), var(--ctl-h, 24px));
+    min-height: var(--sl-min);
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted-foreground);
+}
+.sl-row > .sl-rm:hover,
+.sl-row > .sl-rm:focus-visible {
+    background: var(--secondary);
+    border-color: var(--line, var(--border));
+    color: var(--foreground);
+}
+
+.sl-note {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--muted-foreground);
+}
+.sl-hint {
+    flex: none;
+}
+/* What just happened, in words (a live region that is also visible). Empty = no height. */
+.sl-status {
+    flex: none;
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 600;
+    color: var(--foreground);
+}
+.sl-status:not(:empty) {
+    padding-inline-start: 6px;
+    border-inline-start: 2px solid var(--on, var(--primary));
+}
+
+/* Copy / Upload / Clear, or the question of Clear. Wraps when the words are long (RO, touch). */
+.sl-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    min-width: 0;
+}
+.sl-push {
+    margin-left: auto;
+}
+.sl-ask {
+    flex: 1 1 8rem;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground);
+}
+/* The destructive answer: alert outline AND its own words ("Yes, clear"). */
+.sl-actions > .sl-yes {
+    border-color: var(--alert, var(--destructive));
+}
+/* A button that is off stays focusable (aria-disabled): no hover or press feedback on it. */
+.sl-body .dk-btn[aria-disabled="true"]:hover,
+.sl-body .dk-btn[aria-disabled="true"]:active {
+    background: var(--secondary);
+}
+:root[data-touch="on"] .sl-actions {
+    gap: 8px;
+}

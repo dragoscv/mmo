@@ -1,5 +1,24 @@
 # MixAI Decks changelog
 
+## Unreleased (1.7.0)
+
+### Added
+
+- **Set tracklist** (Tracklist button in the title bar, next to REC; also "Set tracklist" in the
+  command palette): while the master mix is recorded, the app writes the tracklist by itself. A
+  track is listed once it has been the loudest one in the mix for 20 seconds, with the time it took
+  over; cue checks and short previews are left out. The level of a deck is playing × channel fader
+  × its crossfader side (a deck on THRU is always heard). A track doubled on a second deck stays
+  one line. A wrong entry can be removed; its time goes to the entry before it.
+- **Copy tracklist**: puts the list on the clipboard as text, one line per track
+  (`01. [0:00] Artist – Title`), ready for a Mixcloud, YouTube or SoundCloud description.
+- **Open Mixcloud upload**: copies the tracklist and opens the Mixcloud upload page in your
+  browser. You paste the tracklist there and pick the WAV file yourself: the app does not sign in
+  to Mixcloud and does not upload anything itself.
+- The last recorded set (date, length, WAV file name, tracks) is kept on this computer until a
+  later recording lists its first track or you press Clear, so a set can be uploaded the next day
+  and a sound check does not erase it. During a recording the list is also saved once a minute.
+
 ## 1.6.0 — 2026-11-12
 
 ### Added

@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from "react";
-import { Circle, Keyboard, LayoutGrid, Layers, Moon, Settings, Square, Sun } from "lucide-react";
+import { Circle, Keyboard, LayoutGrid, Layers, ListMusic, Moon, Settings, Square, Sun } from "lucide-react";
 import { CommandDialog, useCommandPalette, type CommandItemDef } from "@mmo/ui";
 import { useThemePrefs } from "@mmo/ui/theme";
 import { useUiStore } from "@/state/ui-store";
 import { useMixerStore } from "@/state/mixer-store";
 import { useRecordingStore } from "@/state/recording-store";
+import { useSetlogStore } from "@/setlog/setlog-store";
 import { useT } from "@/i18n";
 
 /**
@@ -68,6 +69,16 @@ export function CommandPalette() {
                 keywords: ["rec", "record", "wav", "inregistrare"],
                 disabled: !native,
                 onSelect: () => void toggleRecording(),
+            },
+            {
+                id: "setlog",
+                group: "actions",
+                label: t("setlog.command"),
+                icon: <ListMusic aria-hidden />,
+                keywords: ["tracklist", "mixcloud", "upload", "set", "piese", "incarca"],
+                disabled: !native,
+                // After the palette has closed and handed the focus back: the popover then takes it.
+                onSelect: () => window.setTimeout(() => useSetlogStore.getState().setOpen(true), 0),
             },
             {
                 id: "mode",
