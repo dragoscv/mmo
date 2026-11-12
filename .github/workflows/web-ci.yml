@@ -177,7 +177,7 @@ jobs:
                   exit "$rc"
             - name: Lighthouse CI (starts `pnpm start` itself)
               run: pnpm exec lhci autorun --config=./lighthouserc.cjs
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               if: always()
               with:
                   name: lighthouse-report
@@ -200,7 +200,7 @@ jobs:
               env:
                   PLAYWRIGHT_BASE_URL: http://127.0.0.1:13789
               run: pnpm exec playwright test e2e/a11y.spec.ts --project=w390 --project=w1440
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               if: failure()
               with:
                   name: playwright-a11y-report
@@ -229,7 +229,7 @@ jobs:
             # Report-only until the baseline is triaged (WP13-06); then drop --no-exit-code.
             - name: knip
               run: pnpm dlx knip@6 --reporter compact --no-exit-code | tee knip-report.txt
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: knip-report
                   path: apps/web/knip-report.txt
