@@ -66,6 +66,12 @@ The output callback and everything it calls (`Core`, `Chain`, every `Processor`)
    error marks the stream dead and the control loop exits with the driver message.
 6. **Input is sanitised.** Non-finite input samples are replaced by silence before the chain, so one bad sample
   from a driver cannot poison an envelope follower.
+7. **Flush-to-zero while rendering.** `Core::render` switches the CPU to flush-to-zero for the block
+   (`live_dsp::NoDenormals`: MXCSR FTZ + DAZ on x86-64, FPCR.FZ on AArch64, no-op elsewhere) and restores the
+   previous mode on return, so the host's own code (a driver callback, a phone app) is not affected. Without it,
+   states decaying into digital silence park in the subnormal range and every operation on them runs in
+   microcode: measured with `render` on a file that goes silent, 11–27× the CPU of the same file with −120 dB
+   of noise; with it, the same (0.7–1.0×).
 
 | Ring | Direction | Capacity | Payload |
 |---|---|---|---|

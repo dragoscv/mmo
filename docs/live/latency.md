@@ -93,6 +93,22 @@ driver really runs.
   for bindgen). **Licence**: the ASIO SDK is dual GPLv3 / proprietary Steinberg licence, which is why it is an
   opt-in feature (ADR-0015 §8). A binary built with it may only be redistributed under the Steinberg licence
   agreement or GPLv3 terms; the default build contains no ASIO code.
+  - **Before any ASIO build leaves this PC** (decided 2026-11-12, tracker WP21-27; terms as read on Steinberg's
+    pinned "ASIO SDK Proprietary Licensing FAQ" of 2026-10-21 — the agreement PDF and the ASIO Usage Guidelines
+    are the binding texts and were not read here):
+    1. A closed-source product that talks to ASIO drivers needs the proprietary agreement, hosts included. It is
+      royalty-free (no application, yearly, per-product or per-unit fee) and one agreement covers every product
+      of the licensee.
+    2. The licensee is the legal person or company responsible for the product; an individual may sign in their
+      own name. Send the completed, signed PDF (an electronic signature is accepted) to
+      `sdklicenseagreements@steinberg.de`. Steinberg countersigns and sends it back; they ask not to enquire
+      within the first 30 days.
+    3. Development and internal tests may start at once. **No external distribution, a free beta included, before
+      both sides have signed.**
+    4. The app, its documentation and the product page must carry "ASIO is a registered trademark of Steinberg
+      Media Technologies GmbH" and use the ASIO Compatible logo as the Usage Guidelines say (the artwork is in
+      the SDK package). "ASIO" may not be part of a product or company name.
+    5. The SDK itself is never redistributed; the repository holds no SDK file.
 - ASIO drivers usually expose one device for input and output: pass the same device to `--input` and `--output`
   (no clock drift). With two different devices the engine corrects drift by dropping frames and says so in
   `info.notes`.
@@ -142,11 +158,30 @@ macOS, PipeWire nodes) and Voicemeeter Remote API control are planned (WP21-12).
 
 Voicemeeter adds its own buffering (set its buffering to the interface's ASIO driver for the lowest figure).
 
+**The route below is a stream route, not a monitoring route.** An application that plays into a Voicemeeter
+virtual input (`Voicemeeter Input`, `AUX`, `VAIO3`, `In 1`–`In 5`) goes through the internal buffer of that
+virtual device before it reaches the Voicemeeter mix. VB-Audio recommends 4096–7168 samples for that buffer
+(the range they document for their virtual cable; a figure for Voicemeeter's own inputs was not found),
+which is 85–149 ms at 48 kHz (calculated from that recommendation; not measured on the reference rig).
+Hearing yourself through `engine → Voicemeeter In 5 → A1` therefore carries that delay on top of the
+interface. Use it to feed OBS; monitor another way:
+
+- **Decided 2026-11-12, not built yet (tracker WP21-25):** the engine runs *inside* Voicemeeter's own audio
+  callback on the microphone strip (Voicemeeter Remote API, input insert). The voice then stays in Voicemeeter's
+  main stream: input buffer + A1 buffer, 2 × 256 frames = 10.7 ms at today's Voicemeeter setting, 6.0–6.7 ms
+  if Voicemeeter runs at 144–160 frames (calculated; converter and USB delay come on top). Unproven until
+  measured: that the callback adds no buffer of its own, and that Voicemeeter is stable below 256 frames on
+  a class-compliant interface.
+- **`WASAPI Exclusive` on the interface** (built): no Voicemeeter in the voice path, but Voicemeeter must give
+  up the interface, and a copy for the stream needs a second output device (planned, after the insert).
+
+The stream route:
+
 1. Engine `--input` = the interface (or `Voicemeeter Out Bx` if Voicemeeter already owns the mic).
 2. Engine `--output` = a Voicemeeter virtual input strip, e.g. `Voicemeeter In 5` (2 channels: main only — the
    monitor bus needs a device with ≥ 4 channels).
-3. In Voicemeeter route that strip to **A1** (your headphones/interface) for monitoring and **B1** for OBS;
-   in OBS add an audio input capture of `Voicemeeter Out B1`.
+3. In Voicemeeter route that strip to **B1** for OBS (add an audio input capture of `Voicemeeter Out B1`);
+   do not use A1 of this strip as your monitor, see above.
 4. Measure the path with the Voicemeeter loopback above. The devices list marks Voicemeeter endpoints with
    `"voicemeeter": true` and virtual cables with `"virtual_cable": true`.
 

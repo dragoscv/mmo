@@ -1,6 +1,10 @@
 //! Pitch detection (YIN), granular pitch shifting with WSOLA anchoring and LPC formant
-//! preservation, plus the scale logic. Rust port of `server/src/audio/pitch-dsp.ts`
-//! (same algorithm, same latency budget: ~2.7 ms detection + ~2.7 ms grain group delay).
+//! preservation, plus the scale logic. Started as a Rust port of
+//! `server/src/audio/pitch-dsp.ts` and has since diverged: the detector analyses the newest
+//! samples and a restarting grain is anchored to the other head's next position (the
+//! TypeScript original and the browser worklet still have both defects). Latency in the signal
+//! path: one grain, [`GRAIN`] samples (5.3 ms at 48 kHz) nominal, the read lag grows with ratios
+//! above 1; the detector runs beside it as control.
 
 use core::f32::consts::PI;
 
@@ -129,9 +133,13 @@ impl Yin {
         d[0] = 1.0;
         let mut running = 0.0f32;
         for tau in 1..=max_tau {
+            // Compare the NEWEST `win` samples with the ones `tau` earlier. Starting at index 0
+            // analysed the oldest part of the history: at A4 the last 12 ms were ignored and a
+            // moving pitch was reported ~17 ms late.
+            let base = YIN_WINDOW - win - tau;
             let mut s = 0.0f32;
             for i in 0..win {
-                let x = sig[i] - sig[i + tau];
+                let x = sig[base + i] - sig[base + i + tau];
                 s += x * x;
             }
             running += s;
@@ -676,7 +684,12 @@ impl Shifter {
                 let lag = GRAIN as f32 * nr.max(1.0);
                 let nominal = self.w as f32 - lag;
                 let o = (k + 1) % HEADS;
-                let anchored = self.wsola(nominal, self.read[o], self.ratio[o], nr);
+                // Align with where the other head will be when both play their next sample: a
+                // head later in this loop has not advanced yet. Without this, head 0 slipped one
+                // sample per grain against head 1: a 220 Hz tone came out 6.8 cents flat (a
+                // 110 Hz tone was not affected).
+                let other = self.read[o] + if o > k { self.ratio[o] } else { 0.0 };
+                let anchored = self.wsola(nominal, other, self.ratio[o], nr);
                 self.read[k] = anchored.rem_euclid(BUF as f32);
             } else if self.read[k] >= BUF as f32 {
                 self.read[k] -= BUF as f32;
@@ -737,6 +750,100 @@ impl Shifter {
 mod tests {
     use super::*;
     use crate::test_util::{rms, sine, voice};
+
+    /// Frequency of a clean tone from its rising zero crossings (linear interpolation).
+    fn zero_cross_freq(x: &[f32], sr: f32) -> f32 {
+        let (mut first, mut last, mut n) = (None, 0.0f64, 0u32);
+        for i in 1..x.len() {
+            if x[i - 1] < 0.0 && x[i] >= 0.0 {
+                let t = (i - 1) as f64 + f64::from(-x[i - 1]) / f64::from(x[i] - x[i - 1]);
+                first.get_or_insert(t);
+                last = t;
+                n += 1;
+            }
+        }
+        (f64::from(n - 1) * f64::from(sr) / (last - first.unwrap())) as f32
+    }
+
+    /// Output pitch error of the shifter on a pure tone, in cents against `f0 × ratio`.
+    fn shifter_cents(f0: f32, ratio: f32) -> f32 {
+        let x = sine(f0, 48000.0, 4 * 48000, 0.5);
+        let mut s = Shifter::new(false);
+        s.set_ratio(ratio);
+        let y: Vec<f32> = x.iter().map(|v| s.tick(*v)).collect();
+        let f = zero_cross_freq(&y[48000..], 48000.0);
+        1200.0 * (f / (f0 * ratio)).log2()
+    }
+
+    /// With nothing to correct (ratio 1) the tone must come out at its own pitch. It used to come
+    /// out 6.8 cents flat (measured at 220 Hz; a 110 Hz tone was not affected): head 0 anchored
+    /// its new grain to head 1's pointer before head 1 advanced, one sample of slip per grain.
+    #[test]
+    fn shifter_at_ratio_one_keeps_the_pitch() {
+        for f0 in [110.0f32, 220.0, 440.0, 880.0] {
+            let cents = shifter_cents(f0, 1.0);
+            assert!(cents.abs() < 0.5, "f0 {f0}: {cents:+.2} cents");
+        }
+    }
+
+    /// How close the output is to `f0 × ratio` once the period fits in a grain (220 Hz and up).
+    /// The bound is what was measured on 2026-11-12, not a goal: up to 5.1 cents off (330 Hz at
+    /// ratio 0.8). Probable cause, not isolated: every grain restart snaps to the waveform of
+    /// the other head.
+    #[test]
+    fn shifter_output_pitch_stays_within_six_cents_from_220_hz_up() {
+        let mut worst = (0.0f32, 0.0f32, 0.0f32);
+        for f0 in [220.0f32, 330.0, 440.0, 880.0] {
+            for ratio in [0.8f32, 0.9, 0.94, 0.98, 0.99, 1.01, 1.02, 1.06, 1.12, 1.25] {
+                let cents = shifter_cents(f0, ratio);
+                if cents.abs() > worst.2.abs() {
+                    worst = (f0, ratio, cents);
+                }
+            }
+        }
+        assert!(worst.2.abs() < 6.0, "worst: {worst:?} (f0, ratio, cents)");
+    }
+
+    /// KNOWN DEFECT, measured 2026-11-12 on pure tones: at 110 Hz small corrections are lost.
+    /// A ratio of 0.99 or 1.01 comes out at the INPUT pitch (17 cents off = the whole
+    /// correction). At 0.98 / 1.02 two estimators disagree (zero crossings, used here: the whole
+    /// 35 cents lost; spectral peak: 8–16 cents off), so the output is not a clean tone. Larger
+    /// corrections are off too (0.94: +107 cents by zero crossings, +6 by spectral peak; 1.06:
+    /// +10). At 220 Hz and above the error stays under 6 cents.
+    /// Probable cause, not isolated: the period (436 samples) is longer than a grain
+    /// (256), which is the case below 187.5 Hz, the range of a male voice. Not measured between
+    /// 110 and 220 Hz, nor on a real voice. The period-synchronous shifter (tracker WP21-26) has
+    /// to make this test pass; remove the `ignore` then.
+    #[test]
+    #[ignore = "known defect: grains shorter than the period lose small corrections (WP21-26)"]
+    fn shifter_applies_small_corrections_at_110_hz() {
+        for ratio in [0.98f32, 0.99, 1.01, 1.02] {
+            let cents = shifter_cents(110.0, ratio);
+            assert!(cents.abs() < 3.0, "110 Hz ratio {ratio}: {cents:+.2} cents");
+        }
+    }
+
+    /// The detector must report the pitch of the newest samples. On a glide of one octave per
+    /// second it used to answer for the sound of ~17 ms earlier (20 cents behind), because it
+    /// analysed the oldest part of its history.
+    #[test]
+    fn yin_follows_a_glide_with_little_lag() {
+        let sr = 48000.0f32;
+        let mut y = Yin::new(sr);
+        let (mut phase, mut f) = (0.0f32, 0.0f32);
+        for i in 0..24000 {
+            f = 400.0 * 2f32.powf(i as f32 / sr); // one octave per second
+            phase += core::f32::consts::TAU * f / sr;
+            y.push(0.5 * phase.sin());
+        }
+        let p = y.detect();
+        let cents = 1200.0 * (p.frequency / f).log2();
+        assert!(
+            (-9.0..3.0).contains(&cents),
+            "{cents:+.1} cents against the newest sample ({:.1} Hz detected, {f:.1} Hz now)",
+            p.frequency
+        );
+    }
 
     #[test]
     fn yin_detects_a4() {

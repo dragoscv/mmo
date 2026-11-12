@@ -313,6 +313,9 @@ impl Core {
     /// Process one block. `input_l/r` hold the input (mono sources pass the same slice twice
     /// via copy before calling). Every slice has the same length `<= max_block`.
     pub fn render(&mut self, input_l: &[f32], input_r: &[f32], out: Buses<'_>) {
+        // Flush-to-zero for the whole block (restored on return): states decaying into silence
+        // must reach zero instead of parking in the subnormal range.
+        let _flush = live_dsp::NoDenormals::enter();
         let n = input_l.len().min(self.max_block);
         let [wl, wr, dl, dr] = &mut self.scratch;
         let (wl, wr, dl, dr) = (&mut wl[..n], &mut wr[..n], &mut dl[..n], &mut dr[..n]);
@@ -657,6 +660,52 @@ mod tests {
         assert!(steepest <= limit, "rise per sample {steepest} > {limit}");
         let end = *out.last().unwrap() / 0.1;
         assert!((end - 2.512).abs() < 1e-2, "{end}");
+    }
+
+    /// When the input stops, filter and reverb states decay towards zero. Without flush-to-zero
+    /// they park in the subnormal range and every later operation on them runs in microcode
+    /// (measured: silence cost 11–27× more CPU than a dithered file). No bus may carry a
+    /// subnormal sample.
+    ///
+    /// The tail does not have to be exactly zero: measured on Speech / MC it settles at 1e-37
+    /// (the same value after 30 s and after 40 s). That is a normal float, so it costs nothing,
+    /// and it is what flush-to-zero does to a one-pole state: once its update is smaller than
+    /// the smallest normal float the update flushes to zero and the state stops moving
+    /// (`live_dsp::denormal` has the arithmetic as a test).
+    #[test]
+    fn silence_after_a_signal_leaves_no_subnormals() {
+        if !cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
+            return; // the guard is a no-op elsewhere (see live_dsp::denormal)
+        }
+        // (preset, the tail must be below 1e-30 = −600 dBFS at the end). The 4 s hall is still
+        // ringing after 30 s, so only "no subnormals" is asked of it.
+        // Every preset is judged before the test fails, so one red run shows all of them.
+        let mut problems = Vec::new();
+        for (preset, quiet_tail) in [("Ballad Hall", false), ("Speech / MC", true)] {
+            let mut core = Core::new(48000.0, 128);
+            let p = factory()
+                .into_iter()
+                .find(|p| p.name == preset)
+                .unwrap()
+                .build(48000.0, 128, 1)
+                .unwrap();
+            core.apply(Command::SwapChain { chain: p.chain }, &mut |_g| {});
+            let mut input = sine(220.0, 24000);
+            input.extend(core::iter::repeat_n(0.0f32, 30 * 48000));
+            let (main, mon) = render_all(&mut core, &input, 128);
+            let subnormal = main.iter().chain(&mon).filter(|v| v.is_subnormal()).count();
+            if subnormal > 0 {
+                problems.push(format!("{preset}: {subnormal} subnormal output samples"));
+            }
+            if quiet_tail {
+                let tail = &main[main.len() - 4800..];
+                let worst = tail.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+                if worst >= 1e-30 {
+                    problems.push(format!("{preset}: tail at {worst:e} after 30 s"));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{problems:?}");
     }
 
     /// One non-finite input sample is dropped: it reaches no bus and the chain keeps working.

@@ -10,6 +10,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — safe and correct, part 2 (WP21-18, 2026-11-12)
+
+Engine 0.1.0 (unreleased). Three more defects from the reality check, each with a test that failed before the
+fix. Measured on synthetic signals and offline renders only.
+
+- **Silence no longer costs CPU.** When the input went to exact digital silence (a muted channel, the gap
+  between songs, the ring-out of the previous scene), filter states fell into the subnormal float range and
+  processing got 11–27× slower: Speech/MC rendered at 3× realtime instead of 93×. The engine now runs each
+  block in flush-to-zero mode (x86-64 and ARM64) and puts the CPU mode back afterwards. After: 181× on the
+  same file, no slower than with noise.
+- **Pitch shifter was 6.8 cents flat.** A tone that passed through pitch correction or the harmonizer came out
+  about 7 cents low, even with no correction to do (one sample of slip per 256-sample grain; measured at 220 Hz,
+  a 110 Hz tone was not affected). With nothing to correct the pitch is now kept exactly
+  (110–880 Hz); with a correction, pure tones at 220–880 Hz come out within 5.1 cents of the target (ratios
+  0.8–1.25).
+- **Found while checking that, not fixed: small corrections are lost on low notes.** On a 110 Hz tone a
+  correction of ±17 cents comes out at the input pitch; at ±35 cents two estimators disagree (zero crossings:
+  the whole correction lost; spectral peak: 8–16 cents off), so the output is not a clean tone; larger
+  corrections are off too (ratio 0.94: +107 or +6 cents by estimator; 1.06: +10). Probable cause, not
+  isolated: the period is longer than the 256-sample grain (below 187.5 Hz, the range of a male voice). Not
+  measured between 110 and 220 Hz or on a real voice. An ignored test records it; the period-synchronous
+  shifter (tracker WP21-26) has to make it pass.
+- **Pitch detector looked at old audio.** It analysed the oldest part of its history, so a moving pitch was
+  reported about 17 ms late (20 cents behind on a glide of one octave per second). It now analyses the newest
+  samples; the test on the same glide allows 9 cents.
+- Not changed, still open: preset levels differ by several dB, the dry monitor tap is not delayed to match the
+  pitch effects, and with formant preservation on the start of some phrases is not formant-preserved. The two
+  pitch defects above are also in the older TypeScript copies of this code (the Companion's `pitch-dsp.ts` and
+  the browser worklet `pitch-shifter-processor.js`), read but not fixed or measured there. Flush-to-zero is
+  not available on 32-bit ARM and 32-bit x86 builds (the Android library is built for arm64 and x86-64).
+
 ## MixAI Live — safe and correct, part 1 (WP21-18, 2026-11-12)
 
 Engine 0.1.0 (unreleased), web 3.5.1 (metadata text only). First slice of the fixes after the 2026-11-11 reality

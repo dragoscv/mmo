@@ -13,6 +13,7 @@ pub mod chain;
 pub mod color;
 pub mod delay;
 pub mod delay_line;
+pub mod denormal;
 pub mod dynamics;
 pub mod eq;
 pub mod modulation;
@@ -23,6 +24,7 @@ pub mod reverb;
 pub mod tune;
 
 pub use chain::{Chain, FxKind, Insert};
+pub use denormal::NoDenormals;
 pub use param::{Curve, ParamSpec, Smoothed, Unit, db_to_lin, lin_to_db};
 pub use pitch::{PitchInfo, Scale};
 pub use processor::Processor;
