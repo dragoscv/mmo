@@ -50,7 +50,7 @@ struct MetersView: View {
     }
 }
 
-/// Tuner: note name (correction target when autotune is active), needle -50…+50 cents, frequency.
+/// Tuner: note name (correction target when pitch correction is active), needle -50…+50 cents, frequency.
 struct TunerView: View {
     let tune: Tune
 

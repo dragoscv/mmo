@@ -1,4 +1,4 @@
-//! Pitch correction (natural → hard "T-Pain"), harmonizer (diatonic / chromatic / MIDI) and tuner.
+//! Pitch correction (natural → hard robotic snap), harmonizer (diatonic / chromatic / MIDI) and tuner.
 
 use crate::param::{ParamSpec, Smoothed, Unit, one_pole_coef, pan_gains};
 use crate::pitch::{KEY_NAMES, PitchInfo, SCALE_NAMES, Scale, Shifter, Yin};
@@ -13,11 +13,15 @@ const SILENCE_HOLD_MS: f32 = 200.0;
 
 const TUNE_SPECS: &[ParamSpec] = &[
     ParamSpec::choice("key", KEY_NAMES, 0),
-    ParamSpec::choice("scale", SCALE_NAMES, 1),
+    // Chromatic by default: with a key nobody set, "C major" pulls a singer in another key to
+    // wrong notes. The song key (setlist) or the user picks the scale.
+    ParamSpec::choice("scale", SCALE_NAMES, 0),
     ParamSpec::new("amount", 0.0, 1.0, 1.0, Unit::Percent),
     ParamSpec::log("retune", 0.5, 400.0, 40.0, Unit::Ms),
     ParamSpec::new("humanize", 0.0, 1.0, 0.3, Unit::Percent),
-    ParamSpec::toggle("formant", true),
+    // Off by default: correction moves the pitch by less than a semitone, where formants barely
+    // shift, and without the formant filter the output cannot exceed the input level.
+    ParamSpec::toggle("formant", false),
     ParamSpec::new("mix", 0.0, 1.0, 1.0, Unit::Percent),
     ParamSpec::new("transpose", -12.0, 12.0, 0.0, Unit::Semitones),
     ParamSpec::new("sticky", 0.0, 100.0, 60.0, Unit::Cents),
@@ -56,7 +60,7 @@ impl Autotune {
             sr: sample_rate,
             v,
             yin: Yin::new(sample_rate),
-            shifter: Shifter::new(true),
+            shifter: Shifter::new(v[5] > 0.5),
             scale: Scale::new(v[0] as usize, v[1] as usize),
             stable: None,
             semis: 0.0,
@@ -75,6 +79,11 @@ impl Autotune {
 
     pub fn status(&self) -> TuneStatus {
         self.status
+    }
+
+    /// Times the formant guard fell back since the last reset (0 when formant is off).
+    pub fn guard_trips(&self) -> u32 {
+        self.shifter.guard_trips()
     }
 
     fn control(&mut self) {
@@ -183,6 +192,7 @@ const HARMONY_MODES: &[&str] = &["diatonic", "chromatic", "midi"];
 /// 1 key + 1 scale + 1 mode + 1 dry + 1 formant, then per voice: interval, level, pan, note.
 const HARM_SPECS: &[ParamSpec] = &[
     ParamSpec::choice("key", KEY_NAMES, 0),
+    // Stays major: diatonic harmonies need a real scale (a "third" in chromatic is 2 semitones).
     ParamSpec::choice("scale", SCALE_NAMES, 1),
     ParamSpec::choice("mode", HARMONY_MODES, 0),
     ParamSpec::new("dry", 0.0, 1.0, 1.0, Unit::Percent),
@@ -426,7 +436,7 @@ impl Processor for Tuner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::sine;
+    use crate::test_util::{rms, sine, voice};
 
     fn detect(buf: &[f32]) -> f32 {
         let mut y = Yin::new(48000.0);
@@ -439,6 +449,7 @@ mod tests {
     #[test]
     fn autotune_snaps_flat_note_to_scale() {
         let mut t = Autotune::new(48000.0);
+        t.set_param(1, 1.0); // C major
         t.set_param(3, 0.5); // hard retune
         t.set_param(4, 0.0);
         // A4 30 cents flat (in C major, target A4 = 440).
@@ -449,6 +460,44 @@ mod tests {
         let got = detect(&l);
         assert!((got - 440.0).abs() < 3.0, "got {got}");
         assert_eq!(t.status().target, 69);
+    }
+
+    #[test]
+    fn autotune_defaults_are_chromatic_without_formant() {
+        let t = Autotune::new(48000.0);
+        assert_eq!(t.param(1), 0.0, "scale must default to chromatic");
+        assert_eq!(t.param(5), 0.0, "formant must default to off");
+    }
+
+    /// Hard correction of a voice-like signal with vibrato: never much louder than the input,
+    /// with formant off (default) and on. This is the case that used to sit on the limiter.
+    #[test]
+    fn autotune_keeps_the_voice_level() {
+        for formant in [0.0f32, 1.0] {
+            for f0 in [220.0, 440.0, 523.25] {
+                let mut t = Autotune::new(48000.0);
+                t.set_param(3, 0.5); // hard retune
+                t.set_param(4, 0.0); // no humanize
+                t.set_param(5, formant);
+                let x = voice(f0, 40.0, 48000.0, 3 * 48000, 0.25);
+                let (mut l, mut r) = (x.clone(), x.clone());
+                t.process(&mut l, &mut r);
+                assert!(l.iter().all(|v| v.is_finite()));
+                for (k, (wi, wo)) in x[24000..]
+                    .chunks(4800)
+                    .zip(l[24000..].chunks(4800))
+                    .enumerate()
+                {
+                    let gain_db = 20.0 * (rms(wo) / rms(wi).max(1e-9)).log10();
+                    assert!(
+                        gain_db < 6.0,
+                        "formant {formant} f0 {f0} window {k}: {gain_db:.1} dB over the input"
+                    );
+                }
+                let peak = l[24000..].iter().fold(0.0f32, |m, v| m.max(v.abs()));
+                assert!(peak < 0.7, "formant {formant} f0 {f0}: peak {peak}");
+            }
+        }
     }
 
     #[test]

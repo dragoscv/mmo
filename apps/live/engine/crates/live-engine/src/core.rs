@@ -54,6 +54,48 @@ pub enum Garbage {
 
 pub const METER_SLOTS: usize = MAX_INSERTS;
 
+/// Ceiling of the safety stage: −1 dBFS. No bus ever carries a sample above it.
+pub const SAFETY_CEILING: f32 = 0.891_250_9;
+/// Faders ramp down in 10 ms but up in 300 ms: a wrong "+12 dB" from a remote never arrives as
+/// a slap.
+const GAIN_DOWN_MS: f32 = 10.0;
+const GAIN_UP_MS: f32 = 300.0;
+
+/// Last stage of a bus, after the faders. It is not an insert: no control can remove, disable or
+/// reorder it, and bypass, the dry monitor and the latency click all pass through it.
+/// Zero latency (in-ear monitoring): stereo-linked, instant attack, 120 ms release, then an
+/// exact clamp at [`SAFETY_CEILING`]. Non-finite samples become silence.
+struct Safety {
+    gain: f32,
+    release: f32,
+}
+
+impl Safety {
+    fn new(sample_rate: f32) -> Self {
+        Self {
+            gain: 1.0,
+            release: 1.0 - (-1.0 / (0.120 * sample_rate)).exp(),
+        }
+    }
+
+    #[inline]
+    fn tick(&mut self, l: f32, r: f32) -> (f32, f32) {
+        if !(l.is_finite() && r.is_finite()) {
+            return (0.0, 0.0);
+        }
+        let pk = l.abs().max(r.abs());
+        if pk * self.gain > SAFETY_CEILING {
+            self.gain = SAFETY_CEILING / pk;
+        } else {
+            self.gain += self.release * (1.0 - self.gain);
+        }
+        (
+            (l * self.gain).clamp(-SAFETY_CEILING, SAFETY_CEILING),
+            (r * self.gain).clamp(-SAFETY_CEILING, SAFETY_CEILING),
+        )
+    }
+}
+
 /// Telemetry snapshot published ~30 times per second.
 #[derive(Clone, Copy, Debug)]
 pub struct Meters {
@@ -69,7 +111,11 @@ pub struct Meters {
     pub dsp_load: f32,
     pub dsp_load_max: f32,
     pub xruns: u32,
+    /// The safety stage had to pull a bus down since the last snapshot (the signal after the
+    /// faders was above [`SAFETY_CEILING`]).
     pub clipped: bool,
+    /// Deepest gain reduction of the safety stage since the last snapshot, dB ≥ 0: main, monitor.
+    pub safety_gr: [f32; 2],
     pub latency_probe: ProbeState,
     pub chain_latency_samples: u32,
 }
@@ -96,6 +142,7 @@ impl Default for Meters {
             dsp_load_max: 0.0,
             xruns: 0,
             clipped: false,
+            safety_gr: [0.0; 2],
             latency_probe: ProbeState::Idle,
             chain_latency_samples: 0,
         }
@@ -124,6 +171,9 @@ pub struct Core {
     mon_dry: Smoothed,
     bypass: Smoothed,
     mute: Smoothed,
+    /// Main, monitor.
+    safety: [Safety; 2],
+    gain_ramp: [u32; 2],
     probe: LatencyProbe,
     probe_out: Vec<f32>,
     // meter accumulation
@@ -131,6 +181,7 @@ pub struct Core {
     acc_in_sq: f64,
     acc_out_peak: [f32; 2],
     acc_out_sq: [f64; 2],
+    acc_safety_min: [f32; 2],
     acc_n: usize,
     publish_every: usize,
     clipped: bool,
@@ -156,12 +207,18 @@ impl Core {
             mon_dry: ramp(0.0),
             bypass: ramp(0.0),
             mute: ramp(1.0),
+            safety: [Safety::new(sample_rate), Safety::new(sample_rate)],
+            gain_ramp: [
+                (GAIN_DOWN_MS * 0.001 * sample_rate) as u32,
+                (GAIN_UP_MS * 0.001 * sample_rate) as u32,
+            ],
             probe: LatencyProbe::new(sample_rate),
             probe_out: vec![0.0; max_block],
             acc_in_peak: 0.0,
             acc_in_sq: 0.0,
             acc_out_peak: [0.0; 2],
             acc_out_sq: [0.0; 2],
+            acc_safety_min: [1.0; 2],
             acc_n: 0,
             publish_every: (sample_rate / 30.0) as usize,
             clipped: false,
@@ -185,6 +242,14 @@ impl Core {
 
     /// Apply one command. `garbage` receives boxes that must be freed off the audio thread.
     pub fn apply(&mut self, cmd: Command, garbage: &mut impl FnMut(Garbage)) {
+        let [down, up] = self.gain_ramp;
+        let fade = |s: &mut Smoothed, db: f32| {
+            let target = db_to_lin(db);
+            // Against the value the gain has NOW: a fader that overshoots and settles is
+            // retargeted in the middle of a rise, and that rise must stay slow.
+            s.set_ramp(if target > s.value() { up } else { down });
+            s.set(target);
+        };
         match cmd {
             Command::SetParam {
                 insert,
@@ -229,9 +294,9 @@ impl Core {
                     garbage(Garbage::Chain(old));
                 }
             }
-            Command::InputGain(db) => self.in_gain.set(db_to_lin(db)),
-            Command::MainGain(db) => self.main_gain.set(db_to_lin(db)),
-            Command::MonitorGain(db) => self.mon_gain.set(db_to_lin(db)),
+            Command::InputGain(db) => fade(&mut self.in_gain, db),
+            Command::MainGain(db) => fade(&mut self.main_gain, db),
+            Command::MonitorGain(db) => fade(&mut self.mon_gain, db),
             Command::MonitorDry(x) => self.mon_dry.set(x.clamp(0.0, 1.0)),
             Command::Bypass(on) => self.bypass.set(if on { 1.0 } else { 0.0 }),
             Command::Mute(on) => self.mute.set(if on { 0.0 } else { 1.0 }),
@@ -254,7 +319,9 @@ impl Core {
         let probing = self.probe.phase() == Phase::Running;
         for i in 0..n {
             let g = self.in_gain.next();
-            let (a, b) = (input_l[i] * g, input_r[i] * g);
+            // One NaN from a driver would otherwise poison every envelope follower downstream.
+            let clean = |x: f32| if x.is_finite() { x } else { 0.0 };
+            let (a, b) = (clean(input_l[i]) * g, clean(input_r[i]) * g);
             let pk = a.abs().max(b.abs());
             if probing {
                 self.probe_out[i] = self.probe.tick(pk);
@@ -295,16 +362,19 @@ impl Core {
             let md = self.mon_dry.next();
             let mo = self.mon_gain.next() * mute;
             let probe = if probing { self.probe_out[i] } else { 0.0 };
-            let ml = (pl * mg + probe).clamp(-1.0, 1.0);
-            let mr = (pr * mg + probe).clamp(-1.0, 1.0);
+            let (ml, mr) = self.safety[0].tick(pl * mg + probe, pr * mg + probe);
+            let (ol, or) = self.safety[1].tick(
+                (pl + md * (dl[i] - pl)) * mo + probe,
+                (pr + md * (dr[i] - pr)) * mo + probe,
+            );
             out.main_l[i] = ml;
             out.main_r[i] = mr;
-            out.mon_l[i] = ((pl + md * (dl[i] - pl)) * mo + probe).clamp(-1.0, 1.0);
-            out.mon_r[i] = ((pr + md * (dr[i] - pr)) * mo + probe).clamp(-1.0, 1.0);
-            let (al, ar) = (ml.abs(), mr.abs());
-            if al >= 1.0 || ar >= 1.0 {
-                self.clipped = true;
+            out.mon_l[i] = ol;
+            out.mon_r[i] = or;
+            for (acc, s) in self.acc_safety_min.iter_mut().zip(&self.safety) {
+                *acc = acc.min(s.gain);
             }
+            let (al, ar) = (ml.abs(), mr.abs());
             self.acc_out_peak[0] = self.acc_out_peak[0].max(al);
             self.acc_out_peak[1] = self.acc_out_peak[1].max(ar);
             self.acc_out_sq[0] += (ml * ml) as f64;
@@ -332,6 +402,9 @@ impl Core {
             return None;
         }
         let n = self.acc_n.max(1) as f64;
+        // 0.1 dB of reduction counts as "the safety stage is working".
+        let gr = self.acc_safety_min.map(|g| -20.0 * g.max(1e-6).log10());
+        self.clipped = gr.iter().any(|d| *d > 0.1);
         let mut m = Meters {
             in_peak: self.acc_in_peak,
             in_rms: (self.acc_in_sq / n).sqrt() as f32,
@@ -345,6 +418,7 @@ impl Core {
             dsp_load_max: self.dsp_load_max,
             xruns: self.xruns,
             clipped: self.clipped,
+            safety_gr: gr,
             chain_latency_samples: self.chain.latency() as u32,
             latency_probe: match self.probe.phase() {
                 Phase::Idle => ProbeState::Idle,
@@ -368,6 +442,7 @@ impl Core {
         self.acc_in_sq = 0.0;
         self.acc_out_peak = [0.0; 2];
         self.acc_out_sq = [0.0; 2];
+        self.acc_safety_min = [1.0; 2];
         self.acc_n = 0;
         self.clipped = false;
         self.dsp_load_max = 0.0;
@@ -471,6 +546,148 @@ mod tests {
         }
         // 1600-sample interval rounded up to whole 128-frame blocks = 1664 → 28.8 Hz.
         assert!((28..=31).contains(&published), "{published}");
+    }
+
+    fn render_all(core: &mut Core, input: &[f32], block: usize) -> (Vec<f32>, Vec<f32>) {
+        let (mut main, mut mon) = (Vec::new(), Vec::new());
+        for blk in input.chunks(block) {
+            let (a, b) = render_block(core, blk);
+            main.extend(a);
+            mon.extend(b);
+        }
+        (main, mon)
+    }
+
+    /// Every fader at +12 dB on a full-scale input, processed and bypassed, with and without a
+    /// chain: neither bus may ever exceed the ceiling, and the meters must say the stage worked.
+    #[test]
+    fn no_bus_exceeds_the_safety_ceiling() {
+        let hot: Vec<f32> = (0..48000)
+            .map(|i| (core::f32::consts::TAU * 220.0 * i as f32 / 48000.0).sin())
+            .collect();
+        for with_chain in [false, true] {
+            for bypass in [false, true] {
+                let mut core = Core::new(48000.0, 128);
+                let mut g = |_g: Garbage| {};
+                if with_chain {
+                    let p = factory()[0].build(48000.0, 128, 1).unwrap();
+                    core.apply(Command::SwapChain { chain: p.chain }, &mut g);
+                }
+                core.apply(Command::InputGain(12.0), &mut g);
+                core.apply(Command::MainGain(12.0), &mut g);
+                core.apply(Command::MonitorGain(12.0), &mut g);
+                core.apply(Command::MonitorDry(0.5), &mut g);
+                core.apply(Command::Bypass(bypass), &mut g);
+                let mut worst = [0.0f32; 2];
+                let mut engaged = false;
+                for blk in hot.chunks(128) {
+                    let (main, mon) = render_block(&mut core, blk);
+                    worst[0] = main.iter().fold(worst[0], |m, v| m.max(v.abs()));
+                    worst[1] = mon.iter().fold(worst[1], |m, v| m.max(v.abs()));
+                    if let Some(m) = core.meters_due() {
+                        engaged |= m.clipped && m.safety_gr.iter().any(|d| *d > 1.0);
+                    }
+                }
+                assert!(
+                    worst.iter().all(|w| *w <= SAFETY_CEILING),
+                    "chain {with_chain} bypass {bypass}: peaks {worst:?}"
+                );
+                assert!(engaged, "chain {with_chain} bypass {bypass}: no reduction");
+            }
+        }
+    }
+
+    #[test]
+    fn safety_stage_is_transparent_below_the_ceiling() {
+        let mut core = Core::new(48000.0, 128);
+        let input = sine(330.0, 4800); // 0.3 peak, no chain
+        let (main, mon) = render_all(&mut core, &input, 128);
+        for ((a, b), x) in main.iter().zip(&mon).zip(&input) {
+            assert!((a - x).abs() < 1e-6 && (b - x).abs() < 1e-6);
+        }
+        let m = core.meters_due().unwrap();
+        assert!(!m.clipped && m.safety_gr == [0.0, 0.0], "{m:?}");
+    }
+
+    /// A fader moved up takes ~300 ms to arrive; moved down, 10 ms.
+    #[test]
+    fn faders_rise_slowly_and_fall_fast() {
+        let mut core = Core::new(48000.0, 128);
+        let mut g = |_g: Garbage| {};
+        let dc = vec![0.1f32; 128];
+        core.apply(Command::MainGain(12.0), &mut g);
+        let first = render_block(&mut core, &dc).0;
+        // 128 samples into a 14 400-sample ramp from 1.0 to 3.98: about +0.03 of gain.
+        assert!(first[127] < 0.1 * 1.05, "rose too fast: {}", first[127]);
+        for _ in 0..120 {
+            render_block(&mut core, &dc);
+        }
+        let top = render_block(&mut core, &dc).0[127];
+        assert!((top - 0.1 * 3.981).abs() < 1e-3, "{top}");
+        core.apply(Command::MainGain(-60.0), &mut g);
+        for _ in 0..4 {
+            render_block(&mut core, &dc);
+        }
+        let low = render_block(&mut core, &dc).0[127];
+        assert!(low < 0.1 * 0.002, "fell too slowly: {low}");
+    }
+
+    /// A fader that overshoots and settles (+12 dB, then +8 dB 100 ms later) is retargeted while
+    /// the gain is still below the new target: the rest of the rise must stay slow. Comparing
+    /// with the previous target instead of the current value finished it in 10 ms.
+    #[test]
+    fn a_retargeted_rise_stays_slow() {
+        let mut core = Core::new(48000.0, 128);
+        let mut g = |_g: Garbage| {};
+        let dc = vec![0.1f32; 128];
+        core.apply(Command::MainGain(12.0), &mut g);
+        let mut out = Vec::new();
+        for _ in 0..38 {
+            out.extend(render_block(&mut core, &dc).0); // ~101 ms: gain about 2.0 of 3.98
+        }
+        let at_retarget = *out.last().unwrap() / 0.1;
+        assert!(at_retarget > 1.5 && at_retarget < 2.4, "{at_retarget}");
+        core.apply(Command::MainGain(8.0), &mut g); // 2.51: still above the current gain
+        for _ in 0..120 {
+            out.extend(render_block(&mut core, &dc).0);
+        }
+        // Fastest rise allowed anywhere: the whole 0 → +12 dB move spread over 300 ms.
+        let limit = 0.1 * (3.982 - 1.0) / (0.3 * 48000.0) * 1.05;
+        let steepest = out.windows(2).map(|w| w[1] - w[0]).fold(0.0f32, f32::max);
+        assert!(steepest <= limit, "rise per sample {steepest} > {limit}");
+        let end = *out.last().unwrap() / 0.1;
+        assert!((end - 2.512).abs() < 1e-2, "{end}");
+    }
+
+    /// One non-finite input sample is dropped: it reaches no bus and the chain keeps working.
+    #[test]
+    fn non_finite_input_is_dropped_and_the_chain_recovers() {
+        for preset in ["Natural Vocal", "Rock Grit", "Speech / MC"] {
+            let build = || {
+                let mut core = Core::new(48000.0, 128);
+                let p = factory()
+                    .into_iter()
+                    .find(|p| p.name == preset)
+                    .unwrap()
+                    .build(48000.0, 128, 1)
+                    .unwrap();
+                core.apply(Command::SwapChain { chain: p.chain }, &mut |_g| {});
+                core
+            };
+            let clean = sine(220.0, 96000);
+            let mut dirty = clean.clone();
+            dirty[48000] = f32::NAN;
+            dirty[48001] = f32::INFINITY;
+            let (want, _) = render_all(&mut build(), &clean, 128);
+            let (got, mon) = render_all(&mut build(), &dirty, 128);
+            assert!(got.iter().chain(&mon).all(|v| v.is_finite()), "{preset}");
+            let rms = |x: &[f32]| (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();
+            let (a, b) = (rms(&want[72000..]), rms(&got[72000..]));
+            assert!(
+                (20.0 * (b / a).log10()).abs() < 0.5,
+                "{preset}: level after the bad sample {b} vs {a}"
+            );
+        }
     }
 
     #[test]

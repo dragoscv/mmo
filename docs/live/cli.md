@@ -140,15 +140,16 @@ rate. `--block` (default 128, clamped 16–4096) is the processing block. Prints
 ## serve
 
 ```text
-mixai-live-engine serve [device options] [--preset <name>] [--lan] [--port <n>] [--name <text>] [--seconds <n>]
-                        [--data-dir <dir>] [--no-store] [--no-midi]
+mixai-live-engine serve [device options] [--preset <name>] [--lan] [--osc] [--port <n>] [--name <text>]
+                        [--seconds <n>] [--data-dir <dir>] [--no-store] [--no-midi]
 ```
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--preset` | `Natural Vocal` | preset loaded at start |
 | `--lan` | off | bind `0.0.0.0` (instead of `127.0.0.1`) and announce `_mixai-live._tcp` over mDNS |
-| `--port` | `17920` | HTTP/WebSocket port; OSC listens on `port + 1` (or a free port if taken) |
+| `--osc` | off | also accept OSC over UDP on `port + 1` (or a free port if taken); every address needs an OSC key ([protocol](remote-protocol.md#osc-address-space)) |
+| `--port` | `17920` | HTTP/WebSocket port |
 | `--name` | `MixAI Live` | engine name in `hello`, mDNS and the remote page |
 | `--seconds` | none | exit after N seconds (tests) |
 | `--data-dir` | per-user app data | where user presets, the last setlist and `midi.json` are kept ([presets](presets.md#storage)) |
@@ -161,7 +162,9 @@ On start it prints **one `ready` JSON line** on stdout — the contract for the 
 {
   "event": "ready",
   "port": 17920,
-  "osc_port": 17921,
+  "osc_port": null,
+  "osc_performer_key": null,
+  "osc_controller_key": null,
   "controller_url": "http://192.168.1.20:17920/?t=<controller token>",
   "performer_url": "http://192.168.1.20:17920/?t=<performer token>",
   "viewer_url": "http://192.168.1.20:17920/?t=<viewer token>",
@@ -169,7 +172,8 @@ On start it prints **one `ready` JSON line** on stdout — the contract for the 
 }
 ```
 
-(printed on one line; shown wrapped here). Without `--lan` the URLs use `127.0.0.1`; with `--lan` they use the
+(printed on one line; shown wrapped here). With `--osc` the three `osc_*` fields hold the UDP port and the two
+OSC keys; treat the keys as secrets too. Without `--lan` the URLs use `127.0.0.1`; with `--lan` they use the
 machine's LAN address. Tokens are random per run; treat the URLs as secrets (anyone with the controller URL can
 change the chain). Open a URL in a browser for the web remote page, or turn it into a QR code for phones. A
 failed mDNS announcement is reported on stderr and pairing by URL/QR still works.

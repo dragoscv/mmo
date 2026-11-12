@@ -12,10 +12,10 @@ State types are the serde forms of `live_engine::session::SessionState` / `MixSt
 | HTTP `GET /health` | `{"ok":true,"protocol":1,"version":"x.y.z"}` (no auth) |
 | HTTP `GET /api/fx` | Effect catalogue: `[{id, params:[{id,min,max,default,unit,curve,choices}]}]` |
 | WebSocket `GET /ws?t=<token>&c=<client-id>` | JSON text frames, one message per frame |
-| UDP OSC (port `ws_port + 1`) | Low-latency faders/buttons (same token as first OSC arg is NOT required: OSC is LAN-only and gated by the paired client's source address) |
+| UDP OSC (port `ws_port + 1`) | Low-latency faders/buttons. **Off by default** (`serve --osc`). Every address starts with an OSC key (`/<key>/live/...`); the sender's address grants nothing, loopback included |
 | mDNS `_mixai-live._tcp.local.` | Discovery; TXT `v=1`, `name=<engine name>`, `port`, `osc` |
 
-Default port **17920** (WS/HTTP), **17921** (OSC). Bind `0.0.0.0` only when LAN control is enabled; the
+Default port **17920** (WS/HTTP), **17921** (OSC, only when enabled). Bind `0.0.0.0` only when LAN control is enabled; the
 desktop UI uses `127.0.0.1` with the `controller` token from the local config file.
 
 ## Auth and roles
@@ -42,9 +42,9 @@ matching `ack` or `error`.
 
 | type | fields | when |
 |---|---|---|
-| `hello` | `protocol: 1, version, role, engine_name, sample_rate, buffer_frames, devices: RunningInfo` | after connect |
+| `hello` | `protocol: 1, version, role, engine_name, sample_rate, buffer_frames, devices: RunningInfo`, and when OSC is on, for `performer` and `controller` only: `osc: { port, performer_key, controller_key? }` | after connect |
 | `state` | `state: SessionState` | after `hello`, and after every change (debounced 30 ms) |
-| `meters` | `in_peak, in_rms, out_peak:[l,r], out_rms:[l,r], gr:[dB per insert], dsp_load, dsp_load_max, xruns, clipped, tune: {freq, midi, cents, target, correction_cents} \| null, latency_probe: "idle"\|"running"\|{"done_ms":x}\|"failed"` | 30 Hz to clients that sent `subscribe` with `meters:true` (watches: 10 Hz with `meters_hz`) |
+| `meters` | `in_peak, in_rms, out_peak:[l,r], out_rms:[l,r], gr:[dB per insert], dsp_load, dsp_load_max, xruns, clipped, safety_gr:[main dB, monitor dB], tune: {freq, midi, cents, target, correction_cents} \| null, latency_probe: "idle"\|"running"\|{"done_ms":x}\|"failed"` | 30 Hz to clients that sent `subscribe` with `meters:true` (watches: 10 Hz with `meters_hz`) |
 | `ack` | `id` | command applied |
 | `error` | `id?, code, message` | codes: `unauthorized`, `forbidden`, `bad_request`, `unknown_insert`, `unknown_param`, `unknown_preset`, `unknown_fx`, `chain_full`, `no_setlist`, `factory_preset`, `unknown_binding`, `rate_limited` |
 
@@ -78,11 +78,35 @@ types are described in [MIDI control](midi.md).
 | `midi_settings` | any of `program_change: bool, channel: 0 (omni) \| 1..16` | controller |
 | `ping` | `t` → server replies `{"type":"pong","t":…}` | viewer |
 
+## Output safety
+
+After the faders, each bus (main and monitor) ends in a safety stage that no control can remove, disable or
+reorder: a zero-latency stereo limiter with an exact ceiling at **−1 dBFS**. `bypass`, the dry monitor blend and
+the latency click pass through it too, and non-finite samples become silence. `meters.safety_gr` is its deepest
+gain reduction since the previous `meters` message (dB ≥ 0, main then monitor); `meters.clipped` is true when
+either value is above 0.1 dB, which means the signal after the faders was too hot, not that the output clipped.
+
+`input_db`, `main_db` and `monitor_db` accept −60…+12 dB. A move **up** ramps over 300 ms, a move **down** over
+10 ms.
+
 ## OSC address space
 
-`/live/mix/{input,main,monitor}` f (dB) · `/live/mix/monitor_dry` f (0..1) · `/live/bypass` i ·
-`/live/mute` i · `/live/scene/next` · `/live/scene/prev` · `/live/goto` i i · `/live/tap` ·
-`/live/fx/<insert>/<param>` f (value) · `/live/fx/<insert>/enabled` i · `/live/panic`.
+OSC is off unless the engine was started with it (`serve --osc`, `HostConfig.osc`). Every address carries a key:
+
+`/<key>/live/mix/{input,main,monitor}` f (dB) · `/<key>/live/mix/monitor_dry` f (0..1) · `/<key>/live/bypass` i ·
+`/<key>/live/mute` i · `/<key>/live/scene/next` · `/<key>/live/scene/prev` · `/<key>/live/goto` i i ·
+`/<key>/live/tap` · `/<key>/live/fx/<insert>/<param>` f (value) · `/<key>/live/fx/<insert>/enabled` i ·
+`/<key>/live/panic`.
+
+- There are two keys, 32 hex characters each: `performer_key` (mix, scenes, tap, panic) and `controller_key`
+  (also `/live/fx/...`). They are **not** the pairing tokens, because a control-surface layout that embeds a key
+  is a file people export and share. Rotating a role's token replaces its OSC key.
+- Keys are sent in `hello.osc` to performers (their own) and controllers (both), and printed in the `ready` line
+  of `serve`. Viewers get none.
+- A datagram without a valid key is dropped silently, whatever its source address. OSC has no replies.
+- Limit: 400 accepted messages per second in total, counted after the key check (datagrams without a valid key
+  do not use it up); `/live/panic` is never rate-limited. Two surfaces share the limit.
+- OSC travels in clear text on the network, like the rest of protocol v1: use it on a network you control.
 
 ## Versioning
 

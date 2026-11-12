@@ -344,8 +344,9 @@ pub struct DeEsser {
     sr: f32,
     v: [f32; 5],
     det: [Biquad; 2],
-    split_hp: [Biquad; 2],
-    split_lp: [Biquad; 2],
+    /// 4th-order Linkwitz-Riley split: `[channel][stage]`.
+    split_hp: [[Biquad; 2]; 2],
+    split_lp: [[Biquad; 2]; 2],
     env: f32,
     gr_db: f32,
     att: f32,
@@ -358,8 +359,8 @@ impl DeEsser {
             sr: sample_rate,
             v: defaults(DEESS_SPECS),
             det: [Biquad::default(); 2],
-            split_hp: [Biquad::default(); 2],
-            split_lp: [Biquad::default(); 2],
+            split_hp: [[Biquad::default(); 2]; 2],
+            split_lp: [[Biquad::default(); 2]; 2],
             env: 0.0,
             gr_db: 0.0,
             att: one_pole_coef(0.3, sample_rate),
@@ -375,13 +376,16 @@ impl DeEsser {
         for b in &mut self.det {
             b.set(bp);
         }
-        // Linkwitz-Riley-ish complementary split (2nd order HP/LP at Q 0.5 sum flat in magnitude).
-        let hp = Coefs::high_pass(f * 0.8, 0.5, self.sr);
-        let lp = Coefs::low_pass(f * 0.8, 0.5, self.sr);
-        for b in &mut self.split_hp {
+        // 4th-order Linkwitz-Riley split (two Butterworth stages per band): LP + HP is in phase
+        // and flat in magnitude. A 2nd-order pair is 180° apart, so its sum cancels at the
+        // crossover, and its low band keeps a third of the sibilant range.
+        let q = core::f32::consts::FRAC_1_SQRT_2;
+        let hp = Coefs::high_pass(f * 0.8, q, self.sr);
+        let lp = Coefs::low_pass(f * 0.8, q, self.sr);
+        for b in self.split_hp.iter_mut().flatten() {
             b.set(hp);
         }
-        for b in &mut self.split_lp {
+        for b in self.split_lp.iter_mut().flatten() {
             b.set(lp);
         }
     }
@@ -423,11 +427,15 @@ impl Processor for DeEsser {
                 *a = sa;
                 *b = sb;
             } else if split {
-                let ha = self.split_hp[0].tick(*a);
-                let hb = self.split_hp[1].tick(*b);
-                let la = self.split_lp[0].tick(*a);
-                let lb = self.split_lp[1].tick(*b);
-                // HP + LP at Q 0.5 is in phase-quadrature-free sum; recombine low band dry.
+                let [h0, h1] = &mut self.split_hp[0];
+                let ha = h1.tick(h0.tick(*a));
+                let [h0, h1] = &mut self.split_hp[1];
+                let hb = h1.tick(h0.tick(*b));
+                let [l0, l1] = &mut self.split_lp[0];
+                let la = l1.tick(l0.tick(*a));
+                let [l0, l1] = &mut self.split_lp[1];
+                let lb = l1.tick(l0.tick(*b));
+                // Low band dry; only the high band is reduced.
                 *a = la + ha * g;
                 *b = lb + hb * g;
             } else {
@@ -442,8 +450,8 @@ impl Processor for DeEsser {
         for f in self
             .det
             .iter_mut()
-            .chain(&mut self.split_hp)
-            .chain(&mut self.split_lp)
+            .chain(self.split_hp.iter_mut().flatten())
+            .chain(self.split_lp.iter_mut().flatten())
         {
             f.reset();
         }
@@ -517,5 +525,25 @@ mod tests {
         let before = rms(&l[12000..]);
         d.process(&mut l, &mut r);
         assert!(rms(&l[12000..]) < before * 0.5);
+    }
+
+    /// Below the threshold the split de-esser must leave the level alone at every frequency,
+    /// the crossover (0.8 × `frequency`) included. The old 2nd-order pair cancelled there
+    /// (−97 dB measured).
+    #[test]
+    fn deesser_split_is_flat_below_threshold() {
+        for f in [
+            300.0, 1000.0, 2000.0, 3000.0, 4000.0, 4600.0, 5000.0, 5200.0, 5600.0, 6500.0, 8000.0,
+            12000.0,
+        ] {
+            let mut d = DeEsser::new(48000.0); // split mode, threshold −30 dB, crossover 5.2 kHz
+            let mut l = sine(f, 48000.0, 24000, 0.01); // −40 dBFS: never reaches the threshold
+            let mut r = l.clone();
+            let before = rms(&l[12000..]);
+            d.process(&mut l, &mut r);
+            let gain_db = 20.0 * (rms(&l[12000..]) / before).log10();
+            assert!(gain_db.abs() < 0.5, "{f} Hz: {gain_db} dB");
+            assert!(d.gain_reduction_db() < 0.1, "{f} Hz reduced");
+        }
     }
 }

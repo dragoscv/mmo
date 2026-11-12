@@ -45,6 +45,7 @@ pub fn meters_json(m: &Meters) -> String {
         "gr": &m.gr[..m.inserts.min(m.gr.len())],
         "dsp_load": m.dsp_load, "dsp_load_max": m.dsp_load_max,
         "xruns": m.xruns, "clipped": m.clipped,
+        "safety_gr": m.safety_gr,
         "tune": tune, "latency_probe": probe,
         "chain_latency_samples": m.chain_latency_samples,
     })

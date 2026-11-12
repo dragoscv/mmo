@@ -57,7 +57,7 @@
         "createUpdaterArtifacts": false,
         "category": "Music",
         "shortDescription": "MixAI Live — realtime vocal processor for live performance",
-        "longDescription": "MixAI Live is a low-latency vocal effects processor for singers: autotune, harmonizer, dynamics, EQ, reverb and delay, setlists with per-song presets, and phone/watch remotes over the local network.",
+        "longDescription": "MixAI Live is a low-latency vocal effects processor for singers: pitch correction, harmonizer, dynamics, EQ, reverb and delay, setlists with per-song presets, and phone/watch remotes over the local network.",
         "copyright": "© mwrty",
         "publisher": "mwrty",
         "homepage": "https://live.mixai.ro",

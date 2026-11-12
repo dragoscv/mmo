@@ -42,7 +42,7 @@ Units: `0–1` = fraction shown as a percentage in the UI; `:1` = compression ra
 | [`chorus`](#chorus) | Stereo chorus | 0 | 0.05 s |
 | [`delay`](#delay) | Stereo / ping-pong delay | 0 | time × echoes to −60 dB (≤ 30 repeats) |
 | [`reverb`](#reverb) | 8-line FDN reverb | 0 | `decay` + `pre_delay` |
-| [`limiter`](#limiter) | Zero-latency safety limiter | 0 | 0 |
+| [`limiter`](#limiter) | Zero-latency chain limiter (the non-removable bus safety stage is separate: [architecture](architecture.md#core-and-buses)) | 0 | 0 |
 | [`tuner`](#tuner) | Pitch analyser (passes audio through) | 0 | 0 |
 
 "Latency" is algorithmic latency added inside the chain; device buffers are separate
@@ -97,10 +97,12 @@ magnitude response for UI curves.
 
 ## deesser
 
-Sibilance detector (band-pass at `frequency`). In `split` mode a complementary crossover splits the signal and
-only the high band is attenuated — the low band always passes dry (the browser version lost it; fixed in web
-3.4.5 too). `wide` attenuates the whole signal. `listen` solos the detector band for tuning. Gain reduction is
-capped at `range`.
+Sibilance detector (band-pass at `frequency`). In `split` mode a 4th-order Linkwitz-Riley crossover at
+0.8 × `frequency` splits the signal and only the high band is attenuated — the low band always passes dry (the
+browser version lost it; fixed in web 3.4.5 too). Below the threshold the two bands sum flat: a test sweeps
+300 Hz–12 kHz and allows ±0.5 dB (the first version used a 2nd-order pair that cancelled at the crossover).
+`wide` attenuates the whole signal. `listen` solos the detector band for tuning. Gain reduction is capped at
+`range`.
 
 <!-- params:deesser:start (generated from live-dsp/src/dynamics.rs DEESS_SPECS; do not edit by hand) -->
 
@@ -137,11 +139,23 @@ from pumping), optional auto make-up gain and a parallel (`mix`) blend. Reports 
 
 ## autotune
 
-Pitch correction ported from the Companion's `pitch-dsp.ts`: YIN pitch detection, a granular/WSOLA shifter
-(256-sample grains, two heads) and LPC formant preservation (`formant`). Detection and the correction ratio are
-updated every 128 samples (2.7 ms at 48 kHz).
+Pitch correction (the id `autotune` is a wire name only; user interfaces call the effect "Pitch correction").
+Ported from the Companion's `pitch-dsp.ts`: YIN pitch detection, a granular/WSOLA shifter (256-sample grains,
+two heads) and optional LPC formant preservation (`formant`). Detection and the correction ratio are updated
+every 128 samples (2.7 ms at 48 kHz).
 
-- `key` + `scale` select the target notes (13 scales; `chromatic` snaps to every semitone).
+- `key` + `scale` select the target notes (13 scales). The default is `chromatic` (nearest semitone), so a
+  singer in any key is pulled to a real note; a song's key or the user narrows it to a scale.
+- `formant` is **off by default**. Correction moves the pitch by less than a semitone, where formants barely
+  shift, and without the formant filter the output is a mix of input samples and cannot exceed the input peak.
+  With `formant` on, the shifted signal is whitened and re-coloured by an order-12 LPC model; a guard compares it
+  with the plain (formant-off) output and plays the plain output whenever the coloured one is implausibly loud
+  (more than 6 dB of energy over it), and a ceiling holds every sample within 6 dB of the recent plain peak.
+  Tests on a continuous voice-like signal (220–523 Hz, vibrato, ratios 0.94–1.06) require zero guard trips and
+  less than 6 dB over the input in every 100 ms window. Known limit: at the attack of a phrase that follows
+  silence the coloured output can overshoot, and the guard then plays the plain output for 50 ms (measured on
+  1 of 3 attacks in the phrase test). So with `formant` on, the start of some phrases is not formant-preserved.
+  The planned period-synchronous shifter replaces this path.
 - `retune` is the glide time to the target: ~0.5 ms is the hard "robot" effect, 40–100 ms sounds natural.
 - `humanize` leaves small deviations alone: deviations under `30 × humanize` cents are not corrected and
   correction fades in smoothly over the next 30 cents (vibrato and scoops survive). `sticky` (cents) keeps the
@@ -156,11 +170,11 @@ updated every 128 samples (2.7 ms at 48 kHz).
 | # | Param id | Range | Default | Unit | Curve |
 |---|---|---|---|---|---|
 | 0 | `key` | 0 `C`, 1 `C#`, 2 `D`, 3 `D#`, 4 `E`, 5 `F`, 6 `F#`, 7 `G`, 8 `G#`, 9 `A`, 10 `A#`, 11 `B` | 0 (`C`) | choice | — |
-| 1 | `scale` | 0 `chromatic`, 1 `major`, 2 `minor`, 3 `harmonic_minor`, 4 `melodic_minor`, 5 `pentatonic_major`, 6 `pentatonic_minor`, 7 `blues`, 8 `dorian`, 9 `phrygian`, 10 `lydian`, 11 `mixolydian`, 12 `phrygian_dominant` | 1 (`major`) | choice | — |
+| 1 | `scale` | 0 `chromatic`, 1 `major`, 2 `minor`, 3 `harmonic_minor`, 4 `melodic_minor`, 5 `pentatonic_major`, 6 `pentatonic_minor`, 7 `blues`, 8 `dorian`, 9 `phrygian`, 10 `lydian`, 11 `mixolydian`, 12 `phrygian_dominant` | 0 (`chromatic`) | choice | — |
 | 2 | `amount` | 0 … 1 | 1 | 0–1 | linear |
 | 3 | `retune` | 0.5 … 400 | 40 | ms | log |
 | 4 | `humanize` | 0 … 1 | 0.3 | 0–1 | linear |
-| 5 | `formant` | 0 / 1 | on | on/off | — |
+| 5 | `formant` | 0 / 1 | off | on/off | — |
 | 6 | `mix` | 0 … 1 | 1 | 0–1 | linear |
 | 7 | `transpose` | -12 … 12 | 0 | st | linear |
 | 8 | `sticky` | 0 … 100 | 60 | cents | linear |

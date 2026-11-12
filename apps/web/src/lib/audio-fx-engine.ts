@@ -1607,7 +1607,7 @@ const BUILT_IN_PRESETS: FxPreset[] = [
     },
     {
         id: "builtin_voice_autotune",
-        name: "Auto-Tune Vocal",
+        name: "Pitch-Corrected Vocal",
         category: "voice",
         chain: [
             { id: createId(), type: "noiseSuppression", enabled: true, params: { threshold: -35, reduction: 15, attack: 0.005, release: 0.05 } },

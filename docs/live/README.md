@@ -19,7 +19,7 @@ or recording:
 - Two output buses: **main** (FOH / stream) and **monitor** (in-ear) with a dry blend for the singer.
 - Click-free scene/preset changes: the previous chain's reverb/delay tail rings out.
 - Measured round-trip latency with a click-train loopback probe ([latency guide](latency.md)).
-- LAN control: HTTP + WebSocket protocol v1, OSC/UDP, mDNS discovery, QR pairing with three token roles, and a
+- LAN control: HTTP + WebSocket protocol v1, optional key-authenticated OSC/UDP, mDNS discovery, QR pairing with three token roles, and a
   web remote page served by the engine ([remote protocol](remote-protocol.md)).
 - Headless binary for stage PCs and scripts, plus offline WAV rendering ([CLI](cli.md)).
 - MIDI control: every input port (incl. paired BLE MIDI pedals), MIDI learn on parameters, mix faders, insert

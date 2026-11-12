@@ -112,6 +112,16 @@ pub enum SessionError {
     Preset(#[from] PresetError),
 }
 
+/// Factory presets renamed since the first release: setlists, MIDI maps and remotes saved with the
+/// old name keep working. Used only when no preset carries the old name literally, so a user
+/// preset saved as "Hard Tune" still loads as itself.
+pub fn renamed_preset(name: &str) -> &str {
+    match name {
+        "Hard Tune" => "Hard Snap",
+        _ => name,
+    }
+}
+
 impl Session {
     pub fn new(sample_rate: f32, max_block: usize) -> Self {
         Self {
@@ -190,6 +200,11 @@ impl Session {
 
     /// Load a preset by name: returns the chain swap command.
     pub fn load_preset(&mut self, name: &str) -> Result<Command, SessionError> {
+        let name = if self.presets.iter().any(|p| p.name == name) {
+            name
+        } else {
+            renamed_preset(name)
+        };
         let preset = self
             .presets
             .iter()
@@ -480,6 +495,28 @@ mod tests {
         assert_eq!(back, s.state());
     }
 
+    /// The old factory name loads the renamed preset, unless the user has a preset of their own
+    /// under that name: then theirs wins.
+    #[test]
+    fn old_preset_name_resolves_but_never_shadows_a_user_preset() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Hard Tune").unwrap();
+        assert_eq!(s.preset_name, "Hard Snap");
+
+        s.load_preset("Natural Vocal").unwrap();
+        s.save_preset("Hard Tune"); // a user copy under the old name (Natural Vocal's chain)
+        s.load_preset("Pop Polish").unwrap();
+        s.load_preset("Hard Tune").unwrap();
+        assert_eq!(s.preset_name, "Hard Tune");
+        assert_eq!(
+            s.chain[0].fx, "gate",
+            "the user's chain, not the factory one"
+        );
+        // The renamed factory preset is still there under its new name.
+        s.load_preset("Hard Snap").unwrap();
+        assert_eq!(s.chain[0].fx, "eq");
+    }
+
     fn setlist() -> Setlist {
         Setlist {
             version: 1,
@@ -512,6 +549,7 @@ mod tests {
                     bpm: None,
                     parts: vec![SongPart {
                         name: "All".into(),
+                        // The old name of "Hard Snap": a saved setlist must still recall it.
                         preset: "Hard Tune".into(),
                         program: None,
                     }],
@@ -537,6 +575,7 @@ mod tests {
         assert_eq!(delay.params.iter().find(|p| p.0 == "bpm").unwrap().1, 90.0);
         s.next_part().unwrap();
         assert_eq!(s.position, Some(Position { song: 1, part: 0 }));
+        assert_eq!(s.preset_name, "Hard Snap", "old preset name must resolve");
         s.next_part().unwrap(); // stays at the end
         assert_eq!(s.position, Some(Position { song: 1, part: 0 }));
         s.prev_part().unwrap();

@@ -1897,7 +1897,7 @@ function PadButton({ pad }: { pad: { id: number; name: string; color: string; bu
 
 /**
  * LED-style meter that visualises the auto-correct in real time, like
- * the front-panel LEDs on a Tascam TA-1VP / Antares Auto-Tune Evo.
+ * the front-panel correction LEDs of a rack-mount vocal processor.
  *
  * Top row  — input cents deviation from the corrector's target note.
  *            Centre LED = on pitch; LEDs left = flat; LEDs right = sharp.
@@ -2251,7 +2251,7 @@ function KeyScalePanel() {
     // Root-lock: when ON, every input snaps to the SELECTED key root
     // (any octave) regardless of the chosen scale. "Re Major" with
     // root-lock means: every note becomes a D, period. When OFF, the
-    // corrector behaves as classic Auto-Tune scale-snap (snap to nearest
+    // corrector behaves as classic scale-snap (snap to nearest
     // note IN the scale — so D Major still allows E, F#, G, A, B, C#).
     // Default ON because that matches user expectation when they pick a
     // single key like "Re Major".
@@ -2771,7 +2771,7 @@ function KeyScalePanel() {
                         {/* Root-lock: snap every input to the SELECTED key
                             root (any octave) instead of the nearest scale
                             note. ON = "Re Major" → only D's get produced.
-                            OFF = classic Auto-Tune scale-snap (D, E, F#, G,
+                            OFF = classic scale-snap (D, E, F#, G,
                             A, B, C# all valid for D Major). Default ON to
                             match the user's expectation that picking a
                             single key means snap-to-that-note. */}

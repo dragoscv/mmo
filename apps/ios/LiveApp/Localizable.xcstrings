@@ -670,13 +670,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Autotune"
+            "value": "Pitch correction"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Autotune"
+            "value": "Corecție de ton"
           }
         }
       }

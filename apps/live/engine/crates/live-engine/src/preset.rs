@@ -284,8 +284,8 @@ pub fn factory() -> Vec<Preset> {
             ],
         ),
         p(
-            "Hard Tune",
-            "Robotic hard snap pitch correction (set key/scale per song).",
+            "Hard Snap",
+            "Robotic hard-snap pitch correction (set key/scale per song).",
             &["tune", "fx"],
             &[
                 ("eq", &[("hpf_freq", 110.0)]),

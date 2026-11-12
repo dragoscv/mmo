@@ -95,7 +95,7 @@ private fun InsertCard(client: LiveClient, ins: InsertState, spec: FxSpec?, lear
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val name = ins.fx.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.ROOT) }
+                val name = fxLabel(ins.fx)
                 val enabledLabel = stringResource(R.string.enabled)
                 val enableTarget = MidiTarget.Enable(ins.fx)
                 // Long press on the name (not the switch: a long press there would also toggle it on release).

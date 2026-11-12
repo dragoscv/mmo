@@ -36,8 +36,8 @@ screen works unchanged. Only the start/stop/latency controls are FFI calls.
 `LocalEngineConfig` defaults for phones: 48 kHz, 192-frame callbacks, `Natural Vocal`, loopback bind,
 **`start_muted = true`** (a phone speaker next to its own microphone howls), memory-only unless `data_dir` is set.
 `lan = true` binds every interface and announces `_mixai-live._tcp` over mDNS; the Android card shows a QR with the
-performer link, and the watch gets the LAN endpoint + performer token. OSC stays off on phones (it trusts loopback
-packets without a token, so any app on the phone could drive the mix).
+performer link, and the watch gets the LAN endpoint + performer token. OSC stays off on phones (nothing there
+sends it, and an open UDP port is one more surface).
 
 Conventions match `decks-ffi`: polling instead of callbacks, one `Mutex` per object, the audio callback stays on
 cpal's thread, and every error has a `reason` field (never `message`: Kotlin's `Throwable.message` owns that name).

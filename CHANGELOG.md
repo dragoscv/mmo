@@ -10,6 +10,45 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — safe and correct, part 1 (WP21-18, 2026-11-12)
+
+Engine 0.1.0 (unreleased), web 3.5.1 (metadata text only). First slice of the fixes after the 2026-11-11 reality
+check. The first four items each have a test that reproduces the defect; the naming item is text only. Measured
+on synthetic voice signals and offline renders only: no real voice and no audio hardware yet.
+
+- **Output safety stage.** Each bus (main, monitor) now ends in a limiter nothing can remove, disable or
+  reorder: ceiling −1 dBFS, zero latency, instant attack, 120 ms release. Bypass, the dry monitor blend and the
+  latency click go through it; non-finite samples become silence; faders move up over 300 ms (down in 10 ms).
+  The WebSocket `meters` message carries `safety_gr`, and `clipped` now means "the stage had to work" (the phone
+  bindings' `LiveMeters` has `clipped` only, for now). Before, `+12 dB` on every fader reached the output as a
+  hard clip at full scale, and bypass skipped the limiter. A hot passage is now turned down for about 120 ms
+  instead of being clipped.
+- **OSC is off by default and needs a key.** `serve --osc` opens it; every address is `/<key>/live/...` with a
+  performer or controller key (sent in `hello.osc`, printed in the ready line, rotated with the role token).
+  The sender's address grants nothing — before, any datagram from loopback was a controller and a paired phone's
+  IP was enough on the LAN. `/live/panic` is never rate-limited. The desktop app has no switch for OSC yet, so
+  OSC surfaces work only with an engine started by hand with `--osc` until that switch exists (WP21-18, open).
+- **De-esser** (split mode): the two bands sum flat again (4th-order Linkwitz-Riley). The old 2nd-order pair
+  cancelled at 0.8 × `frequency`: −97 dB at 5.2 kHz in Natural Vocal, Pop Polish, Ballad Hall and Speech/MC.
+- **Pitch correction no longer blows up.** With formant preservation on, the synthesis filter could come out
+  +15 dB over the input and sit on the limiter (4 of the auditor's 5 voice files). The LPC analysis now has a
+  white-noise correction, and a guard compares the coloured output with the plain (formant-off) output and plays
+  the plain one when the coloured one is implausibly loud. Defaults changed: `scale` chromatic (was C major, which
+  pulled singers in other keys to wrong notes), `formant` off. This changes the factory presets that relied on
+  the defaults: Pop Polish and Harmony Stack now correct to the nearest semitone without formant preservation
+  until a song key is set; Hard Snap keeps formant on (it sets it explicitly). The harmonizer still defaults to
+  C major, because diatonic harmonies need a scale — so in Harmony Stack the lead is chromatic and the harmonies
+  are in C major until the song has a key. With formant on, the first ~45 ms after a start, a preset change or
+  PANIC play without formant preservation while the model builds, and the guard can also step in for 50 ms at
+  the attack of a phrase that follows silence (1 of 3 attacks in the test signal).
+- **Names.** The effect is "Pitch correction" / "Corecție de ton" on the desktop, the web remote page, iOS and
+  Android (which now has real effect labels instead of title-cased ids), in the store text and the web metadata;
+  the wire id `autotune` is unchanged. Factory preset "Hard Tune" is "Hard Snap"; setlists and remotes that say
+  the old name still load it, and a preset you saved yourself as "Hard Tune" still loads as yours. The browser
+  preset "Auto-Tune Vocal" is "Pitch-Corrected Vocal".
+- Tracker: WP21-02/05/07/09 corrected (no benches, no auto-restart, no spectrum, iOS never run; OSC changed),
+  WP21-18…24 added for the plan decided on 2026-11-11.
+
 ## MixAI TV: the phone apps take the product name (WP22-01/02, 2026-11-11)
 
 Android phone 1.3.2 (versionCode 6), iPhone 1.1.2. No feature change.

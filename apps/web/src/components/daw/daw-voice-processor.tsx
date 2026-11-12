@@ -770,7 +770,7 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
             params: { low: eq.low, mid: eq.mid, high: eq.high },
         });
 
-        // 3. Autotune if pitch variance is high
+        // 3. Pitch correction if pitch variance is high
         const variance = computeAvgCentsDeviation(pitchHistoryRef.current);
         const dk = detection?.key ?? selectedKeyRef.current;
         const ds = detection?.scale ?? selectedScaleRef.current;

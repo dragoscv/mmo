@@ -19,3 +19,8 @@ debug = "line-tables-only"
 
 [profile.bench]
 inherits = "release"
+
+# DSP tests push seconds of audio through per-sample loops: unoptimised they take minutes.
+# Debug assertions and overflow checks stay on (only the optimisation level changes).
+[profile.dev.package.live-dsp]
+opt-level = 2

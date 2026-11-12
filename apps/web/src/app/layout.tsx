@@ -143,7 +143,7 @@ const PRODUCT_META: Record<Exclude<HostKind, "legacy">, { name: string; descript
     music: { name: "MixAI Music", description: "Albums, artists, playlists, radio and synced lyrics from your own MixAI Server.", manifest: "/manifest-music.webmanifest" },
     studio: { name: "MixAI Studio", description: "Organize, analyze, tag and mix your music library with AI. Server admin and dashboard.", manifest: "/manifest-studio.webmanifest" },
     dj: { name: "MixAI Decks", description: "Pro DJ app with a Rust audio engine, AI stems and beat-matched automix.", manifest: "/manifest-suite.webmanifest" },
-    live: { name: "MixAI Live", description: "Realtime vocal processor for live singing: autotune, dynamics, effects and remote control.", manifest: "/manifest-suite.webmanifest" },
+    live: { name: "MixAI Live", description: "Realtime vocal processor for live singing: pitch correction, dynamics, effects and remote control.", manifest: "/manifest-suite.webmanifest" },
 };
 
 export async function generateMetadata(): Promise<Metadata> {

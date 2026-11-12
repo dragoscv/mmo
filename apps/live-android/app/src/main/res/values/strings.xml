@@ -149,4 +149,19 @@
     <string name="local_stopped_unexpectedly">the audio stream stopped</string>
     <string name="local_qr">Pairing code for other devices on this Wi-Fi (performer access)</string>
     <string name="local_watch_needs_lan">To use the watch with the phone engine, start it with "Let other devices control it" on.</string>
+
+    <!-- Effect names (engine ids are wire names; `autotune` is shown as pitch correction) -->
+    <string name="fx_gate">Gate</string>
+    <string name="fx_eq">EQ</string>
+    <string name="fx_deesser">De-esser</string>
+    <string name="fx_compressor">Compressor</string>
+    <string name="fx_autotune">Pitch correction</string>
+    <string name="fx_harmonizer">Harmonizer</string>
+    <string name="fx_saturator">Saturator</string>
+    <string name="fx_doubler">Doubler</string>
+    <string name="fx_chorus">Chorus</string>
+    <string name="fx_delay">Delay</string>
+    <string name="fx_reverb">Reverb</string>
+    <string name="fx_limiter">Limiter</string>
+    <string name="fx_tuner">Tuner</string>
 </resources>

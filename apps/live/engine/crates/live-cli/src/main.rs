@@ -105,6 +105,10 @@ enum Cmd {
         /// Listen on every interface and announce over mDNS (phones/watches).
         #[arg(long)]
         lan: bool,
+        /// Also accept OSC over UDP on `port + 1`. Every address must start with an OSC key
+        /// (printed in the ready line): `/<key>/live/...`.
+        #[arg(long)]
+        osc: bool,
         #[arg(long, default_value_t = live_remote::DEFAULT_PORT)]
         port: u16,
         #[arg(long, default_value = "MixAI Live")]
@@ -304,6 +308,7 @@ fn run(cli: Cli) -> Result<(), String> {
             dev,
             preset,
             lan,
+            osc,
             port,
             name,
             seconds,
@@ -313,7 +318,9 @@ fn run(cli: Cli) -> Result<(), String> {
         } => {
             let store = (!no_store)
                 .then(|| Store::new(data_dir.unwrap_or_else(live_engine::store::default_dir)));
-            serve(&dev, &preset, lan, port, &name, seconds, store, !no_midi)?
+            serve(
+                &dev, &preset, lan, osc, port, &name, seconds, store, !no_midi,
+            )?
         }
     }
     Ok(())
@@ -324,6 +331,7 @@ fn serve(
     dev: &DevArgs,
     preset: &str,
     lan: bool,
+    osc: bool,
     port: u16,
     name: &str,
     seconds: Option<u64>,
@@ -343,7 +351,7 @@ fn serve(
         port,
         name: name.into(),
         announce: lan,
-        osc: true,
+        osc,
         store,
         start_muted: false,
         midi: inputs.as_ref().map(|i| (i.names(), midi_rx)),
@@ -360,6 +368,8 @@ fn serve(
             "event": "ready",
             "port": r.port,
             "osc_port": r.osc_port,
+            "osc_performer_key": r.osc_performer_key,
+            "osc_controller_key": r.osc_controller_key,
             "controller_url": r.controller_url,
             "performer_url": r.performer_url,
             "viewer_url": r.viewer_url,

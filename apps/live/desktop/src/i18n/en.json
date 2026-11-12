@@ -217,7 +217,7 @@
         "eq": "EQ",
         "deesser": "De-esser",
         "compressor": "Compressor",
-        "autotune": "Autotune",
+        "autotune": "Pitch correction",
         "harmonizer": "Harmonizer",
         "saturator": "Saturator",
         "doubler": "Doubler",

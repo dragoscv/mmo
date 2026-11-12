@@ -313,7 +313,7 @@ impl LiveEngine {
             port: config.port,
             name: config.name.clone(),
             announce: config.lan,
-            // OSC accepts loopback packets without a token: any app on the phone could drive the mix.
+            // No OSC on phones: nothing there sends it, and an open UDP port is one more surface.
             osc: false,
             store: config.data_dir.as_ref().map(Store::new),
             start_muted: config.start_muted,

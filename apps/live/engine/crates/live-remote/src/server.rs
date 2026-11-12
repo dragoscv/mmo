@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -33,7 +33,8 @@ pub struct RemoteConfig {
     pub bind: IpAddr,
     /// 0 = any free port.
     pub port: u16,
-    /// Also listen for OSC on `port + 1` (UDP).
+    /// Also listen for OSC on `port + 1` (UDP). Off unless asked for: every datagram must then
+    /// carry an OSC key (see `osc.rs`); the sender's address grants nothing.
     pub osc: bool,
     pub engine_name: String,
 }
@@ -43,7 +44,7 @@ impl Default for RemoteConfig {
         Self {
             bind: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             port: DEFAULT_PORT,
-            osc: true,
+            osc: false,
             engine_name: "MixAI Live".into(),
         }
     }
@@ -80,6 +81,9 @@ fn role_index(r: Role) -> usize {
 
 struct Shared {
     tokens: [String; 3],
+    /// OSC keys: performer, controller. Separate from the pairing tokens because control-surface
+    /// layouts that embed them are files people export and share.
+    osc_keys: [String; 2],
     hello: Value,
     state: String,
     meters: String,
@@ -96,6 +100,8 @@ pub(crate) struct Inner {
     stop: AtomicBool,
     next_conn: AtomicU64,
     started: Instant,
+    /// Set once when the OSC socket is bound.
+    osc_port: OnceLock<u16>,
 }
 
 impl Inner {
@@ -111,17 +117,18 @@ impl Inner {
         s.incoming.push_back(inc);
     }
 
-    /// Highest role among connected WebSocket clients from `ip` (OSC authorisation).
-    pub(crate) fn role_of_ip(&self, ip: IpAddr) -> Option<Role> {
-        if ip.is_loopback() {
-            return Some(Role::Controller);
-        }
+    /// Role granted by an OSC key (constant-time compare against both keys).
+    pub(crate) fn osc_role(&self, key: &str) -> Option<Role> {
         let s = self.lock();
-        s.clients
-            .values()
-            .filter(|c| c.addr.parse::<SocketAddr>().is_ok_and(|a| a.ip() == ip))
-            .map(|c| c.role)
-            .max()
+        let performer = ct_eq(&s.osc_keys[0], key);
+        let controller = ct_eq(&s.osc_keys[1], key);
+        if controller {
+            Some(Role::Controller)
+        } else if performer {
+            Some(Role::Performer)
+        } else {
+            None
+        }
     }
 
     pub(crate) fn stopped(&self) -> bool {
@@ -133,6 +140,8 @@ pub struct RemoteServer {
     inner: Arc<Inner>,
     addr: SocketAddr,
     osc_port: Option<u16>,
+    /// The OSC receiver blocks in a read with no timeout: `stop` wakes it at this address.
+    osc: Option<(SocketAddr, JoinHandle<()>)>,
     threads: Vec<JoinHandle<()>>,
 }
 
@@ -155,6 +164,7 @@ impl RemoteServer {
         let inner = Arc::new(Inner {
             shared: Mutex::new(Shared {
                 tokens: [new_token(), new_token(), new_token()],
+                osc_keys: [new_token(), new_token()],
                 hello: json!({ "engine_name": config.engine_name }),
                 state: "null".into(),
                 meters: String::new(),
@@ -170,6 +180,7 @@ impl RemoteServer {
             stop: AtomicBool::new(false),
             next_conn: AtomicU64::new(1),
             started: Instant::now(),
+            osc_port: OnceLock::new(),
         });
         let mut threads = Vec::new();
         let i2 = inner.clone();
@@ -179,22 +190,34 @@ impl RemoteServer {
                 .spawn(move || accept_loop(listener, i2))?,
         );
         let mut osc_port = None;
+        let mut osc = None;
         if config.osc {
             let sock = UdpSocket::bind((config.bind, addr.port().wrapping_add(1)))
                 .or_else(|_| UdpSocket::bind((config.bind, 0)))?;
-            sock.set_read_timeout(Some(Duration::from_millis(100)))?;
-            osc_port = Some(sock.local_addr()?.port());
+            sock.set_read_timeout(None)?;
+            let mut wake = sock.local_addr()?;
+            osc_port = Some(wake.port());
+            let _ = inner.osc_port.set(wake.port());
+            // A socket bound to every interface is reached through loopback.
+            if wake.ip().is_unspecified() {
+                wake.set_ip(match wake.ip() {
+                    IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    IpAddr::V6(_) => IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+                });
+            }
             let i3 = inner.clone();
-            threads.push(
-                std::thread::Builder::new()
-                    .name("live-remote-osc".into())
-                    .spawn(move || osc::run(sock, i3))?,
-            );
+            // 4 MiB: the OSC decoder recurses once per nested bundle of a (4 KiB) datagram.
+            let handle = std::thread::Builder::new()
+                .name("live-remote-osc".into())
+                .stack_size(4 << 20)
+                .spawn(move || osc::run(sock, i3))?;
+            osc = Some((wake, handle));
         }
         Ok(Self {
             inner,
             addr,
             osc_port,
+            osc,
             threads,
         })
     }
@@ -211,10 +234,29 @@ impl RemoteServer {
         self.inner.lock().tokens[role_index(role)].clone()
     }
 
-    /// Rotate a role's token; clients paired with the old one are disconnected.
+    /// OSC key of a role (`None` when OSC is off, and for viewers: OSC only sends controls).
+    pub fn osc_key(&self, role: Role) -> Option<String> {
+        self.osc_port?;
+        let s = self.inner.lock();
+        match role {
+            Role::Viewer => None,
+            Role::Performer => Some(s.osc_keys[0].clone()),
+            Role::Controller => Some(s.osc_keys[1].clone()),
+        }
+    }
+
+    /// Rotate a role's token (and its OSC key); clients paired with the old one are disconnected.
     pub fn rotate_token(&self, role: Role) -> String {
         let t = new_token();
-        self.inner.lock().tokens[role_index(role)] = t.clone();
+        {
+            let mut s = self.inner.lock();
+            s.tokens[role_index(role)] = t.clone();
+            match role {
+                Role::Viewer => {}
+                Role::Performer => s.osc_keys[0] = new_token(),
+                Role::Controller => s.osc_keys[1] = new_token(),
+            }
+        }
         self.inner.token_rev.fetch_add(1, Ordering::SeqCst);
         t
     }
@@ -282,6 +324,27 @@ impl RemoteServer {
 
     pub fn stop(&mut self) {
         self.inner.stop.store(true, Ordering::SeqCst);
+        if let Some((wake, handle)) = self.osc.take() {
+            // Wake the blocking read with a datagram to its own port; repeat until the thread
+            // is gone (2 s at most, then leave it detached rather than hang the shutdown).
+            let any: SocketAddr = match wake {
+                SocketAddr::V4(_) => (Ipv4Addr::UNSPECIFIED, 0).into(),
+                SocketAddr::V6(_) => (std::net::Ipv6Addr::UNSPECIFIED, 0).into(),
+            };
+            let sock = UdpSocket::bind(any).ok();
+            for _ in 0..100 {
+                if handle.is_finished() {
+                    break;
+                }
+                if let Some(s) = &sock {
+                    let _ = s.send_to(&[0], wake);
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            if handle.is_finished() {
+                let _ = handle.join();
+            }
+        }
         for t in self.threads.drain(..) {
             let _ = t.join();
         }
@@ -490,6 +553,17 @@ fn session(
             serde_json::to_value(role).unwrap_or(Value::Null),
         );
         m.insert("client".into(), client.into());
+        // OSC keys go only to devices that may send controls, and only when OSC is on.
+        if role >= Role::Performer
+            && let Some(port) = inner.osc_port.get()
+        {
+            let s = inner.lock();
+            let mut osc = json!({ "port": port, "performer_key": s.osc_keys[0] });
+            if role == Role::Controller {
+                osc["controller_key"] = s.osc_keys[1].clone().into();
+            }
+            m.insert("osc".into(), osc);
+        }
     }
     send(&mut ws, hello.to_string()).map_err(io_err)?;
     let mut seen_state = 0u64;

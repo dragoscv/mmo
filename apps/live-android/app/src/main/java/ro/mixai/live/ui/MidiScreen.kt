@@ -197,5 +197,27 @@ fun targetLabel(t: MidiTarget): String = when (t) {
     is MidiTarget.Unknown -> stringResource(R.string.midi_target_unknown, t.kind)
 }
 
-/** "reverb" → "Reverb" (the engine's effect ids are snake_case). */
-fun fxLabel(fx: String): String = fx.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.ROOT) }
+/**
+ * Display name of an engine effect id (`fx_<id>` string resource). Ids are wire names: `autotune` is shown as
+ * "Pitch correction". Unknown ids (a newer engine) fall back to the title-cased id.
+ */
+@Composable
+fun fxLabel(fx: String): String {
+    val res = when (fx) {
+        "gate" -> R.string.fx_gate
+        "eq" -> R.string.fx_eq
+        "deesser" -> R.string.fx_deesser
+        "compressor" -> R.string.fx_compressor
+        "autotune" -> R.string.fx_autotune
+        "harmonizer" -> R.string.fx_harmonizer
+        "saturator" -> R.string.fx_saturator
+        "doubler" -> R.string.fx_doubler
+        "chorus" -> R.string.fx_chorus
+        "delay" -> R.string.fx_delay
+        "reverb" -> R.string.fx_reverb
+        "limiter" -> R.string.fx_limiter
+        "tuner" -> R.string.fx_tuner
+        else -> return fx.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.ROOT) }
+    }
+    return stringResource(res)
+}

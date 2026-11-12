@@ -41,7 +41,7 @@ flowchart LR
 | control loop (main) | `live-cli` | every 5 ms: drains remote controls → `Session` → commands; publishes state + meters; drops garbage |
 | `live-remote-accept` | `live-remote` | accepts TCP connections (HTTP + WebSocket upgrade) |
 | `live-remote-conn` (one per client) | `live-remote` | auth, rate limit, parse, queue controls, send state/meters/replies |
-| `live-remote-osc` | `live-remote` | OSC/UDP from paired client addresses |
+| `live-remote-osc` (only with OSC on) | `live-remote` | OSC/UDP; each address is checked against the OSC keys |
 
 Processing happens in the **output** callback, so the in → out path is one input period + the ring target
 (one block) + one output period. Input and output may be different devices; clock drift is handled by
@@ -60,10 +60,12 @@ The output callback and everything it calls (`Core`, `Chain`, every `Processor`)
    blocks (the control loop retries a command next tick; meters/garbage pushes are best-effort).
 3. **No unbounded work.** Fixed-size buffers sized at construction (`max_block` = max(8 × buffer, 2048) frames
    in device mode), fixed-size arrays for the latency median, tails processed in 256-frame chunks.
-4. **Every gain change is ramped** (`Smoothed`, 10 ms for bus gains, bypass, mute and monitor-dry; per-effect
-   smoothing inside processors).
+4. **Every gain change is ramped** (`Smoothed`: 10 ms for bypass, mute, monitor-dry and for bus gains going
+   down, 300 ms for bus gains going up; per-effect smoothing inside processors).
 5. **Errors are classified.** Driver xruns and a refused realtime priority are counted/logged; any other stream
    error marks the stream dead and the control loop exits with the driver message.
+6. **Input is sanitised.** Non-finite input samples are replaced by silence before the chain, so one bad sample
+  from a driver cannot poison an envelope follower.
 
 | Ring | Direction | Capacity | Payload |
 |---|---|---|---|
@@ -93,14 +95,18 @@ flowchart LR
   dry --> mon
   probe -.->|"click train"| main
   probe -.-> mon
-  main --> clamp1["clamp ±1"]
-  mon --> clamp2["clamp ±1"]
+  main --> safe1["safety limiter<br/>ceiling −1 dBFS"]
+  mon --> safe2["safety limiter<br/>ceiling −1 dBFS"]
 ```
 
 - **main** — FOH / stream / recording, routed to `--main` (default channels `0,1`).
 - **monitor** — the performer's in-ear mix, routed to `--monitor` (optional). `monitor_dry` 0 = processed only,
   1 = dry only; the singer can keep a dry reference while the audience hears the full chain.
 - `bypass` blends every bus to the dry input (instant safe mode); `mute` silences every bus; both ramp 10 ms.
+- The **safety limiter** is the last stage of each bus and is not an insert: nothing can remove or disable it,
+  and bypass, the dry monitor blend and the latency click go through it. Zero latency, stereo-linked, instant
+  attack, 120 ms release, exact ceiling at −1 dBFS; it reports its gain reduction in the meters (`safety_gr`).
+  It is a sample-peak limiter, not a true-peak one: a look-ahead true-peak master for the stream bus is planned.
 - `panic` (remote) = mute + `Reset` (clears every delay line, reverb tail and envelope).
 - Planned: per-musician in-ear mixes (WP21-13) and a converted-voice FOH bus (WP21-11).
 
@@ -123,8 +129,10 @@ asserts no sample step above 0.25 and that the hall tail is still ringing 1 s la
 `Core::meters_due` publishes a `Meters` snapshot every `sample_rate / 30` samples (~30 Hz; with 128-frame
 blocks the interval rounds up to whole blocks, ≈ 29 Hz): input peak/RMS, output peak/RMS per channel, gain
 reduction per insert, pitch status of the first enabled pitch insert, DSP load (EWMA and max of callback time ÷
-buffer time), engine xruns, clip flag, latency-probe state and chain latency. The control loop keeps only the
-newest snapshot and publishes it to subscribed clients (`meters`, 1–30 Hz per client).
+buffer time), engine xruns, the safety stage's deepest gain reduction per bus (`safety_gr`, dB), the clip flag
+(true when that reduction is above 0.1 dB: the signal after the faders was too hot, the output itself did not
+clip), latency-probe state and chain latency. The control loop keeps only the newest snapshot and publishes it
+to subscribed clients (`meters`, 1–30 Hz per client).
 
 ## Control flow
 

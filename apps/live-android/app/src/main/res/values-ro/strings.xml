@@ -150,4 +150,19 @@
     <string name="local_stopped_unexpectedly">fluxul audio s-a oprit</string>
     <string name="local_qr">Cod de asociere pentru alte dispozitive din această rețea Wi-Fi (acces interpret)</string>
     <string name="local_watch_needs_lan">Ca să folosești ceasul cu motorul de pe telefon, pornește-l cu „Permite controlul de pe alte dispozitive” activat.</string>
+
+    <!-- Numele efectelor -->
+    <string name="fx_gate">Poartă</string>
+    <string name="fx_eq">Egalizator</string>
+    <string name="fx_deesser">De-esser</string>
+    <string name="fx_compressor">Compresor</string>
+    <string name="fx_autotune">Corecție de ton</string>
+    <string name="fx_harmonizer">Armonizator</string>
+    <string name="fx_saturator">Saturator</string>
+    <string name="fx_doubler">Dublare</string>
+    <string name="fx_chorus">Chorus</string>
+    <string name="fx_delay">Delay</string>
+    <string name="fx_reverb">Reverb</string>
+    <string name="fx_limiter">Limitator</string>
+    <string name="fx_tuner">Acordor</string>
 </resources>

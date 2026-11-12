@@ -134,11 +134,14 @@ Shipped by `factory()` and always loaded. Names are stable ids for setlists.
 |---|---|---|
 | Natural Vocal | natural, live | gate › eq › deesser › compressor › reverb › limiter |
 | Pop Polish | pop, tune | eq › deesser › compressor › autotune › doubler › delay › reverb › limiter |
-| Hard Tune | tune, fx | eq › compressor › autotune (retune 0.5 ms) › delay › reverb › limiter |
+| Hard Snap (was "Hard Tune"; the old name still loads) | tune, fx | eq › compressor › autotune (retune 0.5 ms, formant on) › delay › reverb › limiter |
 | Harmony Stack | harmony | eq › compressor › autotune › harmonizer (3rd above, 4th below) › reverb › limiter |
 | Rock Grit | rock | gate › eq › compressor › saturator › delay (110 ms slap) › limiter |
 | Ballad Hall | ballad | eq › deesser › compressor › chorus › delay › reverb (4 s) › limiter |
 | Speech / MC | speech | gate › eq › deesser › compressor (auto make-up) › limiter |
+
+A renamed factory preset keeps its old name as an alias for loading (setlists, MIDI program changes, `--preset`),
+unless a user preset carries that name: then the user preset loads.
 
 Exact values: `mixai-live-engine presets`. A test (`every_factory_preset_builds_without_warnings`) builds every
 factory preset, checks it has no unknown parameters and round-trips it through JSON.

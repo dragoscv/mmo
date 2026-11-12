@@ -78,6 +78,7 @@ pub struct HostConfig {
     pub name: String,
     /// Announce `_mixai-live._tcp` over mDNS (only meaningful with a LAN bind).
     pub announce: bool,
+    /// Open the OSC/UDP port. Off by default; see `osc.rs` for the key every address must carry.
     pub osc: bool,
     pub store: Option<Store>,
     /// Start with every output muted (phones: the speaker next to the mic would howl).
@@ -95,7 +96,7 @@ impl Default for HostConfig {
             port: 0,
             name: "MixAI Live".into(),
             announce: false,
-            osc: true,
+            osc: false,
             store: None,
             start_muted: false,
             midi: None,
@@ -109,6 +110,9 @@ pub struct HostReady {
     pub info: RunningInfo,
     pub port: u16,
     pub osc_port: Option<u16>,
+    /// OSC keys (`/<key>/live/...`), present only when OSC is on.
+    pub osc_performer_key: Option<String>,
+    pub osc_controller_key: Option<String>,
     /// Host advertised in the pairing URLs (LAN IP, or 127.0.0.1 for a loopback bind).
     pub host: IpAddr,
     pub controller_token: String,
@@ -320,6 +324,8 @@ fn run(
         info: running.info.clone(),
         port: server.port(),
         osc_port: server.osc_port(),
+        osc_performer_key: server.osc_key(Role::Performer),
+        osc_controller_key: server.osc_key(Role::Controller),
         host,
         controller_token: server.token(Role::Controller),
         controller_url: server.pairing_url(Role::Controller, host),

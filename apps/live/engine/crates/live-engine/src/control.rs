@@ -484,7 +484,7 @@ mod tests {
                     artist: String::new(),
                     key: None,
                     bpm: None,
-                    parts: vec![part("All", "Hard Tune", Some(7))],
+                    parts: vec![part("All", "Hard Snap", Some(7))],
                     lyrics: None,
                     notes: String::new(),
                 },
@@ -550,7 +550,7 @@ mod tests {
         assert_eq!(s.preset_name, "Pop Polish");
         s.apply_midi(&[0xC0, 7], t0);
         assert_eq!(s.position.as_ref().map(|p| p.song), Some(1));
-        assert_eq!(s.preset_name, "Hard Tune");
+        assert_eq!(s.preset_name, "Hard Snap");
         // Unknown program: nothing happens.
         assert!(s.apply_midi(&[0xC0, 99], t0).is_empty());
         // Omni off on another channel ignores it.
