@@ -108,6 +108,12 @@ class DecksController(val backend: DecksBackend) {
         private set
     var partyOpen by mutableStateOf(true)
         private set
+    /**
+     * Controls lock: phones cannot move the decks or the mixer, song requests keep working. Kept while
+     * connected mode is off (this session only, like [partyOpen]) and applied again at the next start.
+     */
+    var controlsLocked by mutableStateOf(false)
+        private set
     var remoteClients by mutableStateOf(0)
         private set
 
@@ -354,6 +360,8 @@ class DecksController(val backend: DecksBackend) {
         remote = r
         remoteOn = true
         r.setPartyOpen(partyOpen)
+        // A new server starts unlocked: the choice made earlier in this session is applied again.
+        r.setControlsLocked(controlsLocked)
         pairings = RemoteRoleUi.entries.mapNotNull { role -> r.pairing(role)?.let { role to it } }.toMap()
         for (d in controls.indices) labelDeck(d)
         return true
@@ -367,6 +375,12 @@ class DecksController(val backend: DecksBackend) {
     fun changePartyOpen(open: Boolean) {
         partyOpen = open
         remote?.setPartyOpen(open)
+    }
+
+    /** Lock or unlock the phone controls. While connected mode is off the choice waits for the next start. */
+    fun changeControlsLocked(locked: Boolean) {
+        controlsLocked = locked
+        remote?.setControlsLocked(locked)
     }
 
     fun moderate(id: Long, state: RequestStateUi) {
@@ -394,6 +408,8 @@ class DecksController(val backend: DecksBackend) {
         val r = remote ?: return
         val rep = r.pump()
         for (m in rep.mixer) applyRemoteMixer(m)
+        // The server's own state: a lock set elsewhere shows, a lock the server refused does not stay shown.
+        controlsLocked = rep.controlsLocked
         if (frame % 24L == 0L) {
             requests = r.requests()
             remoteClients = r.clientCount()
@@ -536,6 +552,12 @@ class DecksController(val backend: DecksBackend) {
         if (deck(d)?.loopActive == true) backend.loopDouble(d)
     }
 
+    /** Manual loop: set the loop start at the playhead. */
+    fun loopIn(d: Int) = backend.loopIn(d)
+
+    /** Manual loop: set the loop end at the playhead (the loop starts when the end is after the start). */
+    fun loopOut(d: Int) = backend.loopOut(d)
+
     fun beatJump(d: Int, forward: Boolean) {
         val b = controls[d].jumpBeats
         backend.beatJump(d, if (forward) b else -b)
@@ -660,8 +682,8 @@ class DecksController(val backend: DecksBackend) {
                 "hot_cue" -> if (pressed) a.slot?.let { hotCue(d, it.coerceIn(0, 7)) }
                 "hot_cue_delete" -> a.slot?.let { backend.hotCueDelete(d, it) }
                 "auto_loop" -> if (pressed) { a.beats?.let { controls[d].loopBeats = it }; loopAuto(d) }
-                "loop_in" -> if (pressed) backend.loopIn(d)
-                "loop_out" -> if (pressed) backend.loopOut(d)
+                "loop_in" -> if (pressed) loopIn(d)
+                "loop_out" -> if (pressed) loopOut(d)
                 "loop_exit" -> backend.loopExit(d)
                 "loop_halve" -> if (pressed) loopHalve(d)
                 "loop_double" -> if (pressed) loopDouble(d)

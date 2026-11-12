@@ -3,6 +3,7 @@
 
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::time::{Duration, Instant};
 
 /// Largest accepted request head.
 pub const MAX_HEAD: usize = 8 * 1024;
@@ -62,10 +63,18 @@ pub fn parse_head(buf: &[u8]) -> Result<Head, String> {
 }
 
 /// Read until the end of the request head. Returns the raw bytes (head plus anything after it).
-pub fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
+/// The WHOLE head must arrive within `within`: a peer that trickles one byte at a time cannot
+/// hold the connection (and its thread) longer than that.
+pub fn read_head(stream: &mut TcpStream, within: Duration) -> io::Result<Vec<u8>> {
+    let deadline = Instant::now() + within;
     let mut buf = Vec::with_capacity(1024);
     let mut chunk = [0u8; 1024];
     loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(io::Error::new(io::ErrorKind::TimedOut, "request head"));
+        }
+        stream.set_read_timeout(Some(left))?;
         let n = stream.read(&mut chunk)?;
         if n == 0 {
             return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "closed"));
@@ -200,5 +209,50 @@ mod tests {
                 .contains("--background")
         );
         assert!(static_route("/etc/passwd").is_none());
+    }
+
+    #[test]
+    fn a_head_that_trickles_in_is_cut_at_the_deadline() {
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        // One byte every 40 ms, never the end of the head: each read succeeds, so a per-read
+        // timeout alone would never fire.
+        let slow = std::thread::spawn(move || {
+            let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            for _ in 0..100 {
+                if s.write_all(b"x").is_err() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(40));
+            }
+        });
+        let (mut peer, _) = listener.accept().unwrap();
+        let start = Instant::now();
+        let err = read_head(&mut peer, Duration::from_millis(300)).unwrap_err();
+        let took = start.elapsed();
+        assert!(
+            matches!(
+                err.kind(),
+                io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+            ),
+            "{err:?}"
+        );
+        assert!(
+            took >= Duration::from_millis(250) && took < Duration::from_secs(2),
+            "{took:?}"
+        );
+        drop(peer);
+        slow.join().unwrap();
+        // A whole head inside the deadline is read as before.
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut c = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        c.write_all(b"GET /health HTTP/1.1\r\nHost: x\r\n\r\n")
+            .unwrap();
+        let (mut peer, _) = listener.accept().unwrap();
+        let raw = read_head(&mut peer, Duration::from_secs(5)).unwrap();
+        assert_eq!(parse_head(&raw).unwrap().path, "/health");
     }
 }

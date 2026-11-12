@@ -1,0 +1,362 @@
+/* Co-pilot (src/copilot/*). Shared vocabulary: src/look/look.css (dk-*). */
+
+/* Toolbar button: the icon turns to the alert colour when the set-safety check asks for action
+    (the icon shape changes too, and the accessible name says it). Lit while the popover is open
+    (`data-on`, the dk-btn ON look; open / closed itself is the trigger's aria-expanded). */
+.cp-btn[data-urgent]:not([data-on="true"]) > svg {
+    color: var(--alert, var(--destructive));
+}
+
+/* Popover: one fixed column, 360 px wide, nothing scrolls (rows are fitted by CopilotPopover).
+    --cp-min = the smallest control: 24 px, 44 px in touch mode. It is the app's --dt-min (set on
+    :root by components/deck-tabs.css, switched by :root[data-touch="on"]): touch mode forces
+    44 x 44 px on every button (styles.css), so everything that holds a button here (suggestion
+    rows and their two Load columns, the ask field, the request line, the radio rows) is sized
+    from this one variable. CopilotPopover reads the same value for the row fit (fitRows). */
+.cp-pop[data-slot="popover-content"] {
+     --cp-min: var(--dt-min, 24px);
+    width: min(92vw, 360px);
+    padding: 10px;
+    display: grid;
+    gap: 6px;
+    border-radius: var(--ctl-radius, 6px);
+}
+.cp-body {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+.cp-body p {
+    margin: 0;
+}
+/* Truncated single-line text. */
+.cp-c {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cp-sec {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.cp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    min-height: var(--cp-min);
+}
+
+/* ── ask field ── */
+.cp-ask {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.cp-ask-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 0;
+    min-width: 0;
+    height: var(--cp-min);
+    padding: 0 6px;
+    border: 1px solid var(--line, var(--border));
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--well, var(--bg-elev));
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.cp-ask-field > svg {
+    flex: none;
+}
+.cp-ask-field > input {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: none;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    -webkit-user-select: text;
+    user-select: text;
+}
+.cp-ask-field > input::placeholder {
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.cp-ask-field:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: -1px;
+}
+.cp-ask > .dk-btn {
+    flex: none;
+    width: var(--cp-min);
+    height: var(--cp-min);
+    min-height: var(--cp-min);
+}
+
+/* ── active request: what was understood ── */
+/* Row 1: label, count, clear; row 2: the chips, wrapping (never clipped). */
+.cp-request {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto var(--cp-min);
+    align-items: center;
+    gap: 2px 6px;
+    min-width: 0;
+}
+.cp-chips {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    min-width: 0;
+}
+.cp-chip {
+    max-width: 100%;
+    height: 16px;
+    padding: 0 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--secondary);
+    color: var(--foreground);
+    font-size: 10px;
+    line-height: 16px;
+    font-weight: 600;
+}
+.cp-count {
+    flex: none;
+    color: var(--muted-foreground);
+}
+.cp-request > .dk-btn {
+    width: var(--cp-min);
+    height: var(--cp-min);
+    min-height: var(--cp-min);
+}
+/* "Searched the first 2 000 of 30 000 tracks": plain text, may wrap. */
+.cp-pool {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--muted-foreground);
+}
+.cp-pool > svg {
+    flex: none;
+    margin-top: 1px;
+}
+
+/* ── radio rows (energy, bars, style): RadioCells with this group class ── */
+.cp-radios {
+    display: flex;
+    flex: none;
+    gap: 2px;
+    min-width: 0;
+}
+.cp-radios > .dk-cell {
+    min-height: var(--cp-min);
+    padding-inline: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.cp-styles {
+    flex: 1 1 auto;
+}
+.cp-styles > .dk-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 2px;
+}
+
+/* ── suggestions ── */
+/* A row is as high as its Load buttons (--cp-min) plus, with the reasons shown, one 12 px line;
+    gap 2 px. Keep in step with rowHeight(), ROW_WHY_H and ROW_GAP in features.ts (the fit is
+    computed from them with the same --cp-min). The two Load columns are --cp-min wide, so the
+    buttons never overlap each other or the next row, in touch mode either. */
+.cp-list {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    list-style: none;
+}
+.cp-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px 46px var(--cp-min) var(--cp-min);
+    grid-template-rows: var(--cp-min) 12px;
+    align-items: center;
+    column-gap: 4px;
+    height: calc(var(--cp-min) + 12px);
+    min-width: 0;
+}
+.cp-row[data-dense="true"] {
+    grid-template-rows: var(--cp-min);
+    height: var(--cp-min);
+}
+.cp-row-text {
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 600;
+    color: var(--foreground);
+}
+.cp-row-artist {
+    font-weight: 400;
+    color: var(--muted-foreground);
+}
+.cp-row-bpm {
+    text-align: right;
+    color: var(--muted-foreground);
+}
+.cp-row > .dk-key {
+    justify-self: start;
+}
+.cp-row-load {
+    width: var(--cp-min);
+    height: var(--cp-min);
+    min-height: var(--cp-min);
+    padding: 0;
+}
+.cp-row-why {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 9px;
+    line-height: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--fg-faint, var(--muted-foreground));
+}
+.cp-empty {
+    min-height: var(--cp-min);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted-foreground);
+}
+
+/* ── transition: plan, run ── */
+.cp-plan,
+.cp-run {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.cp-plan-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 600;
+    color: var(--foreground);
+}
+.cp-plan-sub {
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--muted-foreground);
+}
+.cp-plan-sub > .dk-num {
+    font-weight: 600;
+    color: var(--foreground);
+    white-space: normal;
+}
+.cp-opt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+.cp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.cp-go {
+    background: var(--on, var(--primary));
+    border-color: var(--on, var(--primary));
+    color: var(--on-fg, var(--primary-foreground));
+}
+.cp-go:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--on, var(--primary)) 88%, var(--foreground));
+}
+.cp-progress {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 1px;
+    background: var(--well, var(--bg-elev));
+    border: 1px solid var(--line, var(--border));
+}
+.cp-progress > i {
+    display: block;
+    height: 100%;
+    background: var(--on, var(--primary));
+}
+
+/* ── set safety + status line ── */
+.cp-warns {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    list-style: none;
+}
+/* dk-label, but a long warning may wrap to a second line. */
+.cp-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    white-space: normal;
+}
+.cp-warn > svg {
+    flex: none;
+    margin-top: 0.5px;
+}
+.cp-warn[data-sev="2"] {
+    color: var(--alert, var(--destructive));
+}
+.cp-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted-foreground);
+}
+/* Empty: out of the layout but still in the accessibility tree, so the next message is announced. */
+.cp-note[data-empty] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+.cp-note > svg {
+    flex: none;
+    margin-top: 1.5px;
+}
+.cp-note[data-tone="error"] {
+    color: var(--foreground);
+}
+.cp-note[data-tone="error"] > svg {
+    color: var(--alert, var(--destructive));
+}

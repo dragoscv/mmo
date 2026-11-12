@@ -19,6 +19,9 @@ import { BUILTIN_SKINS } from "@/packs/builtin-skins";
 import { skinName } from "@/packs/skin-text";
 import { usePackStore } from "@/packs/pack-store";
 import { useT, type MessageKey } from "@/i18n";
+import { LinkChip } from "@/link/LinkChip";
+import { PracticeChip } from "@/practice/PracticeChip";
+import { RemoteChip } from "@/remote/RemoteChip";
 import { startStatus, useStatusStore, type CompanionLink } from "./status-store";
 import { LOAD_CELLS, VU_CELLS, VU_FLOOR_DB, bufferFrames, clockText, loadCells, loadLevel, msToNextMinute, overrunText, shortDevice, vuCells, vuCellsDb } from "./status-math";
 
@@ -215,6 +218,9 @@ export function StatusBar() {
             {native && <AudioLoad />}
             {native && <AudioInfo />}
             <span className="sb-spacer" />
+            <PracticeChip />
+            <LinkChip />
+            <RemoteChip />
             <LibraryLink />
             <Clock />
             <LookInfo />

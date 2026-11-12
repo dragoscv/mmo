@@ -12,6 +12,9 @@ import ro.mixai.decks.ffi.SongRequestState
 class FfiRemote private constructor(private val remote: DecksRemote, private val engine: DecksEngine) : RemotePort {
     override val port: Int = runCatching { remote.port().toInt() }.getOrDefault(0)
 
+    /** The controls lock as the binding last reported it: a pump that failed must not read as "unlocked". */
+    private var locked = false
+
     private fun RemoteRoleUi.ffi() = when (this) {
         RemoteRoleUi.CONTROLLER -> RemoteRole.CONTROLLER
         RemoteRoleUi.VIEWER -> RemoteRole.VIEWER
@@ -31,6 +34,7 @@ class FfiRemote private constructor(private val remote: DecksRemote, private val
 
     override fun pump(): RemotePumpUi = runCatching {
         val r = remote.pump(engine)
+        locked = r.controlsLocked
         RemotePumpUi(
             applied = r.applied.toInt(),
             errors = r.errors,
@@ -43,8 +47,9 @@ class FfiRemote private constructor(private val remote: DecksRemote, private val
                     is RemoteMixerChange.MasterVolume -> RemoteMixerUi.MasterVolume(c.value)
                 }
             },
+            controlsLocked = r.controlsLocked,
         )
-    }.getOrElse { RemotePumpUi(0, listOf(it.message ?: it.toString()), emptyList()) }
+    }.getOrElse { RemotePumpUi(0, listOf(it.message ?: it.toString()), emptyList(), locked) }
 
     override fun requests(): List<SongRequestUi> = runCatching {
         remote.requests().map {
@@ -75,6 +80,13 @@ class FfiRemote private constructor(private val remote: DecksRemote, private val
     }
 
     override fun setPartyOpen(open: Boolean) { runCatching { remote.setPartyOpen(open) } }
+
+    override fun setControlsLocked(locked: Boolean) {
+        runCatching { remote.setControlsLocked(locked) }
+        // What the server holds now, whether or not it took the change (a stopped server refuses it).
+        this.locked = runCatching { remote.controlsLocked() }.getOrDefault(this.locked)
+    }
+
     override fun clearDone() { runCatching { remote.clearDoneRequests() } }
     override fun clientCount(): Int = runCatching { remote.clients().size }.getOrDefault(0)
 

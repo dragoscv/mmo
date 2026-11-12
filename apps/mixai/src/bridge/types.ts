@@ -64,6 +64,14 @@ export interface DeckState {
     stemsActive: boolean;
     /** Per-stem gains [vocals, drums, bass, melody], 0..1.5. */
     stemGains: number[];
+    /** Per-stem crossfader [vocals, drums, bass, melody], −1 (side A) .. +1 (side B); 0 = follows the deck. Absent before 1.6. */
+    stemXf?: number[];
+    /** Stem mute FX: a muted stem leaves an echo tail. Absent before 1.6. */
+    stemMuteFx?: boolean;
+    /** Echo time of the stem mute FX in beats. Absent before 1.6. */
+    stemMuteFxBeats?: number;
+    /** Loop length in beats stored on each hot cue (null = a plain cue); 8 slots. Absent before 1.6. */
+    hotCueLoops?: (number | null)[];
     /** Active FX: 0=off, 1=echo, 2=reverb. */
     fxKind: number;
     /** FX wet/dry mix 0..1. */
@@ -290,6 +298,8 @@ export interface ClockState {
     barPhase: number | null;
     beatsPerBar: number;
     frame: number;
+    /** Engine monotonic microseconds at which `beat` was sampled (absent before 1.6). */
+    hostUs?: number;
     sampleRate: number;
     decks: DeckClock[];
 }

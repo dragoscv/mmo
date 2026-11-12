@@ -29,6 +29,12 @@ use companion::CompanionState;
 mod pack;
 mod window_ctl;
 
+// One module per feature area (each owns its commands and its managed state).
+mod copilot;
+mod link;
+mod remote;
+mod stems;
+
 /// Tauri-managed engine handle. `Option` so a device failure doesn't crash the
 /// whole app — the UI degrades to "UI preview" mode.
 pub struct EngineState(pub Mutex<Option<Engine>>);
@@ -304,8 +310,15 @@ async fn load_track_stream(
 }
 
 #[tauri::command]
-fn deck_play(deck: String, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_play(
+    deck: String,
+    state: State<'_, EngineState>,
+    remote_ctl: State<'_, remote::RemoteCtl>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
+    // Before the engine lock: a phone's held CUE ends here (lock order: remote, then engine).
+    let now = std::time::Instant::now();
+    remote::note_local(&remote_ctl, deck, remote::LocalTransport::Play, now);
     let guard = state.0.lock().unwrap();
     let engine = guard.as_ref().ok_or("engine not running")?;
     if let Some(d) = engine.mirror().decks.iter_mut().find(|d| d.id == deck) {
@@ -316,8 +329,14 @@ fn deck_play(deck: String, state: State<'_, EngineState>) -> Result<(), String> 
 }
 
 #[tauri::command]
-fn deck_pause(deck: String, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_pause(
+    deck: String,
+    state: State<'_, EngineState>,
+    remote_ctl: State<'_, remote::RemoteCtl>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
+    let now = std::time::Instant::now();
+    remote::note_local(&remote_ctl, deck, remote::LocalTransport::Pause, now);
     let guard = state.0.lock().unwrap();
     let engine = guard.as_ref().ok_or("engine not running")?;
     if let Some(d) = engine.mirror().decks.iter_mut().find(|d| d.id == deck) {
@@ -328,8 +347,18 @@ fn deck_pause(deck: String, state: State<'_, EngineState>) -> Result<(), String>
 }
 
 #[tauri::command]
-fn deck_seek(deck: String, position: f64, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_seek(
+    deck: String,
+    position: f64,
+    state: State<'_, EngineState>,
+    remote_ctl: State<'_, remote::RemoteCtl>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
+    if !position.is_finite() {
+        return Err("position must be a finite number".into());
+    }
+    let what = remote::LocalTransport::Seek(position);
+    remote::note_local(&remote_ctl, deck, what, std::time::Instant::now());
     let guard = state.0.lock().unwrap();
     let engine = guard.as_ref().ok_or("engine not running")?;
     engine.send(Command::Seek(deck, position));
@@ -527,8 +556,11 @@ fn deck_jump_hot_cue(
     deck: String,
     slot: usize,
     state: State<'_, EngineState>,
+    remote_ctl: State<'_, remote::RemoteCtl>,
 ) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
+    let now = std::time::Instant::now();
+    remote::note_local(&remote_ctl, deck, remote::LocalTransport::Jump, now);
     with_engine(&state, |e| e.send(Command::JumpHotCue(deck, slot)))
 }
 
@@ -625,8 +657,12 @@ fn deck_phase_sync(
     deck: String,
     lock: Option<bool>,
     state: State<'_, EngineState>,
+    remote_ctl: State<'_, remote::RemoteCtl>,
 ) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
+    // A phase sync moves the playhead by a fraction of a beat.
+    let now = std::time::Instant::now();
+    remote::note_local(&remote_ctl, deck, remote::LocalTransport::Jump, now);
     with_engine(&state, |e| e.phase_sync(deck, lock.unwrap_or(false)))
 }
 
@@ -722,11 +758,18 @@ fn deck_set_quantize(
 
 /// Beat-jump by `beats` (±1/2/4/8/16/32; fractions allowed).
 #[tauri::command]
-fn deck_beat_jump(deck: String, beats: f64, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_beat_jump(
+    deck: String,
+    beats: f64,
+    state: State<'_, EngineState>,
+    remote_ctl: State<'_, remote::RemoteCtl>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     if !beats.is_finite() || beats.abs() > 64.0 {
         return Err("beats must be within ±64".into());
     }
+    let now = std::time::Instant::now();
+    remote::note_local(&remote_ctl, deck, remote::LocalTransport::Jump, now);
     with_engine(&state, |e| e.beat_jump(deck, beats))
 }
 
@@ -1189,6 +1232,9 @@ pub fn run() {
         .manage(HidState::new())
         .manage(CompanionState::default())
         .manage(pack::PackState::default())
+        .manage(link::LinkCtl::default())
+        .manage(remote::RemoteCtl::default())
+        .manage(copilot::CopilotCtl::default())
         .setup(|app| {
             // Custom HTML title bar: drop the native frame on Windows/Linux only. macOS keeps
             // `decorations: true` + Overlay title bar from tauri.conf.json (native traffic lights).
@@ -1217,6 +1263,9 @@ pub fn run() {
             let handle = app.handle().clone();
             // Reconnect the remembered Bluetooth MIDI controller whenever it is switched on.
             ble_midi::start_auto_connect(handle.clone());
+            link::init(&handle);
+            remote::init(&handle);
+            copilot::init(&handle);
             std::thread::spawn(move || {
                 loop {
                     std::thread::sleep(Duration::from_millis(33));
@@ -1333,6 +1382,33 @@ pub fn run() {
             pack::pack_pick_file,
             pack::pack_build,
             pack::pack_export,
+            // -- link (WP19-29): commands of src/link.rs --
+            link::link_status,
+            link::link_start,
+            link::link_stop,
+            link::link_set,
+            // -- remote (WP19-42): commands of src/remote.rs --
+            remote::remote_status,
+            remote::remote_start,
+            remote::remote_stop,
+            remote::remote_rotate,
+            remote::remote_requests,
+            remote::remote_request_set,
+            remote::remote_set,
+            // -- copilot (WP19-39): commands of src/copilot.rs --
+            copilot::copilot_rank,
+            copilot::copilot_plan,
+            copilot::copilot_run,
+            copilot::copilot_cancel,
+            copilot::copilot_status,
+            copilot::copilot_safety,
+            copilot::copilot_intent,
+            copilot::copilot_intent_schema,
+            // -- stems / cue loops (WP19-41): commands of src/stems.rs --
+            stems::deck_set_stem_mute,
+            stems::deck_set_stem_xf,
+            stems::deck_set_stem_mute_fx,
+            stems::deck_save_cue_loop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MIXAI");

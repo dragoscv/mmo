@@ -11,6 +11,7 @@
  * libraryNav.page(-1);           // optional: page up/down by the rows that fit
  * libraryNav.loadSelected("a");  // controller LOAD A / B / C / D button
  * libraryNav.focusSearch();      // focus the search box (icon tier: opens the search popover)
+ * libraryNav.search("daft punk"); // put text in the search box and run the search
  * ```
  *
  * Mapping MIDI: map the browse encoder's relative value to `move(delta)` and
@@ -23,7 +24,8 @@ export type LibraryNavCommand =
     | { type: "move"; delta: number }
     | { type: "page"; dir: number }
     | { type: "load"; deck: DeckId }
-    | { type: "focusSearch" };
+    | { type: "focusSearch" }
+    | { type: "search"; query: string };
 
 type Listener = (cmd: LibraryNavCommand) => void;
 
@@ -49,6 +51,10 @@ export const libraryNav = {
     /** Focus the Library search field. */
     focusSearch(): void {
         emit({ type: "focusSearch" });
+    },
+    /** Replace the search text (the Library fetches that search and goes back to the top). */
+    search(query: string): void {
+        emit({ type: "search", query: query.slice(0, 200) });
     },
     /** Subscribe (used by the Library). Returns the unsubscribe function. */
     subscribe(listener: Listener): () => void {

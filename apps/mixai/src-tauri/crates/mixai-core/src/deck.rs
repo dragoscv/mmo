@@ -10,9 +10,9 @@
 use crate::beatfx::{BeatFx, BeatFxKind};
 use crate::beatgrid::BeatGrid;
 use crate::colorfx::{ColorFx, ColorFxKind};
-use crate::dsp::{Biquad, Smoothed, db_to_lin};
+use crate::dsp::{Biquad, Smoothed, crossfader_gain, db_to_lin};
 use crate::fx::{Fx, FxKind};
-use crate::state::{CrossfaderAssign, DeckId, DeckState};
+use crate::state::{CrossfaderAssign, DeckId, DeckState, stem_mute_step};
 use crate::stretch::{MAX_LAYERS, StemMix, Stretcher, StretcherKind, make_stretcher};
 
 /// Tempo range for every path (varispeed and key-locked stretch).
@@ -26,6 +26,20 @@ pub const TRIM_MAX_DB: f32 = 12.0;
 pub const TRIM_MIN_DB: f32 = -96.0;
 /// Trim smoothing time constant.
 const TRIM_SMOOTH_MS: f32 = 15.0;
+/// Smoothing time constant of the per-stem gains (level and stem crossfader).
+const STEM_SMOOTH_MS: f32 = 20.0;
+/// A stem at or below this gain is silent (muted).
+pub const STEM_SILENT: f32 = 0.001;
+/// Stem mute FX: each echo repeat is this much of the one before it.
+pub const STEM_TAIL_FEEDBACK: f32 = 0.55;
+/// Stem mute FX: repeats in a tail. The last one is at 0.55^12 (−62 dB), so the tail ends
+/// there: it is over 12 echo times (plus the fade) after the mute.
+pub const STEM_TAIL_TAPS: i64 = 12;
+/// Stem mute FX: fade of a repeat when it reaches the mute point, and of the tail on unmute.
+const STEM_TAIL_FADE_MS: f32 = 20.0;
+/// Stem mute FX echo time range in beats.
+pub const STEM_MUTE_FX_BEATS_MIN: f64 = 1.0 / 32.0;
+pub const STEM_MUTE_FX_BEATS_MAX: f64 = 8.0;
 
 /// Linear gain for a trim in dB: ≤ [`TRIM_MIN_DB`] (incl. −∞) or NaN → 0, capped at
 /// [`TRIM_MAX_DB`].
@@ -35,6 +49,161 @@ pub fn trim_gain(db: f32) -> f32 {
     } else {
         db_to_lin(db.min(TRIM_MAX_DB))
     }
+}
+
+/// Gain of one stem for its stem crossfader position `pos` (−1 = side A .. +1 = side B) on a
+/// deck that sits on crossfader side `side`: the mixer's crossfader law (`curve`, see
+/// [`crossfader_gain`]) normalised so that the centre is unity and capped at unity. So 0 (the
+/// default) changes nothing, the deck's own side changes nothing, and the far side is silence.
+/// A deck on THRU has no side: its stems ignore the stem crossfader.
+pub fn stem_xf_gain(pos: f32, side: CrossfaderAssign, curve: u8) -> f32 {
+    let side_a = match side {
+        CrossfaderAssign::A => true,
+        CrossfaderAssign::B => false,
+        CrossfaderAssign::Thru => return 1.0,
+    };
+    if pos.is_nan() || pos == 0.0 {
+        return 1.0;
+    }
+    let centre = crossfader_gain(0.0, side_a, curve);
+    if centre <= 0.0 {
+        return 1.0;
+    }
+    (crossfader_gain(pos, side_a, curve) / centre).clamp(0.0, 1.0)
+}
+
+/// Echo tail of one muted stem (stem mute FX).
+///
+/// A stem is a buffer the deck already holds, so the echo of what was heard before the mute
+/// needs no delay line: repeat `k` is the stem `k` echo times before the tail's own playhead
+/// (`origin + age`), at `feedback^k`. A repeat stops when its read point reaches the mute
+/// point (the send closed there), so the tail is exactly what a feedback echo with the stem
+/// sent into it until the mute would play, and it ends after [`STEM_TAIL_TAPS`] repeats. The
+/// playhead of the tail is its own: seeking or looping the deck after the mute does not move it.
+/// (The stems are summed before the time-stretcher, so there is no per-stem signal a real
+/// delay line could be fed with; reading the stem buffer is also free of allocation.)
+///
+/// Approximation: the repeats are read at the pitch the stem is heard at. With key lock and a
+/// tempo other than ±0 % a repeat therefore covers slightly less (or more) of the track than
+/// a delay line fed with the stretched audio would hold; its timing and level are exact.
+#[derive(Clone, Copy)]
+struct StemTail {
+    /// Repeats are still due (false once the last one played or the stem was unmuted).
+    ringing: bool,
+    /// Deck playhead (source frames) when the stem was muted.
+    origin: f64,
+    /// Source frames played since the mute.
+    age: f64,
+    /// Echo time in source frames (fixed for the life of the tail).
+    delay: f64,
+    /// Level of the stem before the mute.
+    level: f32,
+    /// Return gain: 1 while the tail rings, 0 once it is ended (last repeat played, unmute,
+    /// mute FX off, stems off). Smoothed, so an ended tail fades out instead of stopping dead.
+    ret: Smoothed,
+    /// Loop that was running at the mute (in-point and length in source frames; length 0 =
+    /// none): what was heard before the mute was the loop, so a repeat that reaches back past
+    /// the loop start reads from the loop end.
+    wrap_in: f64,
+    wrap_len: f64,
+}
+
+impl StemTail {
+    fn new(sr: f32) -> Self {
+        StemTail {
+            ringing: false,
+            origin: 0.0,
+            age: 0.0,
+            delay: 1.0,
+            level: 0.0,
+            ret: Smoothed::new(0.0, sr, STEM_TAIL_FADE_MS),
+            wrap_in: 0.0,
+            wrap_len: 0.0,
+        }
+    }
+
+    /// No more repeats; the return fades out.
+    fn stop(&mut self) {
+        self.ringing = false;
+        self.ret.set_target(0.0);
+    }
+
+    /// Nothing left to hear.
+    fn silent(&self) -> bool {
+        !self.ringing && self.ret.value() < 1e-4
+    }
+
+    /// Sum of the repeats at the tail's playhead, before level and return gain. `fade` =
+    /// length in source frames over which a repeat fades once it is past the mute point.
+    /// The flag is true when every repeat has played.
+    #[inline]
+    fn taps(&self, buf: &TrackBuffer, fade: f64) -> (f32, f32, bool) {
+        // Repeats below `first` are entirely past the mute point.
+        let first = (((self.age - fade) / self.delay).floor() as i64 + 1).max(1);
+        if first > STEM_TAIL_TAPS {
+            return (0.0, 0.0, true);
+        }
+        let frames = buf.left.len().min(buf.right.len());
+        let head = self.origin + self.age;
+        let mut level = STEM_TAIL_FEEDBACK.powi(first as i32);
+        let (mut l, mut r) = (0.0f32, 0.0f32);
+        for k in first..=STEM_TAIL_TAPS {
+            let back = k as f64 * self.delay;
+            // Frames this repeat's read point is past the mute point (the send closed there).
+            let over = self.age - back;
+            let w = if over <= 0.0 {
+                1.0
+            } else {
+                (1.0 - over / fade).max(0.0) as f32
+            };
+            let mut q = head - back;
+            if self.wrap_len > 0.0 && q < self.wrap_in {
+                q = self.wrap_in + (q - self.wrap_in).rem_euclid(self.wrap_len);
+            }
+            if w > 0.0 && q >= 0.0 && (q as usize) + 1 < frames {
+                let i = q as usize;
+                let f = (q - i as f64) as f32;
+                let g = level * w;
+                l += (buf.left[i] + (buf.left[i + 1] - buf.left[i]) * f) * g;
+                r += (buf.right[i] + (buf.right[i + 1] - buf.right[i]) * f) * g;
+            }
+            level *= STEM_TAIL_FEEDBACK;
+        }
+        (l, r, false)
+    }
+}
+
+/// Next frame of every stem tail, summed. `xf` = the stems' current stem crossfader gains
+/// (a stem faded out there takes its tail with it), `step` = source frames per output frame,
+/// `fade` = the repeat fade in source frames. Reads preallocated buffers only.
+#[inline]
+fn render_tails(
+    layers: &[Option<TrackBuffer>; MAX_LAYERS],
+    tails: &mut [StemTail; MAX_LAYERS],
+    xf: [f32; MAX_LAYERS],
+    step: f64,
+    fade: f64,
+) -> (f32, f32) {
+    let (mut l, mut r) = (0.0f32, 0.0f32);
+    for (i, t) in tails.iter_mut().enumerate() {
+        let ret = t.ret.next();
+        if t.silent() {
+            continue;
+        }
+        let Some(buf) = layers[i].as_ref() else {
+            t.stop();
+            continue;
+        };
+        let (tl, tr, done) = t.taps(buf, fade);
+        if done {
+            t.stop();
+        }
+        let g = t.level * ret * xf[i];
+        l += tl * g;
+        r += tr * g;
+        t.age += step;
+    }
+    (l, r)
 }
 
 /// One rendered frame: post-fader main output and the pre-fader cue (PFL) tap.
@@ -342,6 +511,22 @@ pub struct Deck {
     stems: Option<[Option<TrackBuffer>; MAX_LAYERS]>,
     stems_active: bool,
     stem_gain: [Smoothed; MAX_LAYERS],
+    /// Per-stem crossfader position (−1..1, 0 = follows the deck), smoothed as a gain.
+    stem_xf_pos: [f32; MAX_LAYERS],
+    stem_xf: [Smoothed; MAX_LAYERS],
+    /// Crossfader law of the mixer (set once per block, see [`Deck::set_xf_context`]).
+    xf_curve: u8,
+    /// Crossfader side the stem crossfader gains were derived for.
+    xf_assign: CrossfaderAssign,
+    /// Stem mute FX on: a muted stem leaves an echo tail ([`StemTail`]).
+    stem_mute_fx: bool,
+    /// Echo time of the stem mute FX in beats.
+    stem_mute_fx_beats: f64,
+    stem_tails: [StemTail; MAX_LAYERS],
+    /// Level each stem had when it was last muted (what an unmute brings back).
+    stem_pre_mute: [f32; MAX_LAYERS],
+    /// Loop length in beats stored on each hot cue (cue loops), `None` = a plain cue.
+    hot_cue_loops: [Option<f64>; 8],
 
     // Per-deck FX unit (beat-synced echo / reverb).
     fx: Fx,
@@ -408,11 +593,25 @@ impl Deck {
             stems: None,
             stems_active: false,
             stem_gain: [
-                Smoothed::new(1.0, sr, 20.0),
-                Smoothed::new(1.0, sr, 20.0),
-                Smoothed::new(1.0, sr, 20.0),
-                Smoothed::new(1.0, sr, 20.0),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
             ],
+            stem_xf_pos: [0.0; MAX_LAYERS],
+            stem_xf: [
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+                Smoothed::new(1.0, sr, STEM_SMOOTH_MS),
+            ],
+            xf_curve: 1,
+            xf_assign: DeckState::empty(id).crossfader_assign,
+            stem_mute_fx: false,
+            stem_mute_fx_beats: crate::state::STEM_MUTE_FX_BEATS,
+            stem_tails: [StemTail::new(sr); MAX_LAYERS],
+            stem_pre_mute: [1.0; MAX_LAYERS],
+            hot_cue_loops: [None; 8],
             fx: Fx::new(sr),
             fx_kind: FxKind::Off,
             fx_beats: 0.5,
@@ -438,6 +637,7 @@ impl Deck {
         self.playing = false;
         // Reset performance state for the new track.
         self.hot_cues = [None; 8];
+        self.hot_cue_loops = [None; 8];
         self.cue_point = 0.0;
         self.loop_active = false;
         self.loop_in = 0.0;
@@ -453,6 +653,9 @@ impl Deck {
         // New track invalidates any previously loaded stems.
         self.stems = None;
         self.stems_active = false;
+        for t in self.stem_tails.iter_mut() {
+            *t = StemTail::new(self.sr);
+        }
         // Re-size the FX echo time to the new track's tempo grid.
         self.recompute_fx_time();
     }
@@ -474,7 +677,13 @@ impl Deck {
         self.volume.set_rate(sr, 12.0);
         self.trim.set_rate(sr, TRIM_SMOOTH_MS);
         for g in self.stem_gain.iter_mut() {
-            g.set_rate(sr, 20.0);
+            g.set_rate(sr, STEM_SMOOTH_MS);
+        }
+        for g in self.stem_xf.iter_mut() {
+            g.set_rate(sr, STEM_SMOOTH_MS);
+        }
+        for t in self.stem_tails.iter_mut() {
+            t.ret.set_rate(sr, STEM_TAIL_FADE_MS);
         }
         self.eq_dirty = true;
         self.filter_dirty = true;
@@ -769,6 +978,9 @@ impl Deck {
     /// the shortest present layer. Passing all-None disables stems.
     pub fn set_stems(&mut self, layers: [Option<TrackBuffer>; MAX_LAYERS]) {
         let any = layers.iter().any(|l| l.is_some());
+        for t in self.stem_tails.iter_mut() {
+            *t = StemTail::new(self.sr);
+        }
         if any {
             self.stems = Some(layers);
             self.stems_active = true;
@@ -778,18 +990,166 @@ impl Deck {
         }
     }
 
-    /// Turn stem playback on/off without discarding the loaded stem buffers.
+    /// Turn stem playback on/off without discarding the loaded stem buffers. Turning it off
+    /// ends every mute FX tail: no more repeats, and what is sounding fades out over a few
+    /// milliseconds (a tail cut in one sample clicks).
     pub fn set_stems_active(&mut self, on: bool) {
         if self.stems.is_some() {
             self.stems_active = on;
+            if !on {
+                for t in self.stem_tails.iter_mut() {
+                    t.stop();
+                }
+            }
         }
     }
 
     /// Set the gain (0..1) for stem `idx` (0=vocals,1=drums,2=bass,3=melody).
+    /// Bringing a stem back by its level ends its mute FX tail, like an unmute. A non-finite
+    /// gain is ignored: it would pass the clamp and never leave the smoothed gain (that stem
+    /// would be silence or garbage until the engine restarts).
     pub fn set_stem_gain(&mut self, idx: usize, gain: f32) {
-        if idx < MAX_LAYERS {
-            self.stem_gain[idx].set_target(gain.clamp(0.0, 1.5));
+        if idx < MAX_LAYERS && gain.is_finite() {
+            let gain = gain.clamp(0.0, 1.5);
+            self.stem_gain[idx].set_target(gain);
+            if gain > STEM_SILENT {
+                self.stem_tails[idx].stop();
+            }
         }
+    }
+
+    /// Mute (`on`) or unmute stem `idx`: a mute takes the level to 0 and keeps the level the
+    /// stem had, an unmute brings that level back ([`stem_mute_step`]). With the stem mute FX
+    /// on, a mute leaves an echo tail of the stem at the echo time
+    /// ([`Deck::set_stem_mute_fx`]); an unmute fades the tail out. Nothing happens for a stem
+    /// that is already in that state.
+    ///
+    /// No tail, so a plain mute, when nothing was sounding (paused deck), when the deck has no
+    /// tempo (the echo time is in beats) and in reverse playback (the tail reads the track
+    /// forward from the mute point: in reverse that is audio that was never heard).
+    pub fn set_stem_mute(&mut self, idx: usize, on: bool) {
+        if idx >= MAX_LAYERS {
+            return;
+        }
+        let level = self.stem_gain[idx].target();
+        let Some((gain, keep)) = stem_mute_step(level, self.stem_pre_mute[idx], on) else {
+            return;
+        };
+        self.stem_pre_mute[idx] = keep;
+        self.stem_gain[idx].set_target(gain);
+        if !on {
+            self.stem_tails[idx].stop();
+            return;
+        }
+        if self.stem_mute_fx && self.stems_on() && self.playing && !self.reverse {
+            let delay = self.stem_tail_delay();
+            // Armed only with a real echo time: a tail without one has no repeats, and its
+            // return gain left open would let a burst through.
+            if delay > 0.0 && delay.is_finite() {
+                let (wrap_in, wrap_len) = if self.loop_active && self.loop_out > self.loop_in {
+                    (self.loop_in, self.loop_out - self.loop_in)
+                } else {
+                    (0.0, 0.0)
+                };
+                let t = &mut self.stem_tails[idx];
+                t.ringing = true;
+                t.origin = self.play_pos;
+                t.age = 0.0;
+                t.delay = delay.max(1.0);
+                t.level = level;
+                t.wrap_in = wrap_in;
+                t.wrap_len = wrap_len;
+                t.ret.set_target(1.0);
+            }
+        }
+    }
+
+    /// Stem crossfader of stem `idx`: −1 = side A .. +1 = side B, 0 = follows the deck
+    /// ([`stem_xf_gain`]). Non-finite values are ignored.
+    pub fn set_stem_xf(&mut self, idx: usize, pos: f32) {
+        if idx < MAX_LAYERS && pos.is_finite() {
+            self.stem_xf_pos[idx] = pos.clamp(-1.0, 1.0);
+            self.retarget_stem_xf();
+        }
+    }
+
+    /// The mixer's crossfader law for this block (the stem crossfader follows it and the
+    /// deck's crossfader side).
+    pub fn set_xf_context(&mut self, curve: u8) {
+        if curve != self.xf_curve || self.crossfader_assign != self.xf_assign {
+            self.xf_curve = curve;
+            self.xf_assign = self.crossfader_assign;
+            self.retarget_stem_xf();
+        }
+    }
+
+    /// Re-derive the stem crossfader gain targets (position, side or law changed).
+    fn retarget_stem_xf(&mut self) {
+        let (side, curve) = (self.crossfader_assign, self.xf_curve);
+        for (gain, pos) in self.stem_xf.iter_mut().zip(self.stem_xf_pos) {
+            gain.set_target(stem_xf_gain(pos, side, curve));
+        }
+    }
+
+    /// Stem crossfader positions.
+    pub fn stem_xf(&self) -> [f32; MAX_LAYERS] {
+        self.stem_xf_pos
+    }
+
+    /// Stem mute FX on/off and its echo time in beats ([`STEM_MUTE_FX_BEATS_MIN`]..
+    /// [`STEM_MUTE_FX_BEATS_MAX`]; non-finite = unchanged). Turning it off ends a running tail.
+    pub fn set_stem_mute_fx(&mut self, on: bool, beats: f64) {
+        self.stem_mute_fx = on;
+        if beats.is_finite() {
+            self.stem_mute_fx_beats = beats.clamp(STEM_MUTE_FX_BEATS_MIN, STEM_MUTE_FX_BEATS_MAX);
+        }
+        if !on {
+            for t in self.stem_tails.iter_mut() {
+                t.stop();
+            }
+        }
+    }
+
+    /// (on, beats) of the stem mute FX.
+    pub fn stem_mute_fx(&self) -> (bool, f64) {
+        (self.stem_mute_fx, self.stem_mute_fx_beats)
+    }
+
+    /// Source frames a stem tail advances per output frame: the rate the stem itself is heard
+    /// at (varispeed: the tempo; key lock: the original pitch, with the key shift).
+    fn stem_tail_step(&self) -> f64 {
+        let speed = self.tempo * self.sync_nudge;
+        let shift = 2f64.powf(self.key_shift / 12.0);
+        let pitch = if self.reverse {
+            speed
+        } else if self.key_lock {
+            shift
+        } else {
+            shift * speed
+        };
+        pitch * self.rate_ratio
+    }
+
+    /// Echo time of the stem mute FX in source frames of the tail (0 without a tempo): the
+    /// chosen number of AUDIBLE beats.
+    fn stem_tail_delay(&self) -> f64 {
+        let bpm = self.effective_bpm();
+        if bpm > 0.0 {
+            60.0 / bpm * self.stem_mute_fx_beats * self.sr as f64 * self.stem_tail_step()
+        } else {
+            0.0
+        }
+    }
+
+    /// A stem tail still has repeats to play. A tail that was cut short (unmute, mute FX off,
+    /// stems off) is not live any more; it fades out over a few milliseconds.
+    pub fn stem_tail_live(&self) -> bool {
+        self.stem_tails.iter().any(|t| t.ringing)
+    }
+
+    /// A stem tail has something to render: repeats still due, or a fade-out still audible.
+    fn stem_tail_audible(&self) -> bool {
+        self.stem_tails.iter().any(|t| !t.silent())
     }
 
     /// True when stems are loaded and active.
@@ -842,26 +1202,97 @@ impl Deck {
     }
 
     /// Set hot cue `slot` (0..7) to the current playhead (snapped when quantize is on).
+    /// The result is a plain cue: a loop stored on that slot before is dropped.
     pub fn set_hot_cue(&mut self, slot: usize) {
         if slot < 8 && self.loaded() {
             self.hot_cues[slot] = Some(self.snap(self.play_pos));
+            self.hot_cue_loops[slot] = None;
         }
     }
 
     /// Jump to hot cue `slot` if set. Returns true when a jump happened.
+    /// A cue that carries a loop (see [`Deck::save_cue_loop`]) also starts that loop there.
     pub fn jump_hot_cue(&mut self, slot: usize) -> bool {
         if let Some(pos) = self.hot_cues.get(slot).copied().flatten() {
-            let target = self.quantized_target(pos);
+            let mut target = self.quantized_target(pos);
+            if let Some(beats) = self.hot_cue_loops.get(slot).copied().flatten() {
+                // The loop sits at the stored cue even when quantize moved the landing point.
+                // Quantize on a playing deck lands up to half a beat after the cue's beat, which
+                // is past the end of a shorter loop: fold the landing point into the loop, so
+                // the deck jumps once (a playhead left past the end wraps on the next frame).
+                if self.loop_from(pos, beats) && target >= self.loop_out {
+                    let len = self.loop_out - self.loop_in;
+                    target = self.loop_in + (target - self.loop_in).rem_euclid(len);
+                }
+            }
             self.jump_to(target);
             return true;
         }
         false
     }
 
-    /// Clear hot cue `slot`.
+    /// Clear hot cue `slot` (and the loop stored on it).
     pub fn clear_hot_cue(&mut self, slot: usize) {
         if slot < 8 {
             self.hot_cues[slot] = None;
+            self.hot_cue_loops[slot] = None;
+        }
+    }
+
+    /// Cue loop: store the running loop on hot cue `slot` (the cue moves to the loop's
+    /// in-point, the loop length in beats is kept with it). Without a running loop the slot's
+    /// loop is removed and the cue stays. Returns true when a loop was stored.
+    pub fn save_cue_loop(&mut self, slot: usize) -> bool {
+        if slot >= 8 || !self.loaded() {
+            return false;
+        }
+        if !(self.loop_active && self.loop_out > self.loop_in) {
+            self.hot_cue_loops[slot] = None;
+            return false;
+        }
+        let sr = self.track_sr();
+        let beats = if self.grid_valid() {
+            self.grid.beat_at(self.loop_out / sr) - self.grid.beat_at(self.loop_in / sr)
+        } else if self.bpm > 0.0 {
+            (self.loop_out - self.loop_in) / sr * self.bpm / 60.0
+        } else {
+            return false;
+        };
+        if !(beats.is_finite() && beats > 0.0) {
+            return false;
+        }
+        self.hot_cues[slot] = Some(self.loop_in);
+        self.hot_cue_loops[slot] = Some(beats);
+        true
+    }
+
+    /// Loop lengths in beats stored on the hot cues (`None` = a plain cue).
+    pub fn hot_cue_loops(&self) -> [Option<f64>; 8] {
+        self.hot_cue_loops
+    }
+
+    /// Activate a `beats`-long loop from source frame `start` (grid-aware like
+    /// [`Deck::beatloop`], but at a given point and never snapped). True when the loop was set.
+    fn loop_from(&mut self, start: f64, beats: f64) -> bool {
+        if !(beats.is_finite() && beats > 0.0) {
+            return false;
+        }
+        let sr = self.track_sr();
+        let out = if self.grid_valid() {
+            self.grid.time_at(self.grid.beat_at(start / sr) + beats) * sr
+        } else if self.bpm > 0.0 {
+            start + (60.0 / self.bpm) * sr * beats
+        } else {
+            return false;
+        };
+        if out > start {
+            self.loop_beats = beats;
+            self.loop_in = start;
+            self.loop_out = out;
+            self.loop_active = true;
+            true
+        } else {
+            false
         }
     }
 
@@ -1000,14 +1431,20 @@ impl Deck {
         let vol = self.volume.next();
         let trim = self.trim.next();
 
-        // Advance per-stem smoothed gains every frame (cheap, keeps mute/blend
-        // click-free). Captured into locals so the disjoint borrow below can
+        // Advance per-stem smoothed gains (level × stem crossfader) every frame (cheap, keeps
+        // mute/blend click-free). Captured into locals so the disjoint borrow below can
         // still take `&mut stretcher` alongside `&track`/`&stems`.
+        let xf = [
+            self.stem_xf[0].next(),
+            self.stem_xf[1].next(),
+            self.stem_xf[2].next(),
+            self.stem_xf[3].next(),
+        ];
         let sg = [
-            self.stem_gain[0].next(),
-            self.stem_gain[1].next(),
-            self.stem_gain[2].next(),
-            self.stem_gain[3].next(),
+            self.stem_gain[0].next() * xf[0],
+            self.stem_gain[1].next() * xf[1],
+            self.stem_gain[2].next() * xf[2],
+            self.stem_gain[3].next() * xf[3],
         ];
 
         // Slip: engage while a loop or reverse runs, return to the shadow on release.
@@ -1081,7 +1518,11 @@ impl Deck {
                         None => *playing = false,
                     }
                     if *loop_active && *loop_out > *loop_in && *play_pos >= *loop_out {
-                        *play_pos = *loop_in + (*play_pos - *loop_out);
+                        // Folded into the loop in ONE wrap, however far past the end the
+                        // playhead is (a seek past a running loop): each wrap resets the
+                        // stretcher. One frame past the end, the usual case, is unchanged.
+                        let len = *loop_out - *loop_in;
+                        *play_pos = *loop_in + (*play_pos - *loop_out).rem_euclid(len);
                         stretcher.reset(*play_pos);
                     }
                 } else {
@@ -1097,7 +1538,8 @@ impl Deck {
                         } else {
                             *play_pos = pos + step;
                             if *loop_active && *loop_out > *loop_in && *play_pos >= *loop_out {
-                                *play_pos = *loop_in + (*play_pos - *loop_out);
+                                let len = *loop_out - *loop_in;
+                                *play_pos = *loop_in + (*play_pos - *loop_out).rem_euclid(len);
                             }
                         }
                     } else if !*reverse {
@@ -1107,6 +1549,19 @@ impl Deck {
                 if *slip_engaged {
                     *slip_pos = (*slip_pos + step).min(frames as f64);
                 }
+            }
+        }
+
+        // Stem mute FX: echo tails of muted stems join the stem mix (they keep sounding while
+        // the deck is paused, like a delay line would). With stems switched off there are no
+        // repeats any more, only the short fade-out of a tail that was ringing.
+        if self.stem_tail_audible() {
+            let step = self.stem_tail_step();
+            let fade = STEM_TAIL_FADE_MS as f64 / 1000.0 * self.track_sr();
+            if let Some(layers) = self.stems.as_ref() {
+                let (tl, tr) = render_tails(layers, &mut self.stem_tails, xf, step, fade);
+                l += tl;
+                r += tr;
             }
         }
 
@@ -1481,5 +1936,577 @@ pub(crate) mod tests {
             pfl = pfl.max(d.render_frame().pfl.0.abs());
         }
         assert!(pfl > 0.1);
+    }
+
+    // ---- WP19-41: stem crossfader, stem mute FX, cue loops ----------------------
+
+    /// Four stem layers (12 s): a tone per `Some(freq)`, no layer per `None`.
+    fn stem_layers(freqs: [Option<f32>; 4]) -> [Option<TrackBuffer>; 4] {
+        freqs.map(|f| f.map(|hz| tone(hz, 12.0, 48_000)))
+    }
+
+    /// A playing deck (varispeed path) with two stems: vocals = 440 Hz, bass = 110 Hz.
+    fn stem_deck(side: CrossfaderAssign) -> Deck {
+        let mut d = loaded_deck(120.0, 0.0);
+        d.set_key_lock(false);
+        d.set_stems(stem_layers([Some(440.0), None, Some(110.0), None]));
+        d.crossfader_assign = side;
+        d.set_xf_context(1);
+        d.seek_secs(2.0);
+        d.play();
+        d
+    }
+
+    fn peak(d: &mut Deck, frames: usize) -> f32 {
+        (0..frames).fold(0.0f32, |p, _| p.max(d.render_frame().main.0.abs()))
+    }
+
+    #[test]
+    fn stem_xf_gain_is_unity_at_centre_and_silence_on_the_far_side() {
+        for curve in 0..3u8 {
+            for side in [CrossfaderAssign::A, CrossfaderAssign::B] {
+                assert_eq!(stem_xf_gain(0.0, side, curve), 1.0, "centre, curve {curve}");
+                assert_eq!(stem_xf_gain(f32::NAN, side, curve), 1.0);
+                let own = if side == CrossfaderAssign::A {
+                    -1.0
+                } else {
+                    1.0
+                };
+                assert_eq!(
+                    stem_xf_gain(own, side, curve),
+                    1.0,
+                    "own side, curve {curve}"
+                );
+                assert_eq!(
+                    stem_xf_gain(-own, side, curve),
+                    0.0,
+                    "far side, curve {curve}"
+                );
+                // Nine tenths of the way: every law attenuates there (the sharp law holds
+                // unity until the last quarter of the travel, so half way proves nothing).
+                let near = stem_xf_gain(-own * 0.9, side, curve);
+                assert!(near > 0.0 && near < 1.0, "0.9, curve {curve}: {near}");
+            }
+        }
+        // The law is the mixer's, normalised to its centre: linear 0.25 / 0.5, smooth
+        // sin(π/8) / sin(π/4), sharp min(4 · 0.25, 1) / 1.
+        let half = |curve| stem_xf_gain(0.5, CrossfaderAssign::A, curve);
+        assert!((half(0) - 0.5).abs() < 1e-6, "linear {}", half(0));
+        let smooth = (std::f32::consts::FRAC_PI_8).sin() / (std::f32::consts::FRAC_PI_4).sin();
+        assert!((half(1) - smooth).abs() < 1e-6, "smooth {}", half(1));
+        assert_eq!(half(2), 1.0, "sharp");
+        // THRU has no side: the stem crossfader does nothing.
+        assert_eq!(stem_xf_gain(1.0, CrossfaderAssign::Thru, 1), 1.0);
+        assert_eq!(stem_xf_gain(-1.0, CrossfaderAssign::Thru, 1), 1.0);
+    }
+
+    #[test]
+    fn stem_crossfader_fades_one_stem_out_on_the_far_side() {
+        // Deck on side B, vocals sent fully to side A: the vocals leave, the bass stays.
+        let mut d = stem_deck(CrossfaderAssign::B);
+        d.set_stem_xf(0, -1.0);
+        // Mute the bass too, so only the vocals could be heard.
+        d.set_stem_gain(2, 0.0);
+        peak(&mut d, 24_000); // smoothing settles (20 ms)
+        assert!(peak(&mut d, 4_800) < 1e-5, "vocals still audible");
+        // The other stem passes untouched: bass back, vocals gone.
+        d.set_stem_gain(2, 1.0);
+        peak(&mut d, 24_000);
+        let bass = peak(&mut d, 4_800);
+        assert!(bass > 0.5, "bass missing: {bass}");
+        // Sent to the deck's own side (B) the stem is at full level again.
+        d.set_stem_xf(0, 1.0);
+        d.set_stem_gain(2, 0.0);
+        peak(&mut d, 24_000);
+        assert!(peak(&mut d, 4_800) > 0.5);
+        // A deck on side A mirrors it.
+        let mut a = stem_deck(CrossfaderAssign::A);
+        a.set_stem_xf(0, 1.0);
+        a.set_stem_gain(2, 0.0);
+        peak(&mut a, 24_000);
+        assert!(peak(&mut a, 4_800) < 1e-5, "side A: vocals still audible");
+        // Moving the deck to the other side (mixer context) brings them back.
+        a.crossfader_assign = CrossfaderAssign::B;
+        a.set_xf_context(1);
+        peak(&mut a, 24_000);
+        assert!(peak(&mut a, 4_800) > 0.5);
+    }
+
+    #[test]
+    fn stem_crossfader_at_centre_is_bit_for_bit_a_no_op() {
+        // Reference without a stem crossfader: a deck on THRU bypasses it altogether (the deck
+        // output is taken before the mixer's crossfader, so the side itself changes nothing).
+        // Two decks on the same side would both go through the same gain law and agree even
+        // if the centre were not unity.
+        let mut plain = stem_deck(CrossfaderAssign::Thru);
+        let mut centred = stem_deck(CrossfaderAssign::B);
+        for i in 0..4 {
+            centred.set_stem_xf(i, 0.0);
+        }
+        // Away from the deck's side and back before any audio was rendered: still nothing.
+        centred.set_stem_xf(0, -0.7);
+        centred.set_stem_xf(0, 0.0);
+        for _ in 0..48_000 {
+            let a = plain.render_frame();
+            let b = centred.render_frame();
+            assert_eq!(a.main, b.main);
+        }
+        assert_eq!(centred.stem_xf(), [0.0; 4]);
+    }
+
+    #[test]
+    fn stem_mute_fx_leaves_a_finite_bounded_echo_tail() {
+        // 120 BPM, ½ beat = 0.25 s echo time = 12 000 frames (110 whole cycles of the 440 Hz
+        // stem, so the repeats add up in phase: the loudest a tail can get).
+        let run = |fx: bool| -> (f32, f32, f32, f32) {
+            let mut d = stem_deck(CrossfaderAssign::B);
+            d.set_stem_gain(2, 0.0); // bass off: only the vocals sound
+            d.set_stem_mute_fx(fx, 0.5);
+            peak(&mut d, 48_000);
+            d.set_stem_mute(0, true);
+            // 0.3..0.5 s after the mute: the gain reached 0 long ago (20 ms), one echo time passed.
+            let first = peak(&mut d, 14_400);
+            let early = peak(&mut d, 9_600);
+            // 12 repeats + fade = 3.02 s after the mute; the loudest sample on the way to 3.2 s.
+            let mut loudest = first.max(early);
+            for _ in 0..27 {
+                loudest = loudest.max(peak(&mut d, 4_800));
+            }
+            let after = peak(&mut d, 24_000);
+            assert!(!d.stem_tail_live(), "tail still live 3.7 s after the mute");
+            // Unmute: the stem is back at once.
+            d.set_stem_mute(0, false);
+            peak(&mut d, 4_800);
+            (early, loudest, after, peak(&mut d, 4_800))
+        };
+        let (early, loudest, after, back) = run(true);
+        assert!(early > 0.3, "no tail 0.3 s after the mute: {early}");
+        assert!(loudest <= 1.2, "tail runaway: {loudest}");
+        assert!(after < 1e-6, "tail not finite: {after}");
+        assert!(back > 0.5, "unmute: {back}");
+        let (early, _, after, _) = run(false);
+        assert!(early < 1e-5, "hard cut still sounding: {early}");
+        assert!(after < 1e-6);
+    }
+
+    #[test]
+    fn stem_mute_fx_tail_fades_on_unmute_and_follows_the_stem_crossfader() {
+        let mut d = stem_deck(CrossfaderAssign::B);
+        d.set_stem_gain(2, 0.0);
+        d.set_stem_mute_fx(true, 0.5);
+        peak(&mut d, 48_000);
+        d.set_stem_mute(0, true);
+        peak(&mut d, 14_400);
+        assert!(d.stem_tail_live());
+        // Unmute while the tail rings: the tail fades (20 ms) and the stem itself is back.
+        d.set_stem_mute(0, false);
+        peak(&mut d, 14_400);
+        assert!(!d.stem_tail_live(), "tail did not stop on unmute");
+        // Mute again, then fade the vocals out on the stem crossfader: the tail goes with them.
+        d.set_stem_mute(0, true);
+        peak(&mut d, 14_400);
+        assert!(peak(&mut d, 2_400) > 0.2);
+        d.set_stem_xf(0, -1.0);
+        peak(&mut d, 24_000);
+        assert!(d.stem_tail_live(), "the tail should still be ringing here");
+        assert!(
+            peak(&mut d, 4_800) < 1e-5,
+            "tail ignores the stem crossfader"
+        );
+        // Turning the mute FX off ends a tail; with it off a mute is a hard cut.
+        d.set_stem_xf(0, 0.0);
+        d.set_stem_mute(0, false);
+        peak(&mut d, 4_800);
+        d.set_stem_mute(0, true);
+        peak(&mut d, 4_800);
+        assert!(d.stem_tail_live());
+        d.set_stem_mute_fx(false, 0.5);
+        peak(&mut d, 14_400);
+        assert!(!d.stem_tail_live());
+        assert_eq!(d.stem_mute_fx(), (false, 0.5));
+        // Bringing the stem back with its level (not the mute button) ends the tail too, and
+        // pulling a level to zero is not a mute: no tail.
+        d.set_stem_mute_fx(true, 0.5);
+        d.set_stem_mute(0, false);
+        peak(&mut d, 4_800);
+        d.set_stem_mute(0, true);
+        peak(&mut d, 4_800);
+        assert!(d.stem_tail_live());
+        d.set_stem_gain(0, 0.8);
+        peak(&mut d, 14_400);
+        assert!(!d.stem_tail_live(), "level up did not end the tail");
+        d.set_stem_gain(0, 0.0);
+        peak(&mut d, 4_800);
+        assert!(!d.stem_tail_live(), "a level at zero must not start a tail");
+        // Beats are clamped to 1/32..8 and non-finite values keep the old time.
+        d.set_stem_mute_fx(true, 100.0);
+        assert_eq!(d.stem_mute_fx(), (true, STEM_MUTE_FX_BEATS_MAX));
+        d.set_stem_mute_fx(true, f64::NAN);
+        assert_eq!(d.stem_mute_fx(), (true, STEM_MUTE_FX_BEATS_MAX));
+        // A stem muted while the deck is paused leaves no tail: nothing was sounding.
+        d.set_stem_mute_fx(true, 0.5);
+        d.set_stem_gain(0, 1.0);
+        peak(&mut d, 4_800);
+        d.pause();
+        d.set_stem_mute(0, true);
+        assert!(!d.stem_tail_live(), "tail from a paused deck");
+        assert!(peak(&mut d, 24_000) < 1e-6);
+    }
+
+    #[test]
+    fn stem_mute_fx_tail_also_sounds_and_ends_with_key_lock() {
+        // Key lock (the app default) plays the stems through the time-stretcher; the tail is
+        // read beside it and must behave the same: there after the mute, gone 12 repeats later.
+        let mut d = stem_deck(CrossfaderAssign::B);
+        d.set_key_lock(true);
+        d.set_tempo(1.06);
+        d.set_stem_gain(2, 0.0);
+        d.set_stem_mute_fx(true, 0.5);
+        peak(&mut d, 48_000);
+        d.set_stem_mute(0, true);
+        // Past the stretcher's own latency (the muted stem itself has left it by 0.3 s).
+        peak(&mut d, 14_400);
+        let early = peak(&mut d, 9_600);
+        // 0.3..0.5 s after the mute the first repeat is over and repeats 2..12 sound. The echo
+        // time is half an AUDIBLE beat (127.2 BPM): 11 320.75 frames, not a whole number of
+        // cycles of the 440 Hz stem, so the repeats add up as phasors: |Σ 0.55^k e^(-ikθ)|,
+        // times the stem's amplitude (0.8) and the channel fader (0.85).
+        let delay = 60.0 / (120.0 * 1.06) * 0.5 * 48_000.0;
+        let theta = std::f64::consts::TAU * delay * 440.0 / 48_000.0;
+        let (mut re, mut im) = (0.0f64, 0.0f64);
+        for k in 2..=STEM_TAIL_TAPS {
+            let g = (STEM_TAIL_FEEDBACK as f64).powi(k as i32);
+            re += g * (k as f64 * theta).cos();
+            im -= g * (k as f64 * theta).sin();
+        }
+        let want = (re * re + im * im).sqrt() * 0.8 * 0.85;
+        assert!(
+            (early as f64 - want).abs() < 0.01,
+            "tail with key lock: {early}, the echo model gives {want}"
+        );
+        let mut loudest = early;
+        for _ in 0..27 {
+            loudest = loudest.max(peak(&mut d, 4_800));
+        }
+        assert!(loudest <= 1.2, "tail runaway with key lock: {loudest}");
+        assert!(peak(&mut d, 24_000) < 1e-4, "tail not finite with key lock");
+        assert!(!d.stem_tail_live());
+    }
+
+    #[test]
+    fn cue_loop_is_saved_on_a_hot_cue_and_replayed_from_it() {
+        let mut d = loaded_deck(120.0, 0.0);
+        d.set_key_lock(false);
+        d.seek_secs(4.0);
+        d.beatloop(4.0); // 4.0 .. 6.0 s
+        assert!(d.save_cue_loop(2));
+        let beats = d.hot_cue_loops()[2].expect("loop stored on the cue");
+        assert!((beats - 4.0).abs() < 1e-9, "{beats}");
+        assert!((d.hot_cue_secs()[2].unwrap() - 4.0).abs() < 1e-9);
+        // Elsewhere, no loop; the jump lands on the cue and starts the loop again.
+        d.loop_exit();
+        d.seek_secs(10.0);
+        assert!(!d.loop_state_secs().0);
+        assert!(d.jump_hot_cue(2));
+        let (active, lin, lout) = d.loop_state_secs();
+        assert!(active, "loop not active after the jump");
+        assert!(
+            (d.position_secs() - 4.0).abs() < 1e-9,
+            "{}",
+            d.position_secs()
+        );
+        assert!(
+            (lin - 4.0).abs() < 1e-3 && (lout - 6.0).abs() < 1e-3,
+            "{lin}..{lout}"
+        );
+        // Playing through: the deck stays inside the loop.
+        d.play();
+        for _ in 0..48_000 * 3 {
+            d.render_frame();
+        }
+        assert!(
+            d.position_secs() >= 4.0 && d.position_secs() < 6.0,
+            "{}",
+            d.position_secs()
+        );
+        // A plain cue has no loop; saving with no running loop stores nothing.
+        d.loop_exit();
+        d.set_hot_cue(3);
+        assert_eq!(d.hot_cue_loops()[3], None);
+        assert!(!d.save_cue_loop(3));
+        assert!(d.jump_hot_cue(3));
+        assert!(!d.loop_state_secs().0);
+        // Clearing the cue clears its loop too.
+        d.clear_hot_cue(2);
+        assert_eq!(d.hot_cue_secs()[2], None);
+        assert_eq!(d.hot_cue_loops()[2], None);
+        assert!(!d.jump_hot_cue(2));
+        // Setting a cue afresh on a slot that carried a loop gives a plain cue.
+        d.seek_secs(8.0);
+        d.beatloop(2.0);
+        assert!(d.save_cue_loop(5));
+        d.loop_exit();
+        d.seek_secs(12.0);
+        d.set_hot_cue(5);
+        assert_eq!(d.hot_cue_loops()[5], None);
+        assert!((d.hot_cue_secs()[5].unwrap() - 12.0).abs() < 1e-9);
+        // Out-of-range slots are ignored.
+        assert!(!d.save_cue_loop(8));
+    }
+
+    // ---- WP19-41 review fixes ---------------------------------------------------
+
+    /// The next `frames` output samples (left channel).
+    fn render(d: &mut Deck, frames: usize) -> Vec<f32> {
+        (0..frames).map(|_| d.render_frame().main.0).collect()
+    }
+
+    /// A playing stem deck whose track has no tempo (no BPM, no beatgrid).
+    fn stem_deck_without_tempo() -> Deck {
+        let mut d = Deck::new(DeckId::A, 48_000.0);
+        d.load(tone(220.0, 12.0, 48_000), (None, None, None, 0.0));
+        d.set_key_lock(false);
+        d.set_stems(stem_layers([Some(440.0), None, Some(110.0), None]));
+        d.seek_secs(2.0);
+        d.play();
+        d
+    }
+
+    #[test]
+    fn non_finite_stem_values_are_ignored_and_never_reach_the_audio() {
+        let mut d = stem_deck(CrossfaderAssign::B);
+        d.set_stem_gain(2, 0.0);
+        d.set_stem_gain(0, 0.6);
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            d.set_stem_gain(0, bad);
+            d.set_stem_xf(0, bad);
+            assert_eq!(d.stem_gain[0].target(), 0.6, "stem gain after {bad}");
+        }
+        assert_eq!(d.stem_xf(), [0.0; 4]);
+        d.set_stem_mute_fx(true, f64::NAN);
+        d.set_stem_mute_fx(true, f64::INFINITY);
+        assert_eq!(d.stem_mute_fx(), (true, crate::state::STEM_MUTE_FX_BEATS));
+        let out = render(&mut d, 48_000);
+        assert!(
+            out.iter().all(|s| s.is_finite()),
+            "a non-finite sample reached the output"
+        );
+        // 0.6 (stem level) x 0.8 (the tone) x 0.85 (channel fader).
+        let level = out[24_000..].iter().fold(0.0f32, |p, s| p.max(s.abs()));
+        assert!((level - 0.6 * 0.8 * 0.85).abs() < 0.01, "level {level}");
+        // The stem still answers: a mute leaves its tail and the output stays finite.
+        d.set_stem_mute(0, true);
+        assert!(d.stem_tail_live());
+        assert!(render(&mut d, 24_000).iter().all(|s| s.is_finite()));
+        // A cue loop with a junk length is a plain cue.
+        d.set_hot_cue(1);
+        d.hot_cue_loops[1] = Some(f64::NAN);
+        assert!(d.jump_hot_cue(1));
+        assert!(!d.loop_state_secs().0);
+    }
+
+    #[test]
+    fn quantized_jump_to_a_short_cue_loop_lands_inside_the_loop() {
+        for key_lock in [false, true] {
+            let mut d = loaded_deck(120.0, 0.0);
+            d.set_key_lock(key_lock);
+            // A 1/8-beat loop (62.5 ms) stored on a cue at beat 8 (4.0 s).
+            d.seek_secs(4.0);
+            d.beatloop(0.125);
+            assert!(d.save_cue_loop(0));
+            d.loop_exit();
+            // Playing 0.4 beats after a beat with quantize on: the jump keeps those 0.4 beats,
+            // which is 0.2 s after the cue, three loop lengths past the loop's end.
+            d.seek_secs(10.2);
+            d.set_quantize(true);
+            d.play();
+            assert!(d.jump_hot_cue(0));
+            let (active, lin, lout) = d.loop_state_secs();
+            assert!(
+                active && (lin - 4.0).abs() < 1e-9 && (lout - 4.0625).abs() < 1e-9,
+                "loop {lin}..{lout}"
+            );
+            let pos = d.position_secs();
+            assert!(
+                pos >= lin && pos < lout,
+                "key lock {key_lock}: landed at {pos}, outside {lin}..{lout}"
+            );
+            // 0.2 s into a 62.5 ms loop is 12.5 ms after its start.
+            assert!((pos - 4.0125).abs() < 1e-6, "{pos}");
+            // And the deck stays in the loop from the first frame on.
+            for _ in 0..4_800 {
+                d.render_frame();
+                let p = d.position_secs();
+                assert!(p >= lin && p < lout, "key lock {key_lock}: {p}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_playhead_far_past_a_running_loop_folds_into_it_in_one_frame() {
+        for key_lock in [false, true] {
+            let mut d = loaded_deck(120.0, 0.0);
+            d.set_key_lock(key_lock);
+            d.seek_secs(4.0);
+            d.beatloop(0.125); // 4.0 .. 4.0625 s
+            d.play();
+            // 95 loop lengths past the end: one wrap (one stretcher reset), not one per frame.
+            d.seek_secs(10.0);
+            d.render_frame();
+            let (_, lin, lout) = d.loop_state_secs();
+            let pos = d.position_secs();
+            assert!(
+                pos >= lin && pos < lout,
+                "key lock {key_lock}: {pos} after one frame, loop {lin}..{lout}"
+            );
+        }
+    }
+
+    #[test]
+    fn stem_mute_in_reverse_is_a_plain_mute_without_a_tail() {
+        let run = |fx: bool| {
+            let mut d = stem_deck(CrossfaderAssign::B);
+            d.set_stem_gain(2, 0.0);
+            d.set_stem_mute_fx(fx, 0.5);
+            d.set_reverse(true);
+            peak(&mut d, 24_000);
+            d.set_stem_mute(0, true);
+            (d.stem_tail_live(), render(&mut d, 48_000))
+        };
+        let (live, with_fx) = run(true);
+        let (_, plain) = run(false);
+        assert!(!live, "a tail started in reverse");
+        // Sample for sample what a mute without the mute FX gives: nothing that was not heard.
+        assert!(with_fx == plain, "the mute FX added something in reverse");
+        assert!(with_fx[14_400..].iter().all(|s| s.abs() < 1e-5));
+        // Forward again, the mute FX is back.
+        let mut d = stem_deck(CrossfaderAssign::B);
+        d.set_stem_mute_fx(true, 0.5);
+        d.set_reverse(true);
+        peak(&mut d, 4_800);
+        d.set_reverse(false);
+        peak(&mut d, 4_800);
+        d.set_stem_mute(0, true);
+        assert!(d.stem_tail_live(), "no tail after reverse was released");
+    }
+
+    #[test]
+    fn stem_mute_fx_without_a_tempo_is_a_plain_mute() {
+        // `fx` = the mute FX is on when the vocals are muted on a track without a tempo. Later
+        // the track gets one and the bass is muted with the mute FX on (a real tail).
+        let run = |fx: bool| {
+            let mut d = stem_deck_without_tempo();
+            assert_eq!(d.effective_bpm(), 0.0);
+            d.set_stem_mute_fx(fx, 0.5);
+            peak(&mut d, 24_000);
+            d.set_stem_mute(0, true);
+            let live = d.stem_tail_live();
+            let armed = d.stem_tails[0].ret.target();
+            let mut out = render(&mut d, 24_000);
+            d.set_grid(BeatGrid::constant(120.0, 0.0));
+            d.set_stem_mute_fx(true, 0.5);
+            d.set_stem_mute(2, true);
+            assert!(d.stem_tail_live(), "no tail once the track has a tempo");
+            out.extend(render(&mut d, 24_000));
+            (live, armed, out)
+        };
+        let (live, armed, with_fx) = run(true);
+        let (_, _, plain) = run(false);
+        assert!(!live, "a tail without an echo time");
+        assert_eq!(armed, 0.0, "the tail's return was left open");
+        // Sample for sample a mute without the mute FX, also once another stem's tail rings:
+        // a return left open would let a 20 ms burst of the vocals through there.
+        assert!(
+            with_fx == plain,
+            "the mute FX left something on a track without a tempo"
+        );
+        // The bass tail itself is there (110 Hz, repeats of 0.25 s = 27.5 cycles: they alternate
+        // in sign, so the level is the alternating sum, well above silence).
+        let tail = with_fx[38_400..].iter().fold(0.0f32, |p, s| p.max(s.abs()));
+        assert!(tail > 0.05, "bass tail missing: {tail}");
+    }
+
+    #[test]
+    fn turning_stems_off_fades_a_ringing_tail_instead_of_cutting_it() {
+        let mut d = stem_deck(CrossfaderAssign::B);
+        d.set_stem_gain(2, 0.0);
+        d.set_stem_mute_fx(true, 0.5);
+        peak(&mut d, 48_000); // 2.0 -> 3.0 s
+        d.set_stem_mute(0, true);
+        peak(&mut d, 14_400); // -> 3.3 s: the stem itself is gone, its tail rings
+        let ringing = render(&mut d, 480); // -> 3.31 s
+        let before = ringing.iter().fold(0.0f32, |p, s| p.max(s.abs()));
+        assert!(before > 0.2, "no tail to cut: {before}");
+        d.set_stems_active(false);
+        assert!(!d.stem_tail_live(), "repeats still due after stems off");
+        // The full mix takes over (a click track: silent between its beats at 3.0 and 3.5 s).
+        // 5 ms later the tail is still there (it fades with a 20 ms time constant) ...
+        let fading = render(&mut d, 240); // -> 3.315 s
+        let just_after = fading.iter().fold(0.0f32, |p, s| p.max(s.abs()));
+        assert!(
+            just_after > before * 0.5 && just_after <= before * 1.05,
+            "tail {before} -> {just_after} right after stems off"
+        );
+        // ... without a step at the switch: a 440 Hz tone moves 6 % of its peak per sample.
+        let step = (fading[0] - ringing[479]).abs();
+        assert!(step < before * 0.1, "step of {step} at stems off");
+        // ... and it is gone 0.3 s later.
+        peak(&mut d, 14_160); // -> 3.61 s
+        assert!(peak(&mut d, 2_400) < 1e-4, "the tail did not fade out");
+    }
+
+    #[test]
+    fn unmute_brings_back_the_level_the_stem_had_before_the_mute() {
+        let mut d = stem_deck(CrossfaderAssign::B);
+        // The UI mirror gets the same commands and must report the same levels.
+        let mut mirror = DeckState::empty(DeckId::A);
+        d.set_stem_gain(2, 0.0);
+        mirror.stem_gains[2] = 0.0;
+        d.set_stem_gain(0, 0.6);
+        mirror.stem_gains[0] = 0.6;
+        peak(&mut d, 24_000);
+        d.set_stem_mute(0, true);
+        assert_eq!(mirror.mirror_stem_mute(0, true), Some(0.0));
+        peak(&mut d, 24_000);
+        assert!(peak(&mut d, 4_800) < 1e-5, "muted stem still audible");
+        d.set_stem_mute(0, false);
+        assert_eq!(mirror.mirror_stem_mute(0, false), Some(0.6));
+        assert_eq!(d.stem_gain[0].target(), 0.6);
+        peak(&mut d, 24_000);
+        let back = peak(&mut d, 4_800);
+        assert!((back - 0.6 * 0.8 * 0.85).abs() < 0.01, "level {back}");
+        // The same command again changes nothing, on either side.
+        d.set_stem_mute(0, false);
+        assert_eq!(mirror.mirror_stem_mute(0, false), None);
+        assert_eq!(d.stem_gain[0].target(), 0.6);
+        // A stem pulled to silence by its level was never muted: unmute is unity.
+        d.set_stem_gain(0, 0.0);
+        mirror.stem_gains[0] = 0.0;
+        d.set_stem_mute(0, false);
+        assert_eq!(mirror.mirror_stem_mute(0, false), Some(1.0));
+        assert_eq!(d.stem_gain[0].target(), 1.0);
+        // A solo and its release (three mutes, three unmutes) put every level back.
+        for (idx, level) in [(0usize, 0.5f32), (1, 0.7), (3, 1.2)] {
+            d.set_stem_gain(idx, level);
+            mirror.stem_gains[idx] = level;
+        }
+        for on in [true, false] {
+            for idx in [0usize, 1, 3] {
+                d.set_stem_mute(idx, on);
+                mirror.mirror_stem_mute(idx, on);
+            }
+            let want = if on {
+                [0.0, 0.0, 0.0, 0.0]
+            } else {
+                [0.5, 0.7, 0.0, 1.2]
+            };
+            for (idx, level) in want.into_iter().enumerate() {
+                assert_eq!(d.stem_gain[idx].target(), level, "deck, stem {idx}");
+                assert_eq!(mirror.stem_gains[idx], level, "mirror, stem {idx}");
+            }
+        }
+        // Out-of-range stems are ignored.
+        d.set_stem_mute(4, true);
+        assert_eq!(mirror.mirror_stem_mute(4, true), None);
     }
 }

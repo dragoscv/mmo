@@ -2,8 +2,6 @@ package ro.mixai.decks.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,15 +11,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import ro.mixai.decks.ui.engine.GridStateUi
 import ro.mixai.decks.ui.model.PeaksData
 import ro.mixai.decks.ui.model.WaveDeck
@@ -199,62 +188,5 @@ fun WavesPanel(modifier: Modifier = Modifier, lanes: @Composable (Modifier) -> U
     val shape = panelShape(LocalDecksSkin.current)
     Box(modifier.clip(shape).background(DecksColors.waveBg)) {
         lanes(Modifier.fillMaxSize())
-    }
-}
-
-/**
- * Whole-track overview for one deck. Tap seeks; Left/Right keys seek ±5 %.
- */
-@Composable
-fun Overview(
-    deck: WaveDeck,
-    peaks: PeaksData?,
-    description: String,
-    positionText: String,
-    modifier: Modifier,
-    onSeek: (Float) -> Unit,
-) {
-    val frac = if (deck.durationSec > 0) (deck.playheadSec / deck.durationSec).toFloat() else 0f
-    Canvas(
-        modifier
-            .pointerInput(Unit) { detectTapGestures { onSeek(it.x / size.width) } }
-            .onKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (e.key) {
-                    Key.DirectionLeft -> { onSeek((frac - 0.05f).coerceAtLeast(0f)); true }
-                    Key.DirectionRight -> { onSeek((frac + 0.05f).coerceAtMost(1f)); true }
-                    else -> false
-                }
-            }
-            .focusable()
-            .semantics { contentDescription = description; stateDescription = positionText },
-    ) {
-        drawRect(DecksColors.waveBg)
-        val mid = size.height / 2
-        if (peaks != null && peaks.size > 0) {
-            val cols = size.width.toInt().coerceAtLeast(1)
-            val per = peaks.size.toFloat() / cols
-            for (c in 0 until cols) {
-                val s = (c * per).toInt()
-                val e = ((c + 1) * per).toInt().coerceAtMost(peaks.size).coerceAtLeast(s + 1)
-                var m = 0
-                for (k in s until e) m = maxOf(m, peaks.low[k].toInt() and 0xFF, peaks.mid[k].toInt() and 0xFF)
-                val h = m / 255f * mid
-                val played = c < frac * cols
-                drawLine(
-                    if (played) DecksColors.muted else DecksColors.deck(deck.index),
-                    Offset(c.toFloat(), mid - h), Offset(c.toFloat(), mid + h), 1f,
-                )
-            }
-        }
-        if (deck.durationSec > 0) {
-            deck.hotCues.forEachIndexed { i, h ->
-                if (h != null) {
-                    val x = (h / deck.durationSec * size.width).toFloat()
-                    drawLine(DecksColors.cue(i), Offset(x, 0f), Offset(x, size.height), 2f)
-                }
-            }
-        }
-        drawLine(DecksColors.foreground, Offset(frac * size.width, 0f), Offset(frac * size.width, size.height), 2f)
     }
 }

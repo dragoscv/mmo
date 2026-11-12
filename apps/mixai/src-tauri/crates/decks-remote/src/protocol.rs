@@ -136,6 +136,12 @@ fn finite64(name: &str, v: f64) -> Result<f64, String> {
 }
 
 impl RemoteCommand {
+    /// Still taken while the DJ has locked the phone controls: only letting go of CUE, so a
+    /// deck that plays because CUE is held stops when the finger lifts.
+    pub fn allowed_when_locked(&self) -> bool {
+        matches!(self, RemoteCommand::Cue { pressed: false, .. })
+    }
+
     /// The deck this command addresses (`None` for mixer-wide commands).
     pub fn deck(&self) -> Option<u8> {
         match *self {
@@ -321,6 +327,11 @@ pub enum ServerMsg {
         id: u64,
         merged: bool,
     },
+    /// Controller: the DJ locked (or unlocked) the phone controls. While locked, commands are
+    /// refused (except releasing CUE); requests and moderation keep working.
+    Controls {
+        locked: bool,
+    },
     Error {
         reason: String,
     },
@@ -419,6 +430,119 @@ mod tests {
                 .validated()
                 .unwrap(),
             RemoteCommand::Crossfader { value: -1.0 }
+        );
+    }
+
+    /// Every command that carries a number, built from one value.
+    fn numeric_commands(v: f64) -> Vec<RemoteCommand> {
+        let f = v as f32;
+        let mut out = vec![
+            RemoteCommand::LoopAuto { deck: 0, beats: v },
+            RemoteCommand::BeatJump { deck: 0, beats: v },
+            RemoteCommand::Volume { deck: 0, value: f },
+            RemoteCommand::Filter { deck: 0, value: f },
+            RemoteCommand::Crossfader { value: f },
+            RemoteCommand::MasterVolume { value: f },
+        ];
+        for band in [EqBand::Low, EqBand::Mid, EqBand::High] {
+            out.push(RemoteCommand::Eq {
+                deck: 0,
+                band,
+                db: f,
+            });
+        }
+        out
+    }
+
+    /// The number a validated command carries and the range the engine takes.
+    fn value_and_range(c: &RemoteCommand) -> (f64, f64, f64) {
+        match *c {
+            RemoteCommand::LoopAuto { beats, .. } => (beats, 1.0 / 32.0, 64.0),
+            RemoteCommand::BeatJump { beats, .. } => (beats, -128.0, 128.0),
+            RemoteCommand::Volume { value, .. } => (f64::from(value), 0.0, 1.0),
+            RemoteCommand::Eq { db, .. } => (f64::from(db), -26.0, 6.0),
+            RemoteCommand::Filter { value, .. } => (f64::from(value), -1.0, 1.0),
+            RemoteCommand::Crossfader { value } => (f64::from(value), -1.0, 1.0),
+            RemoteCommand::MasterVolume { value } => (f64::from(value), 0.0, 1.0),
+            _ => unreachable!("not a numeric command"),
+        }
+    }
+
+    #[test]
+    fn every_numeric_command_refuses_non_finite_and_never_passes_a_value_out_of_range() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            for c in numeric_commands(bad) {
+                assert!(c.clone().validated().is_err(), "{c:?}");
+            }
+        }
+        for wild in [
+            -1e30, -1000.0, -129.0, -1.5, 0.0, 1.5, 65.0, 129.0, 1000.0, 1e30,
+        ] {
+            for c in numeric_commands(wild) {
+                // Refused, or clamped into the range: never handed on as it came.
+                if let Ok(ok) = c.clone().validated() {
+                    let (v, lo, hi) = value_and_range(&ok);
+                    assert!(v.is_finite() && (lo..=hi).contains(&v), "{c:?} -> {ok:?}");
+                }
+            }
+        }
+        // The refusals that are not clamps.
+        for beats in [0.0, 1.0 / 64.0, 64.5, -4.0] {
+            let c = RemoteCommand::LoopAuto { deck: 0, beats };
+            assert!(c.validated().is_err(), "loop of {beats}");
+        }
+        for beats in [0.0, 128.5, -128.5] {
+            let c = RemoteCommand::BeatJump { deck: 0, beats };
+            assert!(c.validated().is_err(), "jump of {beats}");
+        }
+        // A number that is not one never parses into a command either.
+        for json in [
+            r#"{"cmd":"volume","deck":0,"value":null}"#,
+            r#"{"cmd":"volume","deck":0,"value":"1"}"#,
+            r#"{"cmd":"volume","deck":0,"value":NaN}"#,
+            r#"{"cmd":"crossfader","value":1e999}"#,
+            r#"{"cmd":"hot_cue","deck":0,"slot":-1}"#,
+            r#"{"cmd":"hot_cue","deck":0,"slot":256}"#,
+            r#"{"cmd":"play","deck":1.5}"#,
+        ] {
+            let parsed = serde_json::from_str::<RemoteCommand>(json)
+                .ok()
+                .and_then(|c| c.validated().ok());
+            assert_eq!(parsed, None, "{json}");
+        }
+    }
+
+    #[test]
+    fn only_a_cue_release_passes_the_controls_lock() {
+        assert!(
+            RemoteCommand::Cue {
+                deck: 0,
+                pressed: false
+            }
+            .allowed_when_locked()
+        );
+        for c in [
+            RemoteCommand::Cue {
+                deck: 0,
+                pressed: true,
+            },
+            RemoteCommand::Play { deck: 0 },
+            RemoteCommand::Pause { deck: 0 },
+            RemoteCommand::HotCue { deck: 0, slot: 0 },
+            RemoteCommand::LoopExit { deck: 0 },
+            RemoteCommand::Sync {
+                deck: 0,
+                lock: false,
+            },
+        ]
+        .into_iter()
+        .chain(numeric_commands(0.5))
+        {
+            assert!(!c.allowed_when_locked(), "{c:?}");
+        }
+        assert_eq!(
+            serde_json::to_string(&ServerMsg::Controls { locked: true }).unwrap(),
+            r#"{"type":"controls","locked":true}"#
         );
     }
 

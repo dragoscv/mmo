@@ -19,6 +19,10 @@
 @import "./components/mixer.css";
 @import "./library/library.css";
 @import "./settings/skin-editor.css";
+@import "./link/link.css";
+@import "./practice/practice.css";
+@import "./remote/remote.css";
+@import "./copilot/copilot.css";
 @source "../../../packages/ui/src";
 
 /*

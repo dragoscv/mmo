@@ -16,6 +16,8 @@ import type { Tier } from "@/layout/types";
 import { ScrolllessList } from "@/library/ScrolllessList";
 import { keyAction, useTouchMode, useWindowedList } from "@/library/useWindowedList";
 import { libraryNav } from "@/library/library-nav";
+import { useLibraryPool } from "@/library/pool-store";
+import { CopilotButton } from "@/copilot/CopilotButton";
 import { ColumnHeader, DeckDot, DeckLetter, TrackRow, stemsView, trackTitle, type StemJobState } from "@/library/LibraryRows";
 import { StateBlock } from "@/library/LibraryStates";
 import {
@@ -220,6 +222,11 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
     useEffect(() => {
         setPool(tracks);
     }, [tracks, setPool]);
+    // The same pool for everything else that works on "the library" (co-pilot, song requests).
+    useEffect(() => {
+        useLibraryPool.getState().set(tracks, fetched.current?.query ?? "", total);
+    }, [tracks, total]);
+    useEffect(() => () => useLibraryPool.getState().set([], "", 0), []);
 
     const load = useCallback((deck: DeckId, tr: LibraryTrack) => {
         const mixer = useMixerStore.getState();
@@ -349,7 +356,8 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
                 else if (cmd.type === "page") n.dispatch({ type: "page", dir: cmd.dir });
                 else if (cmd.type === "load") {
                     if (n.selected) n.load(cmd.deck, n.selected);
-                } else searchRef.current?.focus();
+                } else if (cmd.type === "search") setQuery(cmd.query);
+                else searchRef.current?.focus();
             }),
         [],
     );
@@ -505,6 +513,7 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
                 <SearchField t={t} value={query} onChange={setQuery} onKeyDown={onSearchKey} inputRef={searchRef} />
                 {full && chips(wide)}
                 {full && <span className="lib-spacer" />}
+                {!icon && <CopilotButton />}
                 {loadError && (
                     <button
                         type="button"

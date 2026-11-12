@@ -31,10 +31,6 @@ object DeckMath {
         return (((b % n) + n) % n).toInt()
     }
 
-    /** Jog ring angle in degrees for a playhead at 33⅓ rpm. */
-    fun jogAngle(playheadSec: Double, rpm: Double = 100.0 / 3.0): Float =
-        ((playheadSec * rpm / 60.0 * 360.0) % 360.0).toFloat()
-
     /** Auto-loop sizes offered by the UI (beats). */
     val LOOP_SIZES = listOf(0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
 

@@ -16,6 +16,7 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [packs.md](packs.md) | `.mixaipack` format: manifest `v` 1 / 2, DTCG tokens, `style` block reference + refusal messages, layouts, assets, Ed25519 signing, trust levels, building a skin pack, Marketplace |
 | [stems.md](stems.md) | On-device stem separation: HT-Demucs ONNX, accelerators, cache, server fallback |
 | [remote.md](remote.md) | Connected mode: phone remote, second screen, Party DJ requests (LAN, QR pairing, security model) |
+| [link.md](link.md) | Tempo sync between Decks instances on the LAN: session model, UDP wire format, constants, PIN key and security limits, commands |
 | [transitions.md](transitions.md) | AI Transition Designer: next-track ranking, phrase-aligned plans, editable automation, set safety, RO/EN commands, risers |
 | [set-recording.md](set-recording.md) | Set recording with automatic tracklist; text / CUE + ISRC / ORDA–UCMR-ADA CSV / Mixcloud / M3U8 exports |
 | [dvs-clean-room.md](dvs-clean-room.md) | Clean-room provenance statement for the DVS decoder |

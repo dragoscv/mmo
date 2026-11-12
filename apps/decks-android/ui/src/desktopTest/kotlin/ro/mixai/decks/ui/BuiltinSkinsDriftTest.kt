@@ -111,8 +111,9 @@ class BuiltinSkinsDriftTest {
             val platter = (style["platter"] as String?)?.toBooleanStrict()
             if (platter != kt.platter) out += "$id.style.platter: Look.kt ${kt.platter} != TS $platter"
             if (style["look"] != "signature") out += "$id.style.look: TS ${style["look"]}, the Kotlin preset assumes signature"
-            // Token dimensions of the preset (the layout is deliberately not compared: see DecksSkin.DEFAULT_LAYOUT).
+            // Token dimensions and the layout of the preset (`style.layout` = the layout the skin selects).
             val preset = DecksSkin.presets.first { it.id == id }
+            if (style["layout"] != preset.layoutId) out += "$id.style.layout: preset ${preset.layoutId} != TS ${style["layout"]}"
             val dims = mapOf("mode" to if (preset.dark) "dark" else "light", "surface" to preset.surface, "density" to preset.density, "radius" to preset.radius)
             for ((k, v) in dims) if (ts[k] != v) out += "$id.$k: preset $v != TS ${ts[k]}"
         }

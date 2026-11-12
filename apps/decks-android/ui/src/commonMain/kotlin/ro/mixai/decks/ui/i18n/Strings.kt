@@ -3,12 +3,19 @@ package ro.mixai.decks.ui.i18n
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import ro.mixai.decks.ui.logic.Format
+import ro.mixai.decks.ui.logic.Plural
 
 /**
  * Every user-visible string of the Decks UI. Keys are snake_case; on Android each key maps to the
  * string resource `decks_<key>` in `res/values` + `res/values-ro` (the Android source of truth),
  * on Desktop to [DesktopStrings] (en + ro). Tests assert that both platforms define every key.
  * Templates use `%1`, `%2` placeholders (no locale-dependent formatting).
+ *
+ * A sentence with a count has one key per plural form, `<key>_one` / `_few` / `_other` ([Counted], [strCount],
+ * [strBeats]): English uses one / other, Romanian one ("1 piesă"), few ("2 piese") and other ("20 de piese").
+ * `plural_rule` is not shown: it names the language whose rule the table's forms follow ("en" / "ro"), so a
+ * table and its rule always travel together (Android: `values` / `values-ro`).
  */
 enum class Str(val key: String) {
     AppName("app_name"),
@@ -68,7 +75,6 @@ enum class Str(val key: String) {
     Waveform("waveform"),
     Overview("overview"),
     PhaseMeter("phase_meter"),
-    JogWheel("jog_wheel"),
     Midi("midi"),
     MidiNone("midi_none"),
     MidiConnected("midi_connected"),
@@ -122,6 +128,8 @@ enum class Str(val key: String) {
     ConnectScreen("connect_screen"),
     ConnectParty("connect_party"),
     ConnectNewCode("connect_new_code"),
+    ConnectLock("connect_lock"),
+    ConnectLockHint("connect_lock_hint"),
     Requests("requests"),
     RequestsOpen("requests_open"),
     RequestsClosed("requests_closed"),
@@ -219,6 +227,44 @@ enum class Str(val key: String) {
     GridTempoDown("grid_tempo_down"),
     GridBpmAt("grid_bpm_at"),
     GridClose("grid_close"),
+    TabCues("tab_cues"),
+    TabLoops("tab_loops"),
+    MoreControls("more_controls"),
+    KeyShort("key_short"),
+    KeyLockShort("key_lock_short"),
+    MatchShort("match_short"),
+    NudgeBack("nudge_back"),
+    NudgeForward("nudge_forward"),
+    TempoDown("tempo_down"),
+    TempoUp("tempo_up"),
+    JumpSizeOne("jump_size_one"),
+    JumpSizeFew("jump_size_few"),
+    JumpSizeOther("jump_size_other"),
+    Ending("ending"),
+    LegendTrim("legend_trim"),
+    LegendHi("legend_hi"),
+    LegendMid("legend_mid"),
+    LegendLow("legend_low"),
+    LegendFilter("legend_filter"),
+    LegendMix("legend_mix"),
+    LegendPhones("legend_phones"),
+    ColTitle("col_title"),
+    ColArtist("col_artist"),
+    ColTime("col_time"),
+    CratePrev("crate_prev"),
+    CrateNext("crate_next"),
+    TrackPlayed("track_played"),
+    TrackOnDeck("track_on_deck"),
+    TrackCountOne("track_count_one"),
+    TrackCountFew("track_count_few"),
+    TrackCountOther("track_count_other"),
+    LoopIn("loop_in"),
+    LoopOut("loop_out"),
+    LoopInShort("loop_in_short"),
+    LoopOutShort("loop_out_short"),
+    LoopExitShort("loop_exit_short"),
+    SearchShort("search_short"),
+    PluralRule("plural_rule"),
 }
 
 typealias StringTable = Map<String, String>
@@ -239,3 +285,38 @@ fun fill(template: String, vararg args: Any): String {
     args.forEachIndexed { i, a -> out = out.replace("%${i + 1}", a.toString()) }
     return out
 }
+
+/** The three plural forms of one sentence with a count. */
+enum class Counted(val one: Str, val few: Str, val other: Str) {
+    JumpSize(Str.JumpSizeOne, Str.JumpSizeFew, Str.JumpSizeOther),
+    TrackCount(Str.TrackCountOne, Str.TrackCountFew, Str.TrackCountOther);
+
+    fun form(p: Plural): Str = when (p) {
+        Plural.One -> one
+        Plural.Few -> few
+        Plural.Other -> other
+    }
+}
+
+/** The language whose plural rule [table] follows (its `plural_rule` entry); English when the table does not say. */
+fun pluralLang(table: StringTable): String = table[Str.PluralRule.key] ?: "en"
+
+/** [s] for the whole count [n], in the plural form [table]'s language needs: "1 track", "5 piese", "20 de piese". */
+fun counted(table: StringTable, s: Counted, n: Int): String {
+    val key = s.form(Format.pluralCategory(pluralLang(table), n.toLong())).key
+    return fill(table[key] ?: key, n)
+}
+
+/** [s] for a beat count as it is shown ([label]: "1", "4", "32"): "Jump size 1 beat", "Salt de 4 bătăi", "Salt de 32 de bătăi". */
+fun countedBeats(table: StringTable, s: Counted, label: String): String {
+    val key = s.form(Format.beatsPlural(pluralLang(table), label)).key
+    return fill(table[key] ?: key, label)
+}
+
+@Composable
+@ReadOnlyComposable
+fun strCount(s: Counted, n: Int): String = counted(LocalStrings.current, s, n)
+
+@Composable
+@ReadOnlyComposable
+fun strBeats(s: Counted, label: String): String = countedBeats(LocalStrings.current, s, label)

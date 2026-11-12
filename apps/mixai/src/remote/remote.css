@@ -1,0 +1,342 @@
+/* Connected mode (src/remote/*). Shared vocabulary: src/look/look.css (dk-*), status bar: shell/shell.css (.sb-*). */
+
+/* Chip: devices and waiting requests, each a small icon + a number. */
+.rm-chip-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--foreground);
+}
+/* Requests waiting: alert colour AND its own icon (never colour alone). */
+.rm-badge {
+    color: var(--alert, var(--destructive));
+}
+/* Phone controls locked: a padlock next to the device count. */
+.rm-chip-lock {
+    flex-shrink: 0;
+    color: var(--foreground);
+}
+
+/* Popover: one fixed column of at most 380 px, nothing scrolls (lists are paged). */
+.rm-pop[data-slot="popover-content"] {
+    width: min(92vw, 380px);
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+    border-radius: var(--ctl-radius, 6px);
+}
+.rm-body {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+.rm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+.rm-state {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--foreground);
+}
+.rm-muted {
+    color: var(--muted-foreground);
+}
+.rm-hint {
+    margin: 0;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted-foreground);
+}
+.rm-error {
+    margin: 0;
+    padding-left: 8px;
+    border-left: 2px solid var(--alert, var(--destructive));
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+}
+/* The shell's own words (English), set apart from the translated sentence. */
+.rm-error-raw {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    color: var(--muted-foreground);
+    user-select: text;
+}
+/* Lock phones: the switch, then what it does right now. */
+.rm-lock {
+    justify-content: flex-start;
+}
+.rm-lock > .dk-btn > svg {
+    flex-shrink: 0;
+}
+/* The three parts of the running server are tabs: one is shown at a time. */
+.rm-tabs {
+    display: flex;
+    gap: 14px;
+    min-width: 0;
+    border-bottom: 1px solid var(--line, var(--border));
+}
+.rm-tabs > .dk-tab > .dk-num {
+    color: var(--muted-foreground);
+}
+/* Requests waiting: alert colour next to the word "Requests" (the number itself is the cue). */
+.rm-tabs > .dk-tab > .dk-num[data-alert="true"] {
+    color: var(--alert, var(--destructive));
+}
+.rm-panel {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+.rm-party {
+    justify-content: flex-start;
+}
+
+/* ── pairing codes: the guest code alone (default), all three side by side, or one enlarged ── */
+.rm-codes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.rm-codes[data-layout="one"],
+.rm-codes[data-layout="solo"] {
+    grid-template-columns: minmax(0, 1fr);
+}
+.rm-code {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    justify-items: start;
+}
+/* The guest code alone: the code on the left at a size a phone reads across a booth, what it
+   is for and its address on the right. Lower than a stacked column, so the popover keeps
+   fitting the smallest window in touch mode too. */
+.rm-codes[data-layout="solo"] > .rm-code {
+    grid-template-columns: 148px minmax(0, 1fr);
+    grid-template-areas:
+        "qr role"
+        "qr hint"
+        "qr url"
+        "qr actions";
+    grid-template-rows: auto auto 1fr auto;
+    column-gap: 12px;
+    align-items: start;
+}
+.rm-codes[data-layout="solo"] .rm-qr-btn {
+    grid-area: qr;
+}
+.rm-codes[data-layout="solo"] .rm-code-role {
+    grid-area: role;
+}
+.rm-codes[data-layout="solo"] .rm-code-hint {
+    grid-area: hint;
+}
+.rm-codes[data-layout="solo"] .rm-url {
+    grid-area: url;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: var(--foreground);
+}
+.rm-codes[data-layout="solo"] .rm-code-actions {
+    grid-area: actions;
+}
+/* The two codes that give control stay behind this action; the warning says why. */
+.rm-private {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    min-width: 0;
+}
+.rm-warn {
+    padding-left: 8px;
+    border-left: 2px solid var(--warning);
+    color: var(--foreground);
+}
+.rm-code-role {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rm-qr-btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border-radius: var(--ctl-radius, 6px);
+    cursor: zoom-in;
+}
+.rm-qr-btn[aria-pressed="true"] {
+    width: min(100%, 248px);
+    justify-self: center;
+    cursor: zoom-out;
+}
+.rm-qr-btn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+/* Dark modules on a light plate whatever the mode: the two ends of the theme's own scale. */
+.rm-qr {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--background);
+    color: var(--foreground);
+}
+.dark .rm-qr {
+    background: var(--foreground);
+    color: var(--background);
+}
+.rm-qr-none {
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+}
+/* The whole URL is in the DOM (select + copy gives all of it); the small view shows its start. */
+.rm-url {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--muted-foreground);
+    user-select: text;
+    cursor: text;
+}
+.rm-code[data-zoomed] .rm-url {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: var(--foreground);
+}
+.rm-code-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* ── requests ── */
+.rm-reqs,
+.rm-clients {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.rm-req {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: baseline;
+    gap: 2px 8px;
+    padding-left: 8px;
+    border-left: 2px solid var(--line, var(--border));
+}
+.rm-req[data-status="pending"] {
+    border-left-color: var(--warning);
+}
+.rm-req[data-status="accepted"] {
+    border-left-color: var(--on, var(--primary));
+}
+/* Title and artist each shorten with their own ellipsis, so a long title cannot push the
+   artist out of the row. */
+.rm-req-song {
+    display: flex;
+    gap: 4px;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--foreground);
+}
+.rm-req-song > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rm-req-song > span {
+    flex-shrink: 2;
+    color: var(--muted-foreground);
+}
+.rm-req-votes {
+    color: var(--muted-foreground);
+}
+.rm-req[data-status="rejected"] .rm-req-song,
+.rm-req[data-status="played"] .rm-req-song {
+    color: var(--muted-foreground);
+}
+.rm-req-note {
+    grid-column: 1 / -1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.rm-req-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.rm-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted-foreground);
+}
+
+/* ── devices ── */
+.rm-clients > li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+.rm-client-addr {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--foreground);
+}
+
+/* ── touch mode (styles.css: every button is at least 44 x 44 px) ──
+   Rows grow with their buttons, so the column is tightened elsewhere to keep the popover
+   inside the smallest window: smaller gaps here, two requests per page (RemotePopover). */
+:root[data-touch="on"] .rm-pop[data-slot="popover-content"] {
+    gap: 6px;
+}
+:root[data-touch="on"] .rm-body,
+:root[data-touch="on"] .rm-panel {
+    gap: 6px;
+}
+/* Buttons next to text: the text takes what is left and wraps; a 44 px button never shrinks
+   or slides under its neighbour. */
+:root[data-touch="on"] .rm-row > .rm-hint,
+:root[data-touch="on"] .rm-row > .rm-state {
+    flex: 1 1 0;
+}
+/* Request actions: 44 px targets with 8 px between them (WCAG 2.5.8 spacing). */
+:root[data-touch="on"] .rm-req-actions,
+:root[data-touch="on"] .rm-code-actions {
+    gap: 8px;
+}
+:root[data-touch="on"] .rm-pager {
+    gap: 8px;
+}
+/* Three codes side by side leave 110 px a column: the 44 px "New code" keeps its own line. */
+:root[data-touch="on"] .rm-codes[data-layout="all"] .rm-code-actions > .dk-btn {
+    width: 100%;
+}
+/* The tabs are 44 px high in touch mode: their underline stays on the row's line. */
+:root[data-touch="on"] .rm-tabs {
+    gap: 8px;
+}

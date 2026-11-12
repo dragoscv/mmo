@@ -447,12 +447,33 @@ fn handle_message(
         Some(c) => c,
         None => return,
     };
+    // The mapping is not needed past this point: no lock is held across the next two.
+    drop(preset);
+
+    // A controller button is the DJ's own transport: a phone's held CUE ends as it does with
+    // the on-screen buttons. Before the engine lock (lock order: remote, then engine).
+    if let Some((deck, what)) = local_transport(&cmd) {
+        let remote: tauri::State<'_, crate::remote::RemoteCtl> = app.state();
+        crate::remote::note_local(&remote, deck, what, std::time::Instant::now());
+    }
 
     // Dispatch on the engine via the managed state.
     let state: tauri::State<'_, EngineState> = app.state();
     let guard = state.0.lock().unwrap();
     if let Some(engine) = guard.as_ref() {
         engine.send(cmd);
+    }
+}
+
+/// What a mapped command means for the CUE button of the phone remote (`remote::note_local`):
+/// only transport commands count.
+fn local_transport(cmd: &Command) -> Option<(mixai_core::DeckId, crate::remote::LocalTransport)> {
+    use crate::remote::LocalTransport;
+    match cmd {
+        Command::Play(deck) => Some((*deck, LocalTransport::Play)),
+        Command::Pause(deck) => Some((*deck, LocalTransport::Pause)),
+        Command::JumpHotCue(deck, _) => Some((*deck, LocalTransport::Jump)),
+        _ => None,
     }
 }
 

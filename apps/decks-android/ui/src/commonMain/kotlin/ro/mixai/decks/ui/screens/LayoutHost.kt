@@ -40,38 +40,15 @@ val NativePanels: Set<PanelId> =
     setOf(PanelId.DeckA, PanelId.DeckB, PanelId.Mixer, PanelId.Crossfader, PanelId.Library, PanelId.Waves)
 
 /**
- * Sizes (dp) the Compose deck / mixer / crossfader CONTENT needs per tier (anything smaller renders
- * the icon tier). The Decks 1.5 contract (`PANEL_SPECS`) lets a deck be `full` from 480×250 because
- * the desktop app redesigned its panels as wide, short strips; the Compose panels still have their
- * 1.4 content (jog wheel, button rows), so the tier they render at is the richest one whose content
- * fits the rect the solver gave, and never richer than the solver's tier. Zero-scroll stays true;
- * remove once the panels are redesigned.
+ * Tier of panel [id] in a [w] × [h] dp box by the solver's own rule (`PANEL_SPECS` minimums with the
+ * solver's fit tolerance); the icon tier when even that does not fit. The panels are sized for those
+ * minimums (Decks 1.5: deck 480×250 / 340×190 / 220×110, mixer 240×250 / 200×190 / 150×110, crossfader
+ * 220×84 / 180×40 / 140×28, library 520×240 / 320×160 / 200×96; rendered at exactly those boxes by
+ * desktopTest/ContentMinimumsTest), so a placed panel is drawn at the tier the solver gave it. This
+ * is only for a box the solver did not size: the dock slot under its tab strip.
  */
-private val contentMinimums: Map<PanelId, List<Pair<PanelTier, Pair<Double, Double>>>> = run {
-    // Heights are measured from the real panels for every preset skin (desktopTest ContentMinimumsTest).
-    val deck = listOf(PanelTier.Full to (510.0 to 390.0), PanelTier.Compact to (340.0 to 356.0))
-    mapOf(
-        PanelId.DeckA to deck, PanelId.DeckB to deck, PanelId.DeckC to deck, PanelId.DeckD to deck,
-        PanelId.Mixer to listOf(PanelTier.Full to (240.0 to 530.0), PanelTier.Compact to (230.0 to 196.0)),
-        // Label + 28 dp fader + panel padding; under that the icon tier drops the label (fader only).
-        PanelId.Crossfader to listOf(PanelTier.Full to (220.0 to CROSSFADER_LABELLED_DP), PanelTier.Compact to (180.0 to CROSSFADER_LABELLED_DP)),
-    )
-}
-
-/** Size (dp) the content of panel [id] needs at [tier]; null = no content minimum (the solver's tier is used as is). */
-fun contentMinimum(id: PanelId, tier: PanelTier): Pair<Double, Double>? = contentMinimums[id]?.firstOrNull { it.first == tier }?.second
-
-/** Height (dp) the crossfader panel needs with its label (2 × 8 padding + label + 4 + 28 fader), and with the fader alone (icon tier: 28 + 2 × 2). */
-const val CROSSFADER_LABELLED_DP = 68.0
-const val CROSSFADER_FADER_ONLY_DP = 32.0
-
-/** The tier panel [id] renders its content at inside a [w] × [h] dp rect the solver marked [tier]. */
-fun contentTier(id: PanelId, tier: PanelTier, w: Double, h: Double): PanelTier {
-    val steps = contentMinimums[id] ?: return tier
-    val fit = steps.firstOrNull { (_, min) -> w + DemoPacks.FIT_TOLERANCE >= min.first && h + DemoPacks.FIT_TOLERANCE >= min.second }?.first
-        ?: PanelTier.Icon
-    return if (fit.ordinal >= tier.ordinal) fit else tier
-}
+fun tierFor(id: PanelId, w: Double, h: Double): PanelTier =
+    DemoPacks.pickTier(PanelRect(0.0, 0.0, w, h), DemoPacks.specs.getValue(id)) ?: PanelTier.Icon
 
 /** Width (dp) under which the native phone layout ([DemoPacks.phone]) replaces the chosen one. */
 const val PHONE_MAX_WIDTH_DP = 700
@@ -83,9 +60,9 @@ fun effectiveLayout(chosen: LayoutDoc, widthDp: Float): LayoutDoc = if (widthDp 
 const val DOCK_TABS_DP = 48.0
 
 /**
- * What [LayoutHost] draws for a solver result: [panels] at the tier their content fits
- * ([contentTier]) and, when something is docked, the [dock] slot with its [tabs] ([host] = the
- * placed panel that shares the slot, shown as the first tab).
+ * What [LayoutHost] draws for a solver result: [panels] at the solver's tier and, when something
+ * is docked, the [dock] slot with its [tabs] ([host] = the placed panel that shares the slot, shown
+ * as the first tab).
  */
 data class LayoutRender(
     val panels: List<PanelPlacement>,
@@ -93,10 +70,10 @@ data class LayoutRender(
     val host: PanelPlacement?,
     val tabs: List<PanelId>,
 ) {
-    /** Tier a dock tab renders at: never richer than the slot's tier, inside the slot minus the tab strip. */
+    /** Tier a dock tab renders at: the solver's rule for the slot minus the tab strip. */
     fun dockTier(id: PanelId): PanelTier {
         val d = dock ?: return PanelTier.Icon
-        return contentTier(id, host?.tier ?: PanelTier.Icon, d.w, (d.h - DOCK_TABS_DP).coerceAtLeast(0.0))
+        return tierFor(id, d.w, (d.h - DOCK_TABS_DP).coerceAtLeast(0.0))
     }
 
     /** Tier panel [id] is drawn at without the user touching the dock; null = behind a dock tab or not in the layout. */
@@ -113,8 +90,7 @@ fun layoutRender(sol: LayoutSolution, shownElsewhere: Set<PanelId> = emptySet())
     val dock = sol.dock.takeIf { docked.isNotEmpty() }
     // The panel the dock shares its slot with (it becomes the first tab).
     val host = dock?.let { d -> sol.placements.firstOrNull { it.rect == d } }
-    val panels = sol.placements.filter { it !== host }.map { it.copy(tier = contentTier(it.panel, it.tier, it.rect.w, it.rect.h)) }
-    return LayoutRender(panels, dock, host, if (dock == null) emptyList() else listOfNotNull(host?.panel) + docked)
+    return LayoutRender(sol.placements.filter { it !== host }, dock, host, if (dock == null) emptyList() else listOfNotNull(host?.panel) + docked)
 }
 
 /**

@@ -92,14 +92,15 @@ data class DecksSkin(
 
     companion object {
         /**
-         * Layout the Compose apps open on. The CONTRACT default stays Pro (`DEFAULT_LAYOUT.id` of
-         * presets.ts = [DemoPacks.DEFAULT_LAYOUT_ID], checked against the fixtures), but Pro and
-         * Vertical waves size their boxes for the redesigned desktop panels, and the Compose deck /
-         * mixer still have their 1.4 content: on a 1366×768 window Pro leaves the decks at the icon
-         * tier (LayoutTest). Until the Compose panels are redesigned the default is the layout that
-         * content fits; Pro and Vertical waves stay selectable.
+         * Layout the Compose apps open on: Pro, the contract default (`DEFAULT_LAYOUT.id` of presets.ts
+         * = [DemoPacks.DEFAULT_LAYOUT_ID], checked against the fixtures). The Compose deck / mixer /
+         * library are the Decks 1.5 strips sized for the `PANEL_SPECS` minimums (rendered in the minimum
+         * box of every tier by desktopTest/ContentMinimumsTest), so the solver's tiers are drawn as given.
          */
-        const val DEFAULT_LAYOUT = "classic"
+        const val DEFAULT_LAYOUT = "pro"
+
+        /** The default layout of Decks ≤ 1.4 (`CLASSIC.id` of presets.ts): a pre-1.5 save on it moves to [DEFAULT_LAYOUT] once. */
+        const val LEGACY_DEFAULT_LAYOUT = "classic"
 
         /** Accent of the Signature default (`SIGNATURE_PREFS` of look.ts): green = ON. */
         const val SIGNATURE_ACCENT = "emerald"
@@ -107,13 +108,12 @@ data class DecksSkin(
         val presets: List<DecksSkin> = listOf(
             // MixAI Signature (default): black-green, flat, dense; `SIGNATURE_PREFS` of look.ts on [DEFAULT_LAYOUT].
             DecksSkin("signature", accent = SIGNATURE_ACCENT, surface = "flat", density = "compact", radius = "sm"),
-            // Familiar skins, same tokens as builtin-skins.ts (styles in [BuiltinSkins]). Their TS layouts are
-            // `pro` / `pro-vertical` / `pro`. Mainroom and Pilot stay on [DEFAULT_LAYOUT] here (Pro renders the
-            // Compose decks at the icon tier at 1366×768); Crate keeps Vertical waves, where decks and mixer
-            // render compact at 1366×768 and 1920×1080 (LayoutTest `signaturePresets…`).
-            DecksSkin("mainroom", accent = SIGNATURE_ACCENT, surface = "flat", density = "compact", radius = "sm"),
+            // Familiar skins, same tokens and layouts as builtin-skins.ts (styles in [BuiltinSkins]; the values and
+            // the `style.layout` of each are compared with the TS file by desktopTest/BuiltinSkinsDriftTest):
+            // Mainroom `pro`, Crate `pro-vertical`, Pilot `pro`.
+            DecksSkin("mainroom", accent = SIGNATURE_ACCENT, surface = "flat", density = "compact", radius = "sm", layoutId = "pro"),
             DecksSkin("crate", accent = SIGNATURE_ACCENT, surface = "flat", density = "compact", radius = "sm", layoutId = "pro-vertical"),
-            DecksSkin("pilot", accent = SIGNATURE_ACCENT, surface = "flat", density = "compact", radius = "sm"),
+            DecksSkin("pilot", accent = SIGNATURE_ACCENT, surface = "flat", density = "compact", radius = "sm", layoutId = "pro"),
             // The Decks 1.x look (`ro.mixai.skin.glass-classic`): glass panels, violet accent, roomy controls, 1.x layout.
             DecksSkin("glass-classic", accent = "violet", surface = "glass", density = "comfortable", radius = "lg",
                 layoutId = "classic", look = LOOK_CLASSIC),
@@ -144,13 +144,15 @@ data class DecksSkin(
             val m = s.split(';').mapNotNull { p -> p.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }.toMap()
             val packId = m["pack"]?.takeIf { packIdRe.matches(it) && it.length <= 100 }
             // No `look` key = saved by Decks ≤ 1.4: move once to the Signature look (as `migrateLookOnce` of
-            // look.ts). A non-default accent was a choice and is kept, and so is the saved layout: unlike the
-            // desktop app (`migrateDefaultLayout`), `classic` is NOT moved to Pro (see [DEFAULT_LAYOUT]). The old
-            // look stays available as the skin "Glass (classic)".
+            // look.ts). A non-default accent was a choice and is kept, and so is a chosen layout. `classic` was
+            // the default layout up to 1.4, so a save that names it is an install that never chose: it moves to
+            // [DEFAULT_LAYOUT] (Pro), as the desktop app does (`migrateDefaultLayout` of layout-store.ts). Once
+            // only: the first save by 1.5 writes the `look` key, and a layout picked after that is kept, Classic
+            // included. The old look stays available as the skin "Glass (classic)", which opens on Classic.
             if (m["look"] !in setOf(LOOK_SIGNATURE, LOOK_CLASSIC)) {
                 return default.copy(
                     accent = m["accent"]?.takeIf { it in TokenRoles.accentHues.keys && it != TokenRoles.DEFAULT_ACCENT } ?: default.accent,
-                    layoutId = m["layout"]?.takeIf { validLayoutId(it) } ?: default.layoutId,
+                    layoutId = m["layout"]?.takeIf { validLayoutId(it) && it != LEGACY_DEFAULT_LAYOUT } ?: default.layoutId,
                     reducedMotion = m["motion"] == "reduced",
                     highContrast = m["contrast"]?.toBooleanStrictOrNull() ?: false,
                     packId = packId,

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -14,14 +15,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ro.mixai.decks.ui.DecksController
 import ro.mixai.decks.ui.components.PadButton
 import ro.mixai.decks.ui.components.Panel
+import ro.mixai.decks.ui.components.tag
 import ro.mixai.decks.ui.engine.RemotePairingUi
 import ro.mixai.decks.ui.engine.RemoteRoleUi
 import ro.mixai.decks.ui.engine.RequestStateUi
@@ -29,11 +36,24 @@ import ro.mixai.decks.ui.i18n.Str
 import ro.mixai.decks.ui.i18n.str
 import ro.mixai.decks.ui.theme.DecksColors
 import ro.mixai.decks.ui.theme.LocalDecksType
+import ro.mixai.decks.ui.theme.LocalTouchInput
+
+/** Test tags of the connect panel's switches (desktopTest/ConnectPanelTest). Not spoken, not shown. */
+object ConnectTags {
+    const val LOCK = "connect-lock"
+    const val LOCK_NAME = "connect-lock-name"
+    const val LOCK_HINT = "connect-lock-hint"
+    const val PARTY = "connect-party"
+}
+
+/** Smallest side (dp) of the lock switch's target: 44 like the panel's other buttons, 48 on touch input. */
+const val CONNECT_SWITCH_DP = 44
+const val CONNECT_SWITCH_TOUCH_DP = 48
 
 /**
  * Connected mode (WP19-21): pairing QR codes for phone remote / second screen / Party DJ guests,
- * the request queue with DJ moderation, and the on/off switch. QR modules are drawn with the
- * skin's foreground on its surface (contrast checked by the skin gate), quiet zone 4 modules.
+ * the controls lock, the request queue with DJ moderation, and the on/off switch. QR modules are drawn
+ * with the skin's foreground on its surface (contrast checked by the skin gate), quiet zone 4 modules.
  */
 @Composable
 fun ConnectPanel(ctl: DecksController, modifier: Modifier = Modifier) {
@@ -64,11 +84,13 @@ fun ConnectPanel(ctl: DecksController, modifier: Modifier = Modifier) {
                     ctl.pairings[role]?.let { PairingCard(ctl, it) }
                 }
             }
+            ControlsLock(ctl)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BasicText(str(Str.Requests), style = type.label, modifier = Modifier.semantics { heading() })
                 PadButton(
                     if (ctl.partyOpen) str(Str.RequestsOpen) else str(Str.RequestsClosed),
                     str(Str.RequestsToggle),
+                    Modifier.tag(ConnectTags.PARTY),
                     active = ctl.partyOpen,
                 ) { ctl.changePartyOpen(!ctl.partyOpen) }
                 PadButton(str(Str.RequestsClear), str(Str.RequestsClear)) { ctl.clearDoneRequests() }
@@ -103,6 +125,41 @@ private fun stateName(s: RequestStateUi) = when (s) {
     RequestStateUi.ACCEPTED -> str(Str.RequestAccepted)
     RequestStateUi.REJECTED -> str(Str.RequestRejected)
     RequestStateUi.PLAYED -> str(Str.RequestPlayedState)
+}
+
+/**
+ * The controls lock (`DecksRemote.set_controls_locked`): a switch that shows its state as a word (on / off),
+ * not only as a colour, with its name beside it and, under the name, one line that says what it does. The
+ * name is the switch's spoken name, so the visible copy of it is not read a second time. Both texts wrap: a
+ * narrow panel makes the row higher, it cuts nothing.
+ */
+@Composable
+private fun ControlsLock(ctl: DecksController) {
+    val type = LocalDecksType.current
+    val locked = ctl.controlsLocked
+    val name = str(Str.ConnectLock)
+    val word = str(if (locked) Str.On else Str.Off)
+    val side = (if (LocalTouchInput.current) CONNECT_SWITCH_TOUCH_DP else CONNECT_SWITCH_DP).dp
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PadButton(
+            word,
+            name,
+            Modifier.tag(ConnectTags.LOCK)
+                .sizeIn(minWidth = side, minHeight = side)
+                .semantics { toggleableState = if (locked) ToggleableState.On else ToggleableState.Off },
+            active = locked,
+            state = word,
+            role = Role.Switch,
+        ) { ctl.changeControlsLocked(!locked) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            BasicText(name, style = type.body, modifier = Modifier.clearAndSetSemantics { testTag = ConnectTags.LOCK_NAME })
+            BasicText(
+                str(Str.ConnectLockHint),
+                style = type.small.copy(color = DecksColors.muted),
+                modifier = Modifier.tag(ConnectTags.LOCK_HINT),
+            )
+        }
+    }
 }
 
 @Composable

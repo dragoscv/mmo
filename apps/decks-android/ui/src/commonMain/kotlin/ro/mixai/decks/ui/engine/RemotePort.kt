@@ -26,7 +26,12 @@ sealed interface RemoteMixerUi {
     data class MasterVolume(val value: Float) : RemoteMixerUi
 }
 
-data class RemotePumpUi(val applied: Int, val errors: List<String>, val mixer: List<RemoteMixerUi>)
+/**
+ * One `pump` of the server. [controlsLocked] = the controls lock the server holds right now
+ * ([RemotePort.setControlsLocked]); it has no default, so every report says it and the shell shows what the
+ * server does, not what the shell last asked for.
+ */
+data class RemotePumpUi(val applied: Int, val errors: List<String>, val mixer: List<RemoteMixerUi>, val controlsLocked: Boolean)
 
 /**
  * Connected mode (WP19-21): phone remote, second screen and Party DJ over the LAN. The JVM/Android
@@ -42,6 +47,12 @@ interface RemotePort : AutoCloseable {
     fun requests(): List<SongRequestUi>
     fun setRequestState(id: Long, state: RequestStateUi)
     fun setPartyOpen(open: Boolean)
+    /**
+     * Controls lock: while on, the server refuses every transport and mixer command from a phone remote and
+     * lets go of every CUE a phone holds; song requests, votes and moderation keep working. A new server
+     * starts unlocked, so the shell applies its choice again after every start.
+     */
+    fun setControlsLocked(locked: Boolean)
     fun clearDone()
     fun clientCount(): Int
 }

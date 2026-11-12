@@ -13,8 +13,8 @@
 //!     switch rebuilds the stream around the same decks, routing and queued commands.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
@@ -59,6 +59,14 @@ const SYNC_NUDGE_MAX: f64 = 0.02;
 /// Beats per bar assumed for the internal clock.
 const INTERNAL_BPB: f64 = 4.0;
 
+static HOST_EPOCH: OnceLock<Instant> = OnceLock::new();
+
+/// Monotonic microseconds since this process first asked (the first [`Engine`] start at the
+/// latest). The time base of [`ClockState::host_us`]; never goes backwards, unrelated to wall time.
+pub fn host_micros() -> u64 {
+    HOST_EPOCH.get_or_init(Instant::now).elapsed().as_micros() as u64
+}
+
 /// Per-deck clock view for the UI / MIDI clock consumers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -95,6 +103,10 @@ pub struct ClockState {
     pub beats_per_bar: u32,
     /// Output frame counter at which `beat` was sampled.
     pub frame: u64,
+    /// [`host_micros`] when `beat` was sampled (start of the audio callback that produced it).
+    /// A follower extrapolates with `bpm`: `beat + (now_us - host_us) * bpm / 60e6`.
+    #[serde(default)]
+    pub host_us: u64,
     pub sample_rate: u32,
     /// Output channels of the open stream.
     pub channels: u16,
@@ -151,6 +163,15 @@ pub enum Command {
     },
     SetStemsActive(DeckId, bool),
     SetStemGain(DeckId, usize, f32),
+    // ---- WP19-41 stem performance ----
+    /// Mute / unmute one stem (gain 0 / 1; with the stem mute FX on a mute leaves an echo tail).
+    SetStemMute(DeckId, usize, bool),
+    /// Stem crossfader of one stem: −1 (side A) .. +1 (side B), 0 = follows the deck.
+    SetStemXf(DeckId, usize, f32),
+    /// Stem mute FX on/off and its echo time in beats.
+    SetStemMuteFx(DeckId, bool, f64),
+    /// Store the running loop on a hot cue (cue loop).
+    SaveCueLoop(DeckId, usize),
     // FX: per-deck beat-synced echo / reverb.
     SetFxKind(DeckId, u8),
     SetFxWet(DeckId, f32),
@@ -183,6 +204,15 @@ pub enum Command {
     SetKeyShift(DeckId, f64),
     /// Master clock source and internal clock tempo (`None` keeps the current tempo).
     SetClock(ClockSource, Option<f64>),
+    /// Set the internal clock's tempo and beat count (LAN tempo sync steers it; it only drives
+    /// the master clock while no deck does). `beat` is valid at `host_us` ([`host_micros`]; 0 =
+    /// "when the command is applied"): the mixer extrapolates to the start of the callback that
+    /// applies it. Out-of-range or non-finite values are ignored.
+    SteerClock {
+        bpm: f64,
+        beat: f64,
+        host_us: u64,
+    },
     // ---- WP19-06 routing ----
     SetRouting(RoutingConfig),
     // ---- WP19-10 FX ----
@@ -206,6 +236,8 @@ pub struct Snapshot {
     pub deck_playing: [AtomicBool; 4],
     /// Hot-cue positions in ms; `u32::MAX` means unset. [deck][slot].
     pub deck_hot_cues_ms: [[AtomicU32; 8]; 4],
+    /// Loop length in beats stored on each hot cue (f64 bits); `u64::MAX` = a plain cue.
+    pub deck_hot_cue_loop_beats: [[AtomicU64; 8]; 4],
     pub deck_loop_active: [AtomicBool; 4],
     pub deck_loop_start_ms: [AtomicU32; 4],
     pub deck_loop_end_ms: [AtomicU32; 4],
@@ -215,6 +247,11 @@ pub struct Snapshot {
     /// 0..3 = deck index, 4 = internal.
     pub clock_source: AtomicU8,
     pub clock_frame: AtomicU64,
+    /// [`host_micros`] at which the published clock holds (the end of the block the callback
+    /// rendered). Also the sequence stamp of the clock fields: 0 while the callback writes
+    /// them (and before the first callback), never the same for two publishes. Read the clock
+    /// through [`Snapshot::clock_sample`], which only returns fields of one publish.
+    pub clock_host_us: AtomicU64,
     pub deck_beat: [AtomicU64; 4],
     pub deck_bpm: [AtomicU64; 4],
     /// Bar phase bits; `u64::MAX` = unknown.
@@ -233,13 +270,96 @@ pub struct Snapshot {
     pub overruns: AtomicU32,
 }
 
+/// The master clock fields of one audio callback, read or written together.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ClockSample {
+    pub bpm: f64,
+    pub beat: f64,
+    /// 0..3 = deck index, 4 = internal.
+    pub source: u8,
+    pub frame: u64,
+    /// [`host_micros`] at which `beat` holds; 0 = no consistent sample (no callback yet, or
+    /// the callback kept writing): the other fields may then be from different callbacks.
+    pub host_us: u64,
+}
+
+/// Tries of [`Snapshot::clock_sample`] before it gives up on a consistent sample. One retry
+/// is the normal case (a publish takes well under a microsecond and happens once per buffer).
+const CLOCK_READ_TRIES: usize = 8;
+
 impl Snapshot {
+    /// Audio callback: publish the master clock. Wait-free: one atomic load and six plain
+    /// stores, no lock, no allocation, no retry loop (the callback is the only writer, so the
+    /// stamp is read and then cleared in two steps instead of a `swap`, which is a retry loop
+    /// on ARM cores without LSE). The stamp is cleared first and written last, so a reader
+    /// that overlaps sees either 0 or a stamp that changed and retries. SeqCst on every
+    /// field: the reader's second stamp load is then ordered after any field store it saw.
+    fn publish_clock(&self, c: ClockSample) {
+        // Strictly increasing, never 0: two publishes are never mistaken for one.
+        let last = self.clock_host_us.load(Ordering::SeqCst);
+        self.clock_host_us.store(0, Ordering::SeqCst);
+        self.clock_bpm.store(c.bpm.to_bits(), Ordering::SeqCst);
+        self.clock_beat.store(c.beat.to_bits(), Ordering::SeqCst);
+        self.clock_source.store(c.source, Ordering::SeqCst);
+        self.clock_frame.store(c.frame, Ordering::SeqCst);
+        self.clock_host_us
+            .store(c.host_us.max(last.saturating_add(1)), Ordering::SeqCst);
+    }
+
+    /// The master clock of ONE callback: beat, tempo, source and time stamp belong together.
+    /// Lock-free; bounded ([`CLOCK_READ_TRIES`]). `host_us` is 0 when no consistent sample
+    /// could be read.
+    pub(crate) fn clock_sample(&self) -> ClockSample {
+        self.clock_sample_with(|| {})
+    }
+
+    /// [`Snapshot::clock_sample`] with a hook that runs in the middle of every read attempt
+    /// (tests use it to publish exactly there).
+    fn clock_sample_with(&self, mut mid_read: impl FnMut()) -> ClockSample {
+        let load = || {
+            let bpm = f64::from_bits(self.clock_bpm.load(Ordering::SeqCst));
+            let beat = f64::from_bits(self.clock_beat.load(Ordering::SeqCst));
+            (bpm, beat)
+        };
+        let mut torn = ClockSample {
+            bpm: 0.0,
+            beat: 0.0,
+            source: 4,
+            frame: 0,
+            host_us: 0,
+        };
+        for _ in 0..CLOCK_READ_TRIES {
+            let before = self.clock_host_us.load(Ordering::SeqCst);
+            let (bpm, beat) = load();
+            mid_read();
+            let source = self.clock_source.load(Ordering::SeqCst);
+            let frame = self.clock_frame.load(Ordering::SeqCst);
+            let after = self.clock_host_us.load(Ordering::SeqCst);
+            torn = ClockSample {
+                bpm,
+                beat,
+                source,
+                frame,
+                host_us: 0,
+            };
+            if before != 0 && after == before {
+                return ClockSample {
+                    host_us: before,
+                    ..torn
+                };
+            }
+            std::hint::spin_loop();
+        }
+        torn
+    }
+
     fn new() -> Self {
         Snapshot {
             clock_bpm: AtomicU64::new(120f64.to_bits()),
             clock_beat: AtomicU64::new(0f64.to_bits()),
             clock_source: AtomicU8::new(4),
             clock_frame: AtomicU64::new(0),
+            clock_host_us: AtomicU64::new(0),
             deck_beat: Default::default(),
             deck_bpm: Default::default(),
             deck_bar_phase: Default::default(),
@@ -254,6 +374,9 @@ impl Snapshot {
             deck_dur_ms: Default::default(),
             deck_playing: Default::default(),
             deck_hot_cues_ms: Default::default(),
+            deck_hot_cue_loop_beats: std::array::from_fn(|_| {
+                std::array::from_fn(|_| AtomicU64::new(u64::MAX))
+            }),
             deck_loop_active: Default::default(),
             deck_loop_start_ms: Default::default(),
             deck_loop_end_ms: Default::default(),
@@ -279,6 +402,8 @@ struct Mixer {
     /// Deck index driving the clock in the current block (None = internal).
     clock_master: Option<usize>,
     frames_total: u64,
+    /// [`host_micros`] at the start of the callback being rendered (0 outside a callback).
+    block_start_us: u64,
     // Routing matrix (WP19-06).
     routing: RoutingConfig,
     comp_master: CompDelay,
@@ -316,6 +441,7 @@ impl Mixer {
             internal_beat: 0.0,
             clock_master: None,
             frames_total: 0,
+            block_start_us: 0,
             routing: RoutingConfig::default(),
             comp_master: CompDelay::new(sr),
             comp_phones: CompDelay::new(sr),
@@ -402,6 +528,14 @@ impl Mixer {
                 }
                 Command::SetStemsActive(d, on) => self.decks[d.index()].set_stems_active(on),
                 Command::SetStemGain(d, idx, g) => self.decks[d.index()].set_stem_gain(idx, g),
+                Command::SetStemMute(d, idx, on) => self.decks[d.index()].set_stem_mute(idx, on),
+                Command::SetStemXf(d, idx, pos) => self.decks[d.index()].set_stem_xf(idx, pos),
+                Command::SetStemMuteFx(d, on, beats) => {
+                    self.decks[d.index()].set_stem_mute_fx(on, beats)
+                }
+                Command::SaveCueLoop(d, slot) => {
+                    self.decks[d.index()].save_cue_loop(slot);
+                }
                 Command::SetFxKind(d, k) => self.decks[d.index()].set_fx_kind(k),
                 Command::SetFxWet(d, w) => self.decks[d.index()].set_fx_wet(w),
                 Command::SetFxBeats(d, b) => self.decks[d.index()].set_fx_beats(b),
@@ -437,6 +571,19 @@ impl Mixer {
                         self.internal_bpm = b;
                     }
                     self.clock_cfg = src;
+                }
+                Command::SteerClock { bpm, beat, host_us } => {
+                    if bpm.is_finite() && (20.0..=300.0).contains(&bpm) && beat.is_finite() {
+                        // Time since the sender sampled `beat` (bounded: a stale or future
+                        // stamp must not throw the clock minutes away).
+                        let late_us = if host_us == 0 || self.block_start_us == 0 {
+                            0.0
+                        } else {
+                            (self.block_start_us as f64 - host_us as f64).clamp(-2e6, 2e6)
+                        };
+                        self.internal_bpm = bpm;
+                        self.internal_beat = beat + late_us * bpm / 60e6;
+                    }
                 }
                 Command::SetRouting(cfg) => {
                     let cfg = cfg.sanitized();
@@ -554,8 +701,10 @@ impl Mixer {
             d.set_sync_nudge(1.0 + nudge);
         }
         let inc = bpm / 60.0 / self.sr as f64;
+        let curve = self.curve;
         for d in self.decks.iter_mut() {
             d.set_clock(bpm, beat, inc);
+            d.set_xf_context(curve);
         }
     }
 
@@ -576,6 +725,8 @@ impl Mixer {
         // there, which is the work most likely to overrun the period.
         // Monotonic clock read: no allocation, no lock (QPC / clock_gettime).
         let started = std::time::Instant::now();
+        let started_us = host_micros();
+        self.block_start_us = started_us;
         self.drain_commands();
         if channels == 0 {
             return;
@@ -650,7 +801,7 @@ impl Mixer {
             self.internal_beat += self.internal_bpm / 60.0 / self.sr as f64 * frames as f64;
         }
         self.frames_total = self.frames_total.wrapping_add(frames);
-        self.publish_snapshot();
+        self.publish_snapshot(started_us);
 
         // DSP load: time spent in this callback against the time the buffer lasts.
         let period = frames as f64 / self.sr.max(1.0) as f64;
@@ -670,7 +821,8 @@ impl Mixer {
         }
     }
 
-    fn publish_snapshot(&mut self) {
+    /// `block_start_us` = [`host_micros`] when the callback that just rendered began.
+    fn publish_snapshot(&mut self, block_start_us: u64) {
         // Publish a few times per buffer is wasteful; once per buffer is fine.
         let s = &self.snapshot;
         s.master_vu.store(
@@ -694,6 +846,10 @@ impl Mixer {
                 };
                 s.deck_hot_cues_ms[i][slot].store(v, Ordering::Relaxed);
             }
+            for (slot, b) in deck.hot_cue_loops().iter().enumerate() {
+                let v = b.map(f64::to_bits).unwrap_or(u64::MAX);
+                s.deck_hot_cue_loop_beats[i][slot].store(v, Ordering::Relaxed);
+            }
             let (lact, lstart, lend) = deck.loop_state_secs();
             s.deck_loop_active[i].store(lact, Ordering::Relaxed);
             s.deck_loop_start_ms[i].store((lstart * 1000.0) as u32, Ordering::Relaxed);
@@ -710,11 +866,21 @@ impl Mixer {
             s.deck_slip_pos[i].store(slip, Ordering::Relaxed);
         }
         let (master, bpm, beat) = self.master_now();
-        s.clock_bpm.store(bpm.to_bits(), Ordering::Relaxed);
-        s.clock_beat.store(beat.to_bits(), Ordering::Relaxed);
-        s.clock_source
-            .store(master.map(|m| m as u8).unwrap_or(4), Ordering::Relaxed);
-        s.clock_frame.store(self.frames_total, Ordering::Relaxed);
+        // `beat` is the clock AFTER this block: it is valid one block length after its start.
+        let block_us = if self.sr > 0.0 {
+            (self.snapshot.buffer_frames.load(Ordering::Relaxed) as f64 / self.sr as f64 * 1e6)
+                as u64
+        } else {
+            0
+        };
+        // One publish for the clock: a reader never pairs this beat with another block's stamp.
+        s.publish_clock(ClockSample {
+            bpm,
+            beat,
+            source: master.map(|m| m as u8).unwrap_or(4),
+            frame: self.frames_total,
+            host_us: block_start_us + block_us,
+        });
         self.frame_counter = self.frame_counter.wrapping_add(1);
     }
 }
@@ -935,6 +1101,8 @@ impl Engine {
         let (tx, rx) = bounded::<Command>(1024);
         let snapshot = Arc::new(Snapshot::new());
         let (recorder, rec_tx) = crate::recorder::Recorder::spawn();
+        // Pin the host time base before the first callback (never initialised on the audio thread).
+        host_micros();
         let mixer = Mixer::new(choice.sample_rate as f32, rx, snapshot.clone(), rec_tx);
         let (home_tx, home_rx) = bounded::<Mixer>(1);
         let (stream, info) =
@@ -1225,12 +1393,27 @@ impl Engine {
         self.send(Command::SetClock(source, bpm));
     }
 
+    /// Set the internal clock's tempo and beat count; `beat` is the value at `host_us`
+    /// ([`host_micros`], 0 = now). Used by LAN tempo sync: with the clock source set to
+    /// internal, sync-locked decks follow it. Ignored by the engine when `bpm` is outside
+    /// 20..300 or a value is not finite.
+    pub fn steer_internal_clock(&self, bpm: f64, beat: f64, host_us: u64) {
+        self.send(Command::SteerClock { bpm, beat, host_us });
+    }
+
     /// Master clock + per-deck beat positions (for UI, MIDI clock out, Link).
+    ///
+    /// `bpm`, `beat`, `source`, `frame` and `host_us` come from one audio callback (see
+    /// [`Snapshot::clock_sample`]); `host_us` is 0 when that could not be had (no callback
+    /// yet): do not extrapolate from such a state.
     pub fn clock_state(&self) -> ClockState {
         let s = &self.snapshot;
         let ld = |a: &AtomicU64| f64::from_bits(a.load(Ordering::Relaxed));
-        let beat = ld(&s.clock_beat);
-        let master = self.clock_master_deck();
+        // First, and in one piece: the lock and the allocations below take long enough for a
+        // callback to publish in between.
+        let clock = s.clock_sample();
+        let beat = clock.beat;
+        let master = DeckId::ALL.get(clock.source as usize).copied();
         let p = self.perf().clone();
         let configured = match p.clock {
             ClockSource::Auto => "auto".to_string(),
@@ -1263,12 +1446,13 @@ impl Engine {
         ClockState {
             configured,
             source: master.map(deck_name).unwrap_or("internal").to_string(),
-            bpm: ld(&s.clock_bpm),
+            bpm: clock.bpm,
             beat,
             beat_phase: beat.rem_euclid(1.0),
             bar_phase,
             beats_per_bar: INTERNAL_BPB as u32,
-            frame: s.clock_frame.load(Ordering::Relaxed),
+            frame: clock.frame,
+            host_us: clock.host_us,
             sample_rate: self.sample_rate,
             channels: self.channels,
             buffer_frames: self.buffer_frames(),
@@ -1364,6 +1548,9 @@ impl Engine {
 
     /// Set the live gain (0..1.5) for stem `idx` (0=vocals,1=drums,2=bass,3=melody).
     pub fn set_stem_gain(&self, deck: DeckId, idx: usize, gain: f32) {
+        if !gain.is_finite() {
+            return;
+        }
         if idx < 4 {
             let mut m = self.mirror();
             let gains = &mut m.decks[deck.index()].stem_gains;
@@ -1373,6 +1560,61 @@ impl Engine {
             gains[idx] = gain.clamp(0.0, 1.5);
         }
         self.send(Command::SetStemGain(deck, idx, gain));
+    }
+
+    // ---- WP19-41 stem performance -------------------------------------------
+
+    /// Mute / unmute stem `idx` (0=vocals,1=drums,2=bass,3=melody): gain 0 / 1, and with the
+    /// stem mute FX on a mute leaves an echo tail of the stem. The mirror follows the same rule
+    /// as the deck ([`crate::state::stem_mute_step`]): nothing changes when the stem is in that
+    /// state already, and an unmute returns to the level the stem had before the mute.
+    pub fn set_stem_mute(&self, deck: DeckId, idx: usize, on: bool) {
+        if idx >= 4 {
+            return;
+        }
+        self.mirror().decks[deck.index()].mirror_stem_mute(idx, on);
+        self.send(Command::SetStemMute(deck, idx, on));
+    }
+
+    /// Stem crossfader of stem `idx`: −1 (side A) .. +1 (side B), 0 = the stem follows the
+    /// deck. Non-finite values are ignored.
+    pub fn set_stem_xf(&self, deck: DeckId, idx: usize, pos: f32) {
+        if idx >= 4 || !pos.is_finite() {
+            return;
+        }
+        let pos = pos.clamp(-1.0, 1.0);
+        {
+            let mut m = self.mirror();
+            let xf = &mut m.decks[deck.index()].stem_xf;
+            if xf.len() < 4 {
+                xf.resize(4, 0.0);
+            }
+            xf[idx] = pos;
+        }
+        self.send(Command::SetStemXf(deck, idx, pos));
+    }
+
+    /// Stem mute FX on/off and its echo time in beats (1/32..8; non-finite = unchanged).
+    pub fn set_stem_mute_fx(&self, deck: DeckId, on: bool, beats: f64) {
+        {
+            let mut m = self.mirror();
+            let d = &mut m.decks[deck.index()];
+            d.stem_mute_fx = on;
+            if beats.is_finite() {
+                d.stem_mute_fx_beats = beats.clamp(
+                    crate::deck::STEM_MUTE_FX_BEATS_MIN,
+                    crate::deck::STEM_MUTE_FX_BEATS_MAX,
+                );
+            }
+        }
+        self.send(Command::SetStemMuteFx(deck, on, beats));
+    }
+
+    /// Cue loop: store the running loop on hot cue `slot` (the snapshot reports it).
+    pub fn save_cue_loop(&self, deck: DeckId, slot: usize) {
+        if slot < 8 {
+            self.send(Command::SaveCueLoop(deck, slot));
+        }
     }
 
     /// Select the active FX (0=off, 1=echo, 2=reverb) for a deck.
@@ -1447,6 +1689,9 @@ impl Engine {
             deck.position = s.deck_pos_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
             deck.duration = s.deck_dur_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
             deck.playing = s.deck_playing[i].load(Ordering::Relaxed);
+            if deck.hot_cue_loops.len() < 8 {
+                deck.hot_cue_loops.resize(8, None);
+            }
             for slot in 0..8 {
                 let v = s.deck_hot_cues_ms[i][slot].load(Ordering::Relaxed);
                 deck.hot_cues[slot] = if v == u32::MAX {
@@ -1454,6 +1699,8 @@ impl Engine {
                 } else {
                     Some(v as f64 / 1000.0)
                 };
+                let b = s.deck_hot_cue_loop_beats[i][slot].load(Ordering::Relaxed);
+                deck.hot_cue_loops[slot] = (b != u64::MAX).then(|| f64::from_bits(b));
             }
             deck.loop_active = s.deck_loop_active[i].load(Ordering::Relaxed);
             deck.loop_start = s.deck_loop_start_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
@@ -1629,6 +1876,168 @@ mod tests {
         let beat = f64::from_bits(m.snapshot.clock_beat.load(Ordering::Relaxed));
         assert!((beat - 128.0 / 60.0 * 2.0).abs() < 1e-6, "beat {beat}");
         assert_eq!(m.snapshot.clock_source.load(Ordering::Relaxed), 4);
+    }
+
+    #[test]
+    fn steering_sets_the_internal_clock_and_ignores_bad_values() {
+        let (mut m, tx) = mixer();
+        tx.send(Command::SetClock(ClockSource::Internal, Some(120.0)))
+            .unwrap();
+        tx.send(Command::SteerClock {
+            bpm: 126.0,
+            beat: 40.0,
+            host_us: 0,
+        })
+        .unwrap();
+        let mut out = vec![0.0f32; 512];
+        m.render(&mut out, 2); // 256 frames
+        let snap = m.snapshot.clone();
+        let beat = || f64::from_bits(snap.clock_beat.load(Ordering::Relaxed));
+        let bpm = || f64::from_bits(snap.clock_bpm.load(Ordering::Relaxed));
+        let one_block = 126.0 / 60.0 * 256.0 / SR as f64;
+        assert!(
+            (beat() - (40.0 + one_block)).abs() < 1e-9,
+            "beat {}",
+            beat()
+        );
+        assert_eq!(bpm(), 126.0);
+        for (b, at) in [(f64::NAN, 1.0), (5.0, 1.0), (126.0, f64::INFINITY)] {
+            tx.send(Command::SteerClock {
+                bpm: b,
+                beat: at,
+                host_us: 0,
+            })
+            .unwrap();
+        }
+        m.render(&mut out, 2);
+        assert!(
+            (beat() - (40.0 + 2.0 * one_block)).abs() < 1e-9,
+            "beat {}",
+            beat()
+        );
+        assert_eq!(bpm(), 126.0);
+        // The published time base moves forward and sits exactly one block after the callback
+        // start: the callback began between the two stamps taken around `render`.
+        let block_us = 256 * 1_000_000 / 48_000; // 5 333 µs
+        let t1 = snap.clock_sample().host_us;
+        let before = host_micros();
+        m.render(&mut out, 2);
+        let after = host_micros();
+        let t2 = snap.clock_sample().host_us;
+        assert!(t1 > 0 && t2 > t1, "t1 {t1} t2 {t2}");
+        assert!(
+            (before + block_us..=after + block_us + 1).contains(&t2),
+            "stamp {t2} is not one block ({block_us} µs) after a callback start within {before}..={after}"
+        );
+        // A stamped steer is extrapolated to the start of the callback that applies it: a beat
+        // sampled 0.5 s before "now" at 120 BPM is one beat further by then. The callback
+        // starts somewhere between the two stamps taken around `render`, however long this
+        // thread was kept waiting in between.
+        let now = host_micros();
+        let stamp = now.saturating_sub(500_000).max(1);
+        tx.send(Command::SteerClock {
+            bpm: 120.0,
+            beat: 100.0,
+            host_us: stamp,
+        })
+        .unwrap();
+        m.render(&mut out, 2);
+        let after = host_micros();
+        let got = beat() - 120.0 / 60.0 * 256.0 / SR as f64;
+        let at = |t: u64| 100.0 + ((t - stamp) as f64).min(2e6) * 120.0 / 60e6;
+        assert!(
+            (at(now) - 1e-6..=at(after) + 1e-6).contains(&got),
+            "extrapolated beat {got}, want {}..={}",
+            at(now),
+            at(after)
+        );
+        // Not vacuous: half a second at 120 BPM is a whole beat, far above the tolerance.
+        if now > 500_000 {
+            assert!(got >= 101.0 - 1e-6, "beat {got}");
+        }
+    }
+
+    fn clock_block(n: u64) -> ClockSample {
+        ClockSample {
+            bpm: 100.0 + n as f64,
+            beat: n as f64 * 0.5,
+            source: (n % 5) as u8,
+            frame: n * 256,
+            host_us: 1_000 + n * 5_333,
+        }
+    }
+
+    #[test]
+    fn a_clock_read_that_overlaps_a_publish_never_mixes_two_blocks() {
+        let snap = Snapshot::new();
+        // Before the first callback there is no sample: the stamp says so.
+        assert_eq!(snap.clock_sample().host_us, 0);
+        snap.publish_clock(clock_block(1));
+        assert_eq!(snap.clock_sample(), clock_block(1));
+        // The callback publishes block 2 in the middle of a read: after the reader loaded the
+        // beat of block 1, before it loads the rest. A reader that does not check would pair
+        // the beat of block 1 with the stamp of block 2 (one buffer apart).
+        let mut published = false;
+        let got = snap.clock_sample_with(|| {
+            if !published {
+                published = true;
+                snap.publish_clock(clock_block(2));
+            }
+        });
+        assert!(published);
+        assert_eq!(got, clock_block(2), "a torn read was returned");
+        // A callback that publishes during EVERY attempt: the reader gives up after a bounded
+        // number of tries and says so with stamp 0 (it never loops for ever, never lies).
+        let mut n = 2;
+        let mut tries = 0;
+        let got = snap.clock_sample_with(|| {
+            n += 1;
+            tries += 1;
+            snap.publish_clock(clock_block(n));
+        });
+        assert_eq!(tries, CLOCK_READ_TRIES);
+        assert_eq!(got.host_us, 0, "no consistent sample must read as unusable");
+        // Afterwards a quiet read is whole again.
+        assert_eq!(snap.clock_sample(), clock_block(n));
+        // Two publishes with the same stamp (two callbacks in one microsecond) still differ.
+        snap.publish_clock(ClockSample {
+            beat: 77.0,
+            ..clock_block(n)
+        });
+        let again = snap.clock_sample();
+        assert_eq!(again.beat, 77.0);
+        assert!(
+            again.host_us > clock_block(n).host_us,
+            "the stamp must move"
+        );
+    }
+
+    #[test]
+    fn clock_reads_stay_whole_while_another_thread_publishes() {
+        let snap = Arc::new(Snapshot::new());
+        let publisher = {
+            let snap = snap.clone();
+            std::thread::spawn(move || {
+                for n in 1..=300_000u64 {
+                    snap.publish_clock(clock_block(n));
+                }
+            })
+        };
+        let (mut whole, mut unusable) = (0u64, 0u64);
+        while !publisher.is_finished() {
+            let c = snap.clock_sample();
+            if c.host_us == 0 {
+                unusable += 1;
+                continue;
+            }
+            // Every field belongs to the block the stamp names.
+            let n = (c.host_us - 1_000) / 5_333;
+            assert_eq!(c, clock_block(n), "torn sample");
+            whole += 1;
+        }
+        publisher.join().unwrap();
+        assert_eq!(snap.clock_sample(), clock_block(300_000));
+        println!("clock reads: {whole} whole, {unusable} given up");
     }
 
     #[test]
@@ -1925,5 +2334,144 @@ mod tests {
             m.decks[0].render_frame();
         }
         assert!((m.decks[0].position_secs() - 4.0).abs() < 1e-3);
+    }
+
+    // ---- WP19-41: stem crossfader, stem mute, cue loops (through the command queue) ----
+
+    /// Deck A (side A, crossfader open on A) playing one stem: the 440 Hz sine as "vocals".
+    fn stem_on_a() -> (Mixer, Sender<Command>) {
+        let (mut m, tx) = sine_on_a();
+        m.decks[0].set_grid(BeatGrid::constant(120.0, 0.0));
+        tx.send(Command::LoadStems {
+            deck: DeckId::A,
+            layers: Box::new([Some(sine_track(8.0)), None, None, None]),
+        })
+        .unwrap();
+        tx.send(Command::Crossfader(-1.0)).unwrap();
+        (m, tx)
+    }
+
+    #[test]
+    fn stem_crossfader_command_follows_the_mixer_curve_and_the_deck_side() {
+        let (mut m, tx) = stem_on_a();
+        let open = master_rms(&mut m);
+        assert!(open > 1e-4, "the stem is audible: {open}");
+        // Deck A sits on side A: the stem sent fully to B is silent, the default (0) is not.
+        tx.send(Command::SetStemXf(DeckId::A, 0, 1.0)).unwrap();
+        assert!(master_rms(&mut m) < 1e-6, "far side is silence");
+        tx.send(Command::SetStemXf(DeckId::A, 0, 0.0)).unwrap();
+        assert!(
+            (master_rms(&mut m) / open - 1.0).abs() < 0.01,
+            "centre = unity"
+        );
+        // Half way to B, on each law: gain(0.5) / gain(0) = sin(π/8) / sin(π/4), 0.25 / 0.5, 1 / 1.
+        tx.send(Command::SetStemXf(DeckId::A, 0, 0.5)).unwrap();
+        let smooth = master_rms(&mut m) / open;
+        tx.send(Command::CrossfaderCurve(CrossfaderCurve::Linear))
+            .unwrap();
+        let linear = master_rms(&mut m) / open;
+        tx.send(Command::CrossfaderCurve(CrossfaderCurve::Sharp))
+            .unwrap();
+        let sharp = master_rms(&mut m) / open;
+        let want = (std::f64::consts::FRAC_PI_8).sin() / (std::f64::consts::FRAC_PI_4).sin();
+        assert!((smooth - want).abs() < 0.01, "smooth {smooth} want {want}");
+        assert!((linear - 0.5).abs() < 0.01, "linear {linear}");
+        assert!((sharp - 1.0).abs() < 0.01, "sharp {sharp}");
+        // A deck moved to side B: the same position is now its own side (unity) and −1 is silence.
+        tx.send(Command::CrossfaderCurve(CrossfaderCurve::Smooth))
+            .unwrap();
+        tx.send(Command::CrossfaderAssign(DeckId::A, CrossfaderAssign::B))
+            .unwrap();
+        tx.send(Command::Crossfader(1.0)).unwrap();
+        assert!((master_rms(&mut m) / open - 1.0).abs() < 0.01, "own side");
+        tx.send(Command::SetStemXf(DeckId::A, 0, -1.0)).unwrap();
+        assert!(master_rms(&mut m) < 1e-6, "far side of a deck on B");
+        // THRU has no side: the stem crossfader is ignored.
+        tx.send(Command::CrossfaderAssign(DeckId::A, CrossfaderAssign::Thru))
+            .unwrap();
+        assert!((master_rms(&mut m) / open - 1.0).abs() < 0.01, "thru");
+        // Junk is ignored: the position stays.
+        tx.send(Command::SetStemXf(DeckId::A, 9, 1.0)).unwrap();
+        tx.send(Command::SetStemXf(DeckId::A, 0, f32::NAN)).unwrap();
+        m.drain_commands();
+        assert_eq!(m.decks[0].stem_xf(), [-1.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn stem_mute_command_cuts_hard_or_leaves_a_tail_with_mute_fx() {
+        let (mut m, tx) = stem_on_a();
+        let open = master_rms(&mut m);
+        // Mute FX off: silence 0.2 s after the mute, and no tail.
+        tx.send(Command::SetStemMute(DeckId::A, 0, true)).unwrap();
+        assert!(master_rms(&mut m) < 1e-6, "hard cut");
+        assert!(!m.decks[0].stem_tail_live());
+        tx.send(Command::SetStemMute(DeckId::A, 0, false)).unwrap();
+        assert!((master_rms(&mut m) / open - 1.0).abs() < 0.01, "unmute");
+        // Mute FX on (1 beat = 0.5 s at 120 BPM): 0.2..0.4 s after the mute the first repeat sounds.
+        tx.send(Command::SetStemMuteFx(DeckId::A, true, 1.0))
+            .unwrap();
+        tx.send(Command::SetStemMute(DeckId::A, 0, true)).unwrap();
+        let tail = master_rms(&mut m);
+        assert!(tail > open * 0.3, "tail {tail} vs open {open}");
+        assert!(m.decks[0].stem_tail_live());
+        assert_eq!(m.decks[0].stem_mute_fx(), (true, 1.0));
+        // Stems off: the tail goes with them.
+        tx.send(Command::SetStemsActive(DeckId::A, false)).unwrap();
+        m.drain_commands();
+        assert!(!m.decks[0].stem_tail_live());
+    }
+
+    #[test]
+    fn cue_loop_is_saved_published_and_replayed_through_commands() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.0);
+        let mut out = vec![0.0f32; 512];
+        let beats = |m: &Mixer, slot: usize| {
+            let b = m.snapshot.deck_hot_cue_loop_beats[0][slot].load(Ordering::Relaxed);
+            (b != u64::MAX).then(|| f64::from_bits(b))
+        };
+        m.render(&mut out, 2);
+        assert!((0..8).all(|s| beats(&m, s).is_none()), "no cue loops yet");
+        tx.send(Command::Seek(DeckId::A, 4.0)).unwrap();
+        tx.send(Command::Beatloop(DeckId::A, 4.0)).unwrap();
+        tx.send(Command::SaveCueLoop(DeckId::A, 2)).unwrap();
+        m.render(&mut out, 2);
+        let got = beats(&m, 2).expect("slot 2 carries a loop");
+        assert!((got - 4.0).abs() < 1e-9, "{got}");
+        assert_eq!(
+            m.snapshot.deck_hot_cues_ms[0][2].load(Ordering::Relaxed),
+            4_000
+        );
+        assert!((0..8).filter(|s| *s != 2).all(|s| beats(&m, s).is_none()));
+        // Somewhere else with no loop: the jump brings the playhead and the loop back.
+        tx.send(Command::LoopExit(DeckId::A)).unwrap();
+        tx.send(Command::Seek(DeckId::A, 10.0)).unwrap();
+        m.render(&mut out, 2);
+        assert!(!m.snapshot.deck_loop_active[0].load(Ordering::Relaxed));
+        tx.send(Command::JumpHotCue(DeckId::A, 2)).unwrap();
+        m.render(&mut out, 2);
+        let s = &m.snapshot;
+        let ms = |a: &AtomicU32| a.load(Ordering::Relaxed);
+        assert!(s.deck_loop_active[0].load(Ordering::Relaxed));
+        // Within 1 ms of the cue and of the stored length (4 beats at 120 BPM = 2 s).
+        assert!(ms(&s.deck_pos_ms[0]).abs_diff(4_000) <= 1);
+        assert!(ms(&s.deck_loop_start_ms[0]).abs_diff(4_000) <= 1);
+        assert!(ms(&s.deck_loop_end_ms[0]).abs_diff(6_000) <= 1);
+        // Clearing the cue clears the loop; a new track starts without cue loops.
+        tx.send(Command::ClearHotCue(DeckId::A, 2)).unwrap();
+        m.render(&mut out, 2);
+        assert!(beats(&m, 2).is_none());
+        assert_eq!(
+            m.snapshot.deck_hot_cues_ms[0][2].load(Ordering::Relaxed),
+            u32::MAX
+        );
+        tx.send(Command::Beatloop(DeckId::A, 2.0)).unwrap();
+        tx.send(Command::SaveCueLoop(DeckId::A, 5)).unwrap();
+        tx.send(Command::SaveCueLoop(DeckId::A, 8)).unwrap(); // out of range: ignored
+        m.render(&mut out, 2);
+        assert!(beats(&m, 5).is_some());
+        load(&mut m, DeckId::A, 126.0, 0.0);
+        m.render(&mut out, 2);
+        assert!((0..8).all(|s| beats(&m, s).is_none()), "cleared by a load");
     }
 }

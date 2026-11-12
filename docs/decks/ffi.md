@@ -84,6 +84,29 @@ Loads work while the engine is stopped: decoded audio is parked and handed to th
 `start()`. `stop()` unloads the decks. A newer `load` on the same deck turns the older ticket into
 `Cancelled`.
 
+**CUE button** (`cue(deck, pressed)`, the CDJ button; the state machine is `src/cue_button.rs`,
+shared with the phone remote). Playing: back to the cue point and pause. Paused on the cue point:
+play while held, the release goes back to the cue point. Paused elsewhere: set the cue point there.
+
+* A held CUE has an owner. `cue()` is the app's own button (MIDI mappings included); a phone remote
+  is another holder. The first holder owns the hold: another phone's press or release on that deck
+  changes nothing until the owner lets go, and a phone never ends a hold of the app's own button.
+  `play` / `pause` during a hold end it where the deck is.
+* The app's own button wins over a phone (changed 2026-11-12; before, it did nothing while a phone
+  held the deck): `cue(deck, true)` on a deck a phone previews ends the phone's hold and the deck
+  goes back to the cue point, paused, as a CUE press on a playing CDJ does. The phone's later
+  release and the `cue(deck, false)` of that press change nothing. The desktop shell follows the
+  same rules; both run one shared table of scenarios (`the_shared_cue_scenarios` in
+  `src/cue_button.rs` and in `apps/mixai/src-tauri/src/remote.rs`).
+* A hold never outlives its track: after another `load` on the deck the release changes nothing
+  (the new track is not paused or moved).
+* The engine applies a command at its next audio callback, so right after a command the snapshot
+  is one buffer old. For 150 ms after `play`, `pause`, `seek`, `cue`, `hot_cue_jump`, `beat_jump`
+  and `phase_sync` the button goes by what was asked for: a quick second press after "back to the
+  cue point" previews from the cue point instead of moving the cue point to the old playhead. A
+  press while a jump is still on its way (hot cue, beat jump, phase sync on a paused deck) is
+  dropped; the next one counts.
+
 `EngineSnapshot` = `{running, sample_rate, latency_ms, master_vu, master_volume, crossfader,
 recording, clock: ClockSnapshot, decks: [DeckSnapshot; 4], channels, buffer_frames?,
 output_device_id?}` (the last three were added with defaults, so older generated bindings keep
@@ -200,11 +223,37 @@ alive. Null / zero handles are rejected with `InvalidArgument`; anything else is
 Connected mode (phone remote, second screen, Party DJ — [remote.md](remote.md)).
 `start(port, party_open)` (port 0 = any) → `port()`, `pairing(RemoteRole) -> RemotePairing{role, url,
 qr_width, qr_modules}`, `rotate(role)`, `set_track_labels(deck, title?, artist?)`,
-`pump(engine: DecksEngine) -> RemotePumpReport{applied, errors, mixer_changes: [RemoteMixerChange]}`
-(call from the UI tick; applies phone commands and publishes the engine state), `requests() ->
-[SongRequest]`, `set_request_state(id, SongRequestState)`, `set_party_open`, `clear_done_requests`,
+`pump(engine: DecksEngine) -> RemotePumpReport{applied, errors, mixer_changes: [RemoteMixerChange],
+controls_locked}` (call from the UI tick; applies phone commands and publishes the engine state),
+`set_controls_locked(locked)`, `controls_locked() -> Bool`, `requests() -> [SongRequest]`,
+`set_request_state(id, SongRequestState)`, `set_party_open`, `clear_done_requests`,
 `clients() -> [RemoteClient]`, `stop()`, `is_running()`. A stopped server returns `NotRunning`; a port
 that cannot open fails `start` with `Unsupported`.
+
+* **CUE from a phone** is the deck's CUE button (above) with the phone's connection as the holder.
+  `pump` ends a hold whose phone is gone (Wi-Fi lost, tab closed, code rotated: the server drops a
+  silent phone within about 5 s): the deck goes back to its cue point, paused. So keep calling
+  `pump` while the server runs. `stop()` and destroying the object (`close()` / `destroy()` in
+  Kotlin, deinit in Swift) end every hold of this server's phones first, on the engine last
+  pumped. A hold of the app's own CUE button is never ended by the remote; the app's own
+  `cue` / `play` / `pause` do end a phone's hold (CUE button, above).
+* **One engine per `DecksRemote`.** The server lets go of holds on the engine last handed to
+  `pump` (it keeps one handle to it, taken once, not on every tick). Pass the same `DecksEngine`
+  on every tick. If an app does pump another engine, what this server's phones hold on the previous
+  one is let go at that moment (back to the cue point, paused).
+* **Controls lock** (added 2026-11-11, additive): `set_controls_locked(true)` refuses every
+  transport and mixer command from a phone (the server answers the phone with an error and the
+  phone page shows the lock; `pump` drops whatever still gets through), lets go of every CUE a
+  phone holds at once, and keeps song requests, votes and moderation working. Only letting go of
+  CUE still passes. `NotRunning` on a stopped server; a new `DecksRemote` starts unlocked, so an
+  app that wants the choice kept across Connect off / on applies it again after `start`.
+  `controls_locked()` and `RemotePumpReport.controls_locked` report it. The field is the last one
+  and has the default `false`, so app code that builds the record (test fakes) keeps compiling;
+  the bindings themselves must be regenerated with the library, as for every record change.
+* **Validation.** The server validates every phone command; `pump` validates it again (decks 0–3,
+  hot cue 0–7, loop 1/32–64 beats, beat jump ±128 and not 0, no NaN / ∞, continuous controls
+  clamped). An invalid one is a line in `errors` and no engine call; `mixer_changes` carries the
+  value that was applied.
 
 ### Transition Designer
 

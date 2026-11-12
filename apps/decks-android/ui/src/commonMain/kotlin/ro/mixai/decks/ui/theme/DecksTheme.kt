@@ -123,6 +123,14 @@ val LocalDecksType = staticCompositionLocalOf { decksType() }
 /** Reduced motion flag (OS setting or skin): no continuous jog rotation, no beat pulses, no scrolling grid. */
 val LocalReducedMotion = staticCompositionLocalOf { false }
 
+/**
+ * Touch input: the device is used with fingers, so list rows and the controls inside them get 48 dp targets
+ * (the library's rows and load cells). False = pointer / keyboard: the dense 22 dp rows of the desktop look.
+ * The platform root provides it: Android from `PackageManager.FEATURE_TOUCHSCREEN` (a phone or tablet is true, a
+ * TV box or a mouse-only Chromebook false); the desktop app leaves the default.
+ */
+val LocalTouchInput = staticCompositionLocalOf { false }
+
 /** Active skin geometry (corner radius, control height, layout). */
 val LocalDecksSkin = staticCompositionLocalOf { DecksSkin.default }
 

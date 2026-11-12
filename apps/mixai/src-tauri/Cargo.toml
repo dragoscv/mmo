@@ -1,6 +1,6 @@
 [package]
 name = "mixai"
-version = "1.5.0"
+version = "1.6.0"
 description = "MixAI Decks — native DJ software"
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 license = "AGPL-3.0-or-later"
@@ -52,6 +52,12 @@ sha2 = "0.10.9"
 base64 = "0.22.1"
 # Shared .mixaipack reader + PackStore (WP19-34), also used by the native apps via decks-ffi.
 decks-packs = { path = "crates/decks-packs" }
+# LAN tempo sync between Decks instances (WP19-29): own protocol, MIT/Apache (Ableton Link is GPL).
+decks-link = { path = "crates/decks-link" }
+# Connected mode in the desktop shell (WP19-42): phone remote, second screen, party requests.
+decks-remote = { path = "crates/decks-remote" }
+# Co-pilot (WP19-39): next-track ranking, phrase-aligned transition plans, set safety, intents.
+decks-transition = { path = "crates/decks-transition" }
 
 [target.'cfg(windows)'.dependencies]
 # SendInput for the Windows 11 Snap Layouts flyout on the custom title bar.

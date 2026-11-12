@@ -43,6 +43,13 @@ object AndroidDecks {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
     /**
+     * Touch input ([ro.mixai.decks.ui.theme.LocalTouchInput]): the device has a touch screen. The manifest marks
+     * the feature as not required, so the app also installs on TV boxes and mouse-only Chromebooks: false there.
+     */
+    fun touchInput(context: Context): Boolean =
+        context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
+
+    /**
      * SAF tree → plain path for the Rust reader: `primary:Music/Sets` →
      * `/storage/emulated/0/Music/Sets`, other volumes → `/storage/<id>/…` (same rule as the
      * activity's scan-folder picker).
@@ -169,7 +176,8 @@ fun DecksAndroidRoot(
         pendingPick = null
         if (uri != null && cb != null) AndroidDecks.treePath(uri)?.let(cb)
     }
-    CompositionLocalProvider(LocalStrings provides strings) {
+    val touch = remember(context) { AndroidDecks.touchInput(context) }
+    CompositionLocalProvider(LocalStrings provides strings, ro.mixai.decks.ui.theme.LocalTouchInput provides touch) {
         DecksTheme(reducedMotion, state.skin, packColors) {
             DecksScreen(
                 ctl,

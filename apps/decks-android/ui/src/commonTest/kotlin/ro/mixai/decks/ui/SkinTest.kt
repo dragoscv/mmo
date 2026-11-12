@@ -91,10 +91,15 @@ class SkinTest {
             assertEquals(key, s.layoutId)
             assertEquals(key, s.resolveLayout(DemoPacks.presets)?.id)
         }
-        // Saved by Decks <= 1.4 (no look key): the saved layout is kept. Unlike the desktop app, `classic` is NOT
-        // moved to Pro: the Compose panels still have their 1.4 content (DecksSkin.DEFAULT_LAYOUT).
+        // Saved by Decks <= 1.4 (no look key): a chosen layout is kept; `classic` was the default then, so such an
+        // install moves to Pro once (as `migrateDefaultLayout` of the desktop app's layout-store.ts).
         assertEquals("performance", DecksSkin.decode("id=nocturne;layout=performance").layoutId)
-        assertEquals("classic", DecksSkin.decode("id=nocturne;layout=classic").layoutId)
+        assertEquals("pro", DecksSkin.decode("id=nocturne;layout=classic").layoutId, "the old default moves to the new one")
+        assertEquals(DecksSkin.DEFAULT_LAYOUT, DecksSkin.decode("id=nocturne;layout=classic").layoutId)
+        // Once: what 1.5 saves carries the look key, and Classic picked in 1.5 stays Classic (Signature look or not).
+        val moved = DecksSkin.decode("id=nocturne;layout=classic")
+        assertEquals(moved, DecksSkin.decode(moved.encode()))
+        assertEquals("classic", DecksSkin.decode(moved.copy(layoutId = "classic").encode()).layoutId, "chosen again in 1.5: kept")
         assertEquals("pro", DecksSkin.decode("id=nocturne;layout=pro").layoutId, "Pro stays selectable")
         // A bare pack-local id maps to the namespaced pack layout when it is unique.
         val pack = DemoPacks.presets.first { it.id == "stage" }.copy(id = "com.example.bundle.x/festival")
@@ -149,7 +154,7 @@ class SkinTest {
         assertEquals("signature", d.id)
         assertTrue(d.signature && d.dark)
         assertEquals("emerald", d.accent)
-        assertEquals("classic", d.layoutId)
+        assertEquals("pro", d.layoutId)
         // look.css geometry: panel radius 2, control radius 3, panel pad 8, panel gap 2, flat (opaque) panels.
         assertEquals(2f, d.panelRadiusDp)
         assertEquals(3f, d.controlRadiusDp)
@@ -184,8 +189,11 @@ class SkinTest {
         assertEquals(12.0, glass.panelGapDp)
         assertEquals(TokenRoles.radiusDp.getValue("lg") * 1.2f, glass.panelRadiusDp)
         assertTrue(DecksPalette(glass).surface.alpha < 1f, "glass panels are translucent")
-        // Decks 1.4 default (no look key) -> the Signature look on the layout it had; a chosen accent survives, violet (the old default) does not.
+        // Decks 1.4 default (no look key) -> the Signature look on the new default layout (Classic was the old default:
+        // it moves to Pro once); a chosen accent survives, violet (the old default) does not; a chosen layout survives.
         assertEquals(DecksSkin.default, DecksSkin.decode("id=nocturne;dark=true;accent=violet;surface=solid;density=comfortable;radius=md;motion=full;layout=classic;contrast=false;pack="))
+        assertEquals(DecksSkin.default.copy(layoutId = "library"), DecksSkin.decode("id=nocturne;dark=true;accent=violet;surface=solid;density=comfortable;radius=md;motion=full;layout=library;contrast=false;pack="))
+        assertEquals(DecksSkin.default, DecksSkin.decode("id=nocturne;accent=violet"), "no saved layout: the default layout")
         assertEquals("amber", DecksSkin.decode("id=booth;accent=amber;layout=classic").accent)
         assertEquals("signature", DecksSkin.decode("id=booth;accent=amber;layout=classic").id)
         // Once saved by 1.5 the choice sticks, including going back to the classic look.
@@ -194,8 +202,8 @@ class SkinTest {
 
     @Test fun familiarSkinsCarryTheBuiltinSkinValues() {
         // Colour VALUES are compared with builtin-skins.ts itself in desktopTest/BuiltinSkinsDriftTest; here: that
-        // the palette roles pick them up. Layouts: see DecksSkin.DEFAULT_LAYOUT (TS: pro / pro-vertical / pro).
-        val want = mapOf("mainroom" to "classic", "crate" to "pro-vertical", "pilot" to "classic")
+        // the palette roles pick them up. Layouts as in TS: pro / pro-vertical / pro.
+        val want = mapOf("mainroom" to "pro", "crate" to "pro-vertical", "pilot" to "pro")
         for ((id, layout) in want) {
             val s = DecksSkin.presets.first { it.id == id }
             assertTrue(s.signature, id)

@@ -1,5 +1,54 @@
 # MixAI Decks changelog
 
+## 1.6.0 — 2026-11-12
+
+### Added
+
+- **Stem crossfader** (STEMS tab, or "More stem controls" in a small tab): a small crossfader per
+  stem. At the centre the stem follows its deck; towards the crossfader side the deck is not on, it
+  fades out, using the mixer's crossfader curve. Double-click returns it to the centre. A deck on
+  THRU has no side, so its stem crossfaders do nothing and show a THRU tag.
+- **MUTE FX** (STEMS tab): a stem muted while the deck plays leaves an echo tail at 1/4, 1/2, 1 or
+  2 beats, which ends by itself after 12 repeats. It needs a tempo: on a track without BPM or
+  beatgrid, on a paused deck and in reverse a mute is a plain mute.
+- **Cue loops**: a hot cue can store the running loop. Press the loop button next to the pads,
+  then a pad, or Alt+click the pad (Alt+Enter on a focused pad). The pad shows a loop sign and the
+  length in beats; pressing it jumps there and starts the loop. With no loop running the same
+  button takes a loop off a pad and keeps the cue. Needs a tempo; like hot cues, cue loops are not
+  kept when another track is loaded.
+- **Tempo sync between Decks instances** (LINK in the status bar): instances on this computer or
+  on the local network share one tempo and beat. The instance that started the session leads, the
+  others follow; decks with SYNC on follow the shared clock. Followers can nudge by a quarter beat.
+  An optional 4-digit PIN groups instances; it is a grouping code, not a password. This is MixAI's
+  own protocol and does not work with Ableton Link. Audio latency between computers is not
+  compensated.
+- **Co-pilot** (Copilot button in the Library toolbar): up to 8 next-track suggestions with the
+  reason (key, tempo, energy), taken from the tracks the Library has loaded (at most 2,000); a set
+  builder that reads a typed request in English or Romanian ("90s hip-hop 95-105 BPM"); Mix next,
+  which plans a phrase-aligned transition to the other deck that you start with Go and can cancel;
+  and set-safety warnings while a deck plays. Suggestions and plans are worked out in the app by
+  fixed rules, with no online service; the words of a request also go to the Library search.
+- **Connect** (status bar): phones on the same network scan a QR code to get a remote for the
+  decks and mixer, a read-only second screen, or a guest page for song requests and votes. Only the
+  guest code is shown at first. Requests can be accepted, rejected, marked played or looked up in
+  the library. "Lock phones" blocks deck and mixer commands from phones; "New code" disconnects
+  the devices paired with the old one, and every start makes new codes. A deck playing because a
+  phone holds CUE goes back to its cue point if that phone drops off (within about 5 s), and your
+  own PLAY, PAUSE and CUE (on screen, keyboard or controller) always win over a phone's held CUE.
+  Windows asks for network permission the first time: allow it on private networks.
+- **Practice mode** (status bar): while two decks play and are heard, scores the mix 0–100 from
+  tempo match, beats aligned, key match and steady level, with a meter for each, up to three tips
+  and a small bonus for slow crossfades in time. It is an estimate, not a verdict on a mix.
+
+### Changed
+
+- Unmuting a stem brings it back at the level it had before the mute, not at full level.
+
+### Fixed
+
+- On a track without a beatgrid the loop state in the tooltip and for screen readers said "Loop on,
+  0:02.0 beats"; it now gives the length as a time.
+
 ## 1.5.0 — 2026-11-11
 
 ### Added

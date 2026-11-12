@@ -8,14 +8,22 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use mixai_core::deck::TrackBuffer;
 use mixai_core::{
-    BeatFxKind, ClockSource, ColorFxKind, Command, DeckId, Engine, OutputMode, RoutingConfig,
-    TempoMarker, TempoSection, valid_bpm, valid_sec,
+    BeatFxKind, ClockSource, ColorFxKind, Command, DeckId, Engine, MixerState, OutputMode,
+    RoutingConfig, TempoMarker, TempoSection, valid_bpm, valid_sec,
 };
 
 use crate::{DecksError, lock};
+
+/// The CDJ CUE button as a pure state machine (hold ownership, settle window); shared with the
+/// phone remote pump in `remote.rs`.
+#[path = "cue_button.rs"]
+pub(crate) mod cue_button;
+
+use cue_button::{CueHolder, CueSend, CueState, DeckView};
 
 const DECKS: usize = 4;
 const HOT_CUES: u8 = 8;
@@ -594,8 +602,11 @@ struct DeckData {
     key_index: Option<u8>,
     pending: Option<PendingLoad>,
     latest_ticket: u64,
-    cue_point: f64,
-    cue_preview: bool,
+    /// Ticket of the load that put the current track on the deck: the identity of the track
+    /// for a CUE hold (`latest_ticket` already names a load that is still decoding).
+    loaded_ticket: u64,
+    /// Transport cue point, who holds CUE and what was last asked of the transport.
+    cue: CueState,
     fader: f32,
     gain_db: f32,
 }
@@ -609,8 +620,8 @@ impl Default for DeckData {
             key_index: None,
             pending: None,
             latest_ticket: 0,
-            cue_point: 0.0,
-            cue_preview: false,
+            loaded_ticket: 0,
+            cue: CueState::default(),
             fader: 0.85,
             gain_db: 0.0,
         }
@@ -672,6 +683,61 @@ fn send_load(e: &Engine, deck: DeckId, p: PendingLoad) {
     }
     e.set_deck_key(deck, p.key);
 }
+
+/// What the CUE button reads of a deck.
+fn cue_view(live: &MixerState, id: DeckId, d: &DeckData) -> DeckView {
+    let st = &live.decks[id.index()];
+    DeckView {
+        loaded: d.info.is_some(),
+        playing: st.playing,
+        position: st.position,
+        track: d.loaded_ticket,
+    }
+}
+
+fn send_cue(e: &Engine, id: DeckId, send: Option<CueSend>) {
+    match send {
+        Some(CueSend::Play) => e.send(Command::Play(id)),
+        Some(CueSend::Return(point)) => {
+            e.send(Command::Pause(id));
+            e.send(Command::Seek(id, point));
+        }
+        None => {}
+    }
+}
+
+/// End every CUE hold whose holder `keep` rejects: the deck goes back to its cue point, paused
+/// (a deck that got another track meanwhile is not touched). Returns the holds ended.
+fn end_cue_holds_in(shared: &Mutex<Shared>, keep: &dyn Fn(CueHolder) -> bool, now: Instant) -> u32 {
+    let mut s = lock(shared);
+    let Shared { engine, decks, .. } = &mut *s;
+    // The pump asks on every step: no engine snapshot unless there is something to end.
+    if !decks.iter().any(|d| d.cue.has_hold_not_kept(keep)) {
+        return 0;
+    }
+    let Some(e) = engine.as_ref() else {
+        // No audio engine: nothing plays, the holds are only forgotten.
+        let held = decks.iter_mut().filter(|d| d.cue.has_hold_not_kept(keep));
+        return held.map(|d| d.cue.drop_hold()).count() as u32;
+    };
+    let live = e.snapshot_state();
+    let mut ended = 0;
+    for (i, d) in decks.iter_mut().enumerate() {
+        if d.cue.has_hold_not_kept(keep) {
+            let id = DeckId::ALL[i];
+            let view = cue_view(&live, id, d);
+            send_cue(e, id, d.cue.end_hold_unless(view, keep, now));
+            ended += 1;
+        }
+    }
+    ended
+}
+
+/// Ends CUE holds on the engine it was taken from, for as long as that engine lives
+/// ([`DecksEngine::hold_releaser`]): `DecksRemote` keeps one so `stop()` / drop can let go of
+/// what its phones hold without being handed the engine.
+pub(crate) type HoldReleaser =
+    Box<dyn Fn(&dyn Fn(CueHolder) -> bool, Instant) -> u32 + Send + Sync>;
 
 fn key_index(k: &decks_analysis::KeyResult) -> u8 {
     k.tonic % 12
@@ -766,8 +832,10 @@ fn finish_load(shared: &Mutex<Shared>, ticket: u64, deck: DeckId, result: Result
                 grid: l.grid.as_ref().map(BeatGridInfo::to_core),
                 key: l.key,
             };
-            d.cue_point = l.info.first_beat_sec.unwrap_or(0.0);
-            d.cue_preview = false;
+            // Another track: a CUE hold that began on the previous one is over, and the new
+            // track is not touched by it (loading stopped the deck).
+            d.loaded_ticket = ticket;
+            d.cue = CueState::for_track(ticket, l.info.first_beat_sec.unwrap_or(0.0));
             d.info = Some(l.info);
             d.peaks = l.peaks;
             d.grid = l.grid;
@@ -844,6 +912,68 @@ impl DecksEngine {
     fn deck_cmd(&self, deck: u8, f: impl FnOnce(DeckId) -> Command) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
         self.with(|e| e.send(f(id)))
+    }
+
+    /// Run `f` on the running engine, then note on the deck what was asked of its transport:
+    /// for `cue_button::SETTLE` the CUE button goes by that, not by the engine snapshot (which
+    /// is one audio buffer old).
+    fn transport(
+        &self,
+        id: DeckId,
+        f: impl FnOnce(&Engine),
+        note: impl FnOnce(&mut CueState, Instant),
+    ) -> Result<(), DecksError> {
+        let mut s = lock(&self.shared);
+        let Shared { engine, decks, .. } = &mut *s;
+        f(engine.as_ref().ok_or_else(not_running)?);
+        note(&mut decks[id.index()].cue, Instant::now());
+        Ok(())
+    }
+
+    /// The CUE button of `deck` pressed / released by `by` at `now` ([`DecksEngine::cue`] is
+    /// the app's own button; the phone remote pump names the phone). Returns the new cue point
+    /// when the press moved it.
+    pub(crate) fn cue_from(
+        &self,
+        deck: u8,
+        by: CueHolder,
+        pressed: bool,
+        now: Instant,
+    ) -> Result<Option<f64>, DecksError> {
+        let id = deck_id(deck)?;
+        let mut s = lock(&self.shared);
+        let Shared { engine, decks, .. } = &mut *s;
+        let e = engine.as_ref().ok_or_else(not_running)?;
+        let d = &mut decks[id.index()];
+        let view = cue_view(&e.snapshot_state(), id, d);
+        let step = d.cue.button(view, by, pressed, now);
+        send_cue(e, id, step.send);
+        Ok(step.moved)
+    }
+
+    /// End every CUE hold whose holder `keep` rejects (back to the cue point, paused).
+    pub(crate) fn end_cue_holds(&self, keep: &dyn Fn(CueHolder) -> bool, now: Instant) -> u32 {
+        end_cue_holds_in(&self.shared, keep, now)
+    }
+
+    /// [`DecksEngine::end_cue_holds`] without a reference to the engine (it does nothing once
+    /// the engine is gone).
+    pub(crate) fn hold_releaser(&self) -> HoldReleaser {
+        let shared = Arc::downgrade(&self.shared);
+        Box::new(
+            move |keep: &dyn Fn(CueHolder) -> bool, now: Instant| -> u32 {
+                shared
+                    .upgrade()
+                    .map_or(0, |s| end_cue_holds_in(&s, keep, now))
+            },
+        )
+    }
+
+    /// Identity of this engine for `DecksRemote` (one hold releaser per engine). The address
+    /// of the shared state: a stored [`HoldReleaser`] keeps that allocation (its `Weak`), so
+    /// no later engine can get the same number while one is kept.
+    pub(crate) fn target_id(&self) -> usize {
+        Arc::as_ptr(&self.shared) as usize
     }
 }
 
@@ -1037,60 +1167,60 @@ impl DecksEngine {
 
     pub fn play(&self, deck: u8) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
-        self.with(|e| {
-            e.mirror().decks[id.index()].playing = true;
-            e.send(Command::Play(id));
-        })
+        self.transport(
+            id,
+            |e| {
+                e.mirror().decks[id.index()].playing = true;
+                e.send(Command::Play(id));
+            },
+            CueState::asked_play,
+        )
     }
 
     pub fn pause(&self, deck: u8) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
-        self.with(|e| {
-            e.mirror().decks[id.index()].playing = false;
-            e.send(Command::Pause(id));
-        })
+        self.transport(
+            id,
+            |e| {
+                e.mirror().decks[id.index()].playing = false;
+                e.send(Command::Pause(id));
+            },
+            CueState::asked_pause,
+        )
     }
 
     pub fn seek(&self, deck: u8, position_sec: f64) -> Result<(), DecksError> {
         let p = finite("position_sec", position_sec)?.max(0.0);
-        self.deck_cmd(deck, |id| Command::Seek(id, p))
+        let id = deck_id(deck)?;
+        self.transport(
+            id,
+            |e| e.send(Command::Seek(id, p)),
+            |cue, now| cue.asked_seek(p, now),
+        )
     }
 
     /// CDJ-style CUE button. Playing: back to the cue point and pause. Paused on the cue
     /// point: preview while held (release returns to the cue point). Paused elsewhere: set the
     /// cue point here.
+    ///
+    /// This is the app's own button (MIDI mappings included). A held CUE belongs to whoever
+    /// pressed it, and a phone cannot let go of a hold that began here. The other way round
+    /// this button wins: pressed while a phone remote holds CUE on the deck it ends that hold
+    /// and the deck goes back to the cue point, paused, as on a playing CDJ (the phone's later
+    /// release and the release of this press change nothing). `play` / `pause` during a hold
+    /// end it where the deck is (the release then changes nothing). Right after a transport
+    /// command (150 ms) the button goes by what was asked for, not by the engine snapshot, so
+    /// a quick second press does not take the old playhead for a new cue point.
     pub fn cue(&self, deck: u8, pressed: bool) -> Result<(), DecksError> {
-        let id = deck_id(deck)?;
-        let mut s = lock(&self.shared);
-        let Shared { engine, decks, .. } = &mut *s;
-        let e = engine.as_ref().ok_or_else(not_running)?;
-        let d = &mut decks[id.index()];
-        let live = e.snapshot_state();
-        let st = &live.decks[id.index()];
-        if pressed {
-            if st.playing {
-                e.send(Command::Pause(id));
-                e.send(Command::Seek(id, d.cue_point));
-                d.cue_preview = false;
-            } else if (st.position - d.cue_point).abs() < 0.02 {
-                e.send(Command::Play(id));
-                d.cue_preview = true;
-            } else {
-                d.cue_point = st.position;
-            }
-        } else if d.cue_preview {
-            e.send(Command::Pause(id));
-            e.send(Command::Seek(id, d.cue_point));
-            d.cue_preview = false;
-        }
-        Ok(())
+        self.cue_from(deck, CueHolder::Local, pressed, Instant::now())
+            .map(|_| ())
     }
 
     /// Set the transport cue point explicitly.
     pub fn set_cue_point(&self, deck: u8, position_sec: f64) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
         let p = finite("position_sec", position_sec)?.max(0.0);
-        lock(&self.shared).decks[id.index()].cue_point = p;
+        lock(&self.shared).decks[id.index()].cue.point = p;
         Ok(())
     }
 
@@ -1102,7 +1232,12 @@ impl DecksEngine {
 
     pub fn hot_cue_jump(&self, deck: u8, slot: u8) -> Result<(), DecksError> {
         let slot = hot_cue_slot(slot)?;
-        self.deck_cmd(deck, |id| Command::JumpHotCue(id, slot))
+        let id = deck_id(deck)?;
+        self.transport(
+            id,
+            |e| e.send(Command::JumpHotCue(id, slot)),
+            CueState::asked_jump,
+        )
     }
 
     pub fn hot_cue_delete(&self, deck: u8, slot: u8) -> Result<(), DecksError> {
@@ -1150,7 +1285,7 @@ impl DecksEngine {
     pub fn beat_jump(&self, deck: u8, beats: f64) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
         let b = finite("beats", beats)?;
-        self.with(|e| e.beat_jump(id, b))
+        self.transport(id, |e| e.beat_jump(id, b), CueState::asked_jump)
     }
 
     // ---- tempo / key / sync -----------------------------------------------------------
@@ -1203,7 +1338,8 @@ impl DecksEngine {
     /// keeps following it.
     pub fn phase_sync(&self, deck: u8, lock_on: bool) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
-        self.with(|e| e.phase_sync(id, lock_on))
+        // A phase sync moves the playhead by a fraction of a beat.
+        self.transport(id, |e| e.phase_sync(id, lock_on), CueState::asked_jump)
     }
 
     pub fn set_sync_lock(&self, deck: u8, on: bool) -> Result<(), DecksError> {
@@ -1424,7 +1560,7 @@ impl DecksEngine {
                 quantize: dc.is_some_and(|c| c.quantize),
                 sync_lock: dc.is_some_and(|c| c.sync_lock),
                 pfl: ms.is_some_and(|m| m.cue),
-                cue_point_sec: d.cue_point,
+                cue_point_sec: d.cue.point,
                 hot_cues: ms.map_or_else(|| vec![None; HOT_CUES as usize], |m| m.hot_cues.clone()),
                 volume: d.fader,
                 gain_db: d.gain_db,

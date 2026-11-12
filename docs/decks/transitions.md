@@ -54,12 +54,70 @@ Targets: `volume` 0–1, `eq` (band 0 low / 1 mid / 2 high) −26…+6 dB, `filt
 
 FFI additions: `DecksEngine.set_stems_active(deck, on)` and `set_stem_gain(deck, stem, gain)` (needed by stem swap).
 
+## Keys
+
+`Camelot::parse` reads Camelot only (`8A`, `12b`, full-width `８Ａ`) and returns `None` for anything else,
+whatever the text holds: it walks characters, never byte offsets, so a tag that ends in a multibyte character
+(`A♭`, `Am♭` from ID3 `TKEY`) cannot panic. Musical names are not converted here; a key that is not Camelot counts
+as unknown (`key_unknown`, score 0.5). Callers may pass tags as they come.
+
+## Desktop co-pilot (WP19-39)
+
+MixAI Decks desktop (`apps/mixai`) uses the same crate through `src-tauri/src/copilot.rs` (commands `copilot_rank`,
+`copilot_plan`, `copilot_run`, `copilot_cancel`, `copilot_status`, `copilot_safety`, `copilot_intent`,
+`copilot_intent_schema`) and the popover behind the **Copilot** button of the Library toolbar (`src/copilot/`).
+
+**It is a rule-based helper, not a model.** Suggestions are the fixed-weight score above on key, tempo and energy;
+plans come from the style table above; typed requests are read by two small parsers. The same input always gives
+the same answer, offline, with no network call. The UI never calls it "AI".
+
+| Part | What it does |
+|---|---|
+| Next track | Ranks the tracks the Library has loaded against the playing deck (its tempo with the pitch fader applied, on a 0.5 BPM grid) and shows up to 8 with their reasons; **A** / **B** load one. Energy direction: hold / up / down. |
+| Set builder | A typed RO / EN request becomes filters on those tracks: free words (title, artist, genre, album, file name; diacritics optional), a tempo window (`95-105 bpm`, `peste 130`, `până la 128`, `around 124`; half / double time counts), decades (`90s`, `anii '90`, `anii 80 și 90`), key relation (`in key` / `harmonic` = compatible, `same key`, `relative key`), `more energy` / `mai lent`, `with stems`, favourites, not played tonight. The chips under the field show what was understood. |
+| Mix next | Plans a phrase-aligned transition from the playing deck to the other one (length and style can be chosen), **Go** runs it, **Cancel** stops it. Typed commands do the same (`mix next in 8 bars with echo`, `fă tranziția în 16 măsuri`). |
+| Set safety | The 32-bar look-ahead above, every 2 s while a deck plays. A warning that asks for action now is also announced to screen readers. |
+
+Behaviour that protects a live set:
+
+- A run belongs to the two tracks its decks held at the start. When either deck gets another track mid-run the run
+  stops as cancelled on its next tick (20 ms) and puts nothing on the new track. Loading the very same track again
+  is not seen as a change.
+- A run is refused when the crossfader cuts the incoming deck by more than 6 dB, when a deck is empty or the
+  outgoing one is not playing, and when the thread that plays runs is not there (instead of waiting for ever).
+- A cancelled run leaves the mixer where it is; an echo and a sync lock it switched on are switched off (a lock
+  left on would keep the incoming deck following the other deck's tempo). A finished run gives the outgoing deck
+  its fader, EQ, filter and stem gains back once the plan has paused it.
+- A bare `stop` / `oprește` cancels the running transition. For 8 s after one ends it answers "nothing to cancel"
+  instead of pausing the deck that has just gone on air; after that it is the ordinary deck command again.
+- Arrow keys inside the popover never reach the global shortcuts (bare arrows move the crossfader).
+
+Limits:
+
+- It works on the rows the Library has loaded: at most 2 000, in the Library's current search and sort order. When
+  the library holds more, the popover says "searched the first N of M tracks"; narrow the Library list (search,
+  playlist) to reach the rest. Free words that are not genre / album words are also sent to the Library search,
+  which covers the whole library.
+- Key, tempo and energy come from the library analysis. A track without them is ranked as "unknown" (neutral
+  score), not excluded. A key relation in a request does exclude tracks without a key, as long as the playing deck
+  has a key to compare with; without one the relation keeps every track.
+- Keys must be Camelot. Decades need the `year` tag. Only 4/4 is modelled.
+- The score knows nothing about the room, the genre or what was played before tonight: it is a short list to choose
+  from, not a decision.
+- Requests longer than 200 characters are cut (by character, never through one).
+- No voice input and no codai call on desktop: a text the parsers do not understand gets "not understood".
+
+Tests: `cargo test -p mixai copilot::` (shell: validation, hostile keys end to end, runs against a recording engine,
+track change, missing runner thread), and `node --test src/copilot/*.test.ts` in `apps/mixai` (request parser,
+plural forms RO / EN, row fit incl. touch mode, the wire contract against the Rust source, and a scan that keeps
+regular-expression lookbehind out of the shipped sources: WKWebView before Safari 16.4 cannot parse it).
+
 ## Tests
 
-- `cargo test -p decks-transition`: 31 (Camelot parsing/scores/pitch classes, ranking incl. half/double time,
-  energy direction, penalties, determinism; curves, normalise, edits, runner; plan styles, phrase alignment, bass
-  never doubled, short-track fallback, full run; safety; RO/EN intents and LLM validation; riser length/level/swell/
-  determinism).
+- `cargo test -p decks-transition`: 33 (Camelot parsing/scores/pitch classes and keys that are not Camelot, ranking
+  incl. half/double time, energy direction, penalties, determinism; curves, normalise, edits, runner; plan styles,
+  phrase alignment, bass never doubled, short-track fallback, full run; safety; RO/EN intents and LLM validation;
+  riser length/level/swell/determinism).
 - `cargo test -p decks-ffi --lib`: rank → plan → safety round trip, intents + schema + riser, runner on a stopped engine.
 - `:decks-ui:desktopTest` `TransitionTest` (5): demo engine refuses, suggestions + load, safety, command → plan → run →
   finish, cancel.

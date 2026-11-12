@@ -1,0 +1,16 @@
+[package]
+name = "decks-link"
+version = "0.1.0"
+description = "MixAI Decks LAN tempo sync (WP19-29): beat / phase / tempo shared between Decks instances over UDP (own protocol, no GPL sync stacks)"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014): own LAN protocol; Ableton Link and rusty_link are GPL.
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[lib]
+name = "decks_link"
+crate-type = ["rlib"]
+
+[dependencies]

@@ -58,7 +58,6 @@
     <string name="decks_waveform" formatted="false">Formă de undă</string>
     <string name="decks_overview" formatted="false">Privire de ansamblu piesă</string>
     <string name="decks_phase_meter" formatted="false">Fază față de master</string>
-    <string name="decks_jog_wheel" formatted="false">Jog wheel, trage pentru ajustare</string>
     <string name="decks_midi" formatted="false">MIDI</string>
     <string name="decks_midi_none" formatted="false">Niciun controller</string>
     <string name="decks_midi_connected" formatted="false">%1 · %2</string>
@@ -94,6 +93,8 @@
     <string name="decks_connect_screen" formatted="false">Al doilea ecran</string>
     <string name="decks_connect_party" formatted="false">Cereri la petrecere</string>
     <string name="decks_connect_new_code" formatted="false">Cod nou</string>
+    <string name="decks_connect_lock" formatted="false">Blochează comenzile de pe telefoane</string>
+    <string name="decks_connect_lock_hint" formatted="false">Cât timp e pornit, telefoanele nu pot mișca deck-urile. Cererile de piese merg în continuare.</string>
     <string name="decks_requests" formatted="false">Cereri</string>
     <string name="decks_requests_open" formatted="false">Deschise</string>
     <string name="decks_requests_closed" formatted="false">Închise</string>
@@ -209,4 +210,42 @@
     <string name="decks_grid_tempo_down" formatted="false">Tempo mai lent la %1</string>
     <string name="decks_grid_bpm_at" formatted="false">%1 BPM la capul de redare</string>
     <string name="decks_grid_close" formatted="false">Închide editorul de grilă</string>
+    <string name="decks_tab_cues" formatted="false">Hot cue</string>
+    <string name="decks_tab_loops" formatted="false">Buclă</string>
+    <string name="decks_more_controls" formatted="false">Mai multe controale</string>
+    <string name="decks_key_short" formatted="false">Ton</string>
+    <string name="decks_key_lock_short" formatted="false">Key</string>
+    <string name="decks_match_short" formatted="false">Match</string>
+    <string name="decks_nudge_back" formatted="false">Mută puțin înapoi</string>
+    <string name="decks_nudge_forward" formatted="false">Mută puțin înainte</string>
+    <string name="decks_tempo_down" formatted="false">Tempo mai lent</string>
+    <string name="decks_tempo_up" formatted="false">Tempo mai rapid</string>
+    <string name="decks_jump_size_one" formatted="false">Salt de %1 bătaie</string>
+    <string name="decks_jump_size_few" formatted="false">Salt de %1 bătăi</string>
+    <string name="decks_jump_size_other" formatted="false">Salt de %1 de bătăi</string>
+    <string name="decks_ending" formatted="false">Se termină</string>
+    <string name="decks_legend_trim" formatted="false">Trim</string>
+    <string name="decks_legend_hi" formatted="false">Îna</string>
+    <string name="decks_legend_mid" formatted="false">Med</string>
+    <string name="decks_legend_low" formatted="false">Jos</string>
+    <string name="decks_legend_filter" formatted="false">Fil</string>
+    <string name="decks_legend_mix" formatted="false">Mix</string>
+    <string name="decks_legend_phones" formatted="false">Căști</string>
+    <string name="decks_col_title" formatted="false">Titlu</string>
+    <string name="decks_col_artist" formatted="false">Artist</string>
+    <string name="decks_col_time" formatted="false">Timp</string>
+    <string name="decks_crate_prev" formatted="false">Colecția anterioară</string>
+    <string name="decks_crate_next" formatted="false">Colecția următoare</string>
+    <string name="decks_track_played" formatted="false">redată</string>
+    <string name="decks_track_on_deck" formatted="false">pe %1</string>
+    <string name="decks_track_count_one" formatted="false">%1 piesă</string>
+    <string name="decks_track_count_few" formatted="false">%1 piese</string>
+    <string name="decks_track_count_other" formatted="false">%1 de piese</string>
+    <string name="decks_loop_in" formatted="false">Punct de început al buclei</string>
+    <string name="decks_loop_out" formatted="false">Punct de sfârșit al buclei</string>
+    <string name="decks_loop_in_short" formatted="false">IN</string>
+    <string name="decks_loop_out_short" formatted="false">OUT</string>
+    <string name="decks_loop_exit_short" formatted="false">IEȘIRE</string>
+    <string name="decks_search_short" formatted="false">Caută</string>
+    <string name="decks_plural_rule" formatted="false">ro</string>
 </resources>

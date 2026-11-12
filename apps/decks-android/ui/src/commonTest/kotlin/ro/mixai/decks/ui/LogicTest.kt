@@ -11,15 +11,12 @@ class FormatTest {
         assertEquals("0:00.0", Format.time(0.0))
         assertEquals("1:05.3", Format.time(65.37))
         assertEquals("0:00.0", Format.time(-3.0))
-        assertEquals("-0:10.0", Format.remaining(50.0, 60.0))
     }
 
-    @Test fun bpmAndTempo() {
+    @Test fun bpm() {
         assertEquals("—", Format.bpm(null))
         assertEquals("124.00", Format.bpm(124.0))
-        assertEquals("+2.50%", Format.tempoPercent(1.025))
-        assertEquals("-8.00%", Format.tempoPercent(0.92))
-        assertEquals("0.00%", Format.tempoPercent(1.0))
+        assertEquals("—", Format.bpm(0.0))
     }
 
     @Test fun semitonesAndDb() {
@@ -65,11 +62,5 @@ class DeckMathTest {
         assertEquals(6f, DeckMath.unitToEqDb(1f), 1e-6f)
         assertEquals(-1f, DeckMath.unitToBipolar(0f))
         assertEquals(12f, DeckMath.unitToTrimDb(1f))
-    }
-
-    @Test fun jogAngleStaysInCircle() {
-        val a = DeckMath.jogAngle(1234.5)
-        assertTrue(a >= 0f && a < 360f)
-        assertEquals(200f, DeckMath.jogAngle(1.0), 1e-3f) // 33⅓ rpm = 200°/s
     }
 }

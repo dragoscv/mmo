@@ -270,6 +270,33 @@ mod tests {
     }
 
     #[test]
+    fn a_key_that_is_not_camelot_ranks_as_unknown_without_panicking() {
+        // What ID3 TKEY and other tools write: this crate is also called without the desktop
+        // shell's filter (decks-ffi hands the key over as it came).
+        let long = "♭".repeat(200);
+        let hostile = ["A♭", "8Ａ", "Am♭", "♭", "8♭", "", "   ", "é", long.as_str()];
+        let list: Vec<Candidate> = hostile
+            .iter()
+            .enumerate()
+            .map(|(i, k)| c(t(&format!("h{i}"), 124.0, k, 6)))
+            .collect();
+        let opts = RankOptions {
+            limit: 50,
+            ..Default::default()
+        };
+        let r = rank_next(&t("now", 124.0, "8A", 6), &list, &opts);
+        assert_eq!(r.len(), hostile.len());
+        let tag = |id: &str| r.iter().find(|x| x.id == id).unwrap().reasons[0].clone();
+        assert_eq!(tag("h0"), "key_unknown");
+        assert_eq!(tag("h1"), "key_same", "full-width 8A");
+        assert_eq!(tag("h3"), "key_unknown");
+        for k in hostile {
+            let r = rank_next(&t("now", 124.0, k, 6), &list, &opts);
+            assert_eq!(r.len(), hostile.len(), "{k:?}");
+        }
+    }
+
+    #[test]
     fn penalties_and_self_exclusion() {
         let playing = t("now", 124.0, "8A", 6);
         let mut same_artist = t("sa", 124.0, "8A", 6);

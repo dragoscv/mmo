@@ -7,20 +7,37 @@ pub struct Camelot {
     pub minor: bool,
 }
 
+/// ASCII form of a full-width character (`８` → `8`, `Ａ` → `A`); anything else as it is.
+fn ascii_form(c: char) -> char {
+    match c {
+        '\u{FF01}'..='\u{FF5E}' => char::from_u32(u32::from(c) - 0xFEE0).unwrap_or(c),
+        _ => c,
+    }
+}
+
 impl Camelot {
-    /// Parse `8A`, `12b`, ` 3B `. Anything else is `None`.
+    /// Parse `8A`, `12b`, ` 3B `, full-width `８Ａ`. Anything else is `None`, whatever the text
+    /// holds: this never panics. Musical names (`A♭`, `F#m`) are not Camelot and are not parsed
+    /// here (`8♭` is not read as `8B`).
     pub fn parse(s: &str) -> Option<Self> {
-        let s = s.trim();
-        let (num, letter) = s.split_at(s.len().checked_sub(1)?);
-        let number: u8 = num.parse().ok()?;
-        if !(1..=12).contains(&number) {
-            return None;
-        }
-        let minor = match letter {
-            "A" | "a" => true,
-            "B" | "b" => false,
+        // Character by character, never by byte offset: a tag may end in a multibyte character
+        // and a byte split inside one panics.
+        let mut chars = s.trim().chars().map(ascii_form);
+        let minor = match chars.next_back()? {
+            'A' | 'a' => true,
+            'B' | 'b' => false,
             _ => return None,
         };
+        let mut number: u8 = 0;
+        let mut digits = false;
+        for c in chars {
+            let digit = c.to_digit(10)? as u8;
+            number = number.checked_mul(10)?.checked_add(digit)?;
+            digits = true;
+        }
+        if !digits || !(1..=12).contains(&number) {
+            return None;
+        }
         Some(Self { number, minor })
     }
 
@@ -94,6 +111,55 @@ mod tests {
         assert_eq!(Camelot::parse("8C"), None);
         assert_eq!(Camelot::parse(""), None);
         assert_eq!(Camelot::parse("A"), None);
+    }
+
+    #[test]
+    fn hostile_keys_are_rejected_without_panicking() {
+        let long = "é".repeat(200);
+        let digits = "9".repeat(200) + "A";
+        // What tags and other tools really hold: musical names with ♭ / ♯, full-width text, a
+        // multibyte last character, nothing at all, or far too much.
+        for bad in [
+            "",
+            " ",
+            "\t\n",
+            "\u{3000}",
+            "A",
+            "8",
+            "♭",
+            "A♭",
+            "Am♭",
+            "8♭",
+            "8♯",
+            "F♯m",
+            "8é",
+            "é",
+            "🎧",
+            "8A🎧",
+            "８",
+            "Ａ",
+            "８Ｃ",
+            "１３Ａ",
+            "8 A",
+            "-8A",
+            "8.5A",
+            "\u{feff}8A",
+            "8A\u{200b}",
+            long.as_str(),
+            digits.as_str(),
+        ] {
+            assert_eq!(Camelot::parse(bad), None, "{bad:?}");
+        }
+        // Full-width digits and letters are the same key.
+        let k = |number, minor| Some(Camelot { number, minor });
+        assert_eq!(Camelot::parse("８Ａ"), k(8, true));
+        assert_eq!(Camelot::parse("8Ａ"), k(8, true));
+        assert_eq!(Camelot::parse("\u{3000}１２ｂ "), k(12, false));
+        assert_eq!(Camelot::parse("08A"), k(8, true));
+        // The callers of the parser stay calm too.
+        assert_eq!(key_score(Some("A♭"), Some("8A")), (0.5, "key_unknown"));
+        assert_eq!(key_score(Some("8A"), Some("Am♭")), (0.5, "key_unknown"));
+        assert_eq!(key_score(Some("８Ａ"), Some("8A")), (1.0, "key_same"));
     }
 
     #[test]

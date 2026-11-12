@@ -117,6 +117,35 @@ class ControllerTest {
         assertEquals("sampler.trigger", ctl.lastMidi)
     }
 
+    @Test fun manualLoopInAndOutAreControllerIntentsSharedWithMidi() {
+        loadBoth()
+        // The deck's IN / OUT buttons call these two.
+        ctl.backend.seek(0, 10.0)
+        ctl.loopIn(0)
+        ctl.backend.seek(0, 14.0)
+        ctl.loopOut(0)
+        ctl.tick()
+        val a = ctl.deck(0)!!
+        assertTrue(a.loopActive, "a loop runs once the end is after the start")
+        assertEquals(10.0, a.loopStartSec, 1e-9)
+        assertEquals(14.0, a.loopEndSec, 1e-9)
+        // A controller's LOOP IN / LOOP OUT buttons go the same way.
+        ctl.backend.seek(1, 5.0)
+        assertTrue(ctl.dispatch(MidiAction("deck", "loop_in", deck = 1, pressed = true)))
+        ctl.backend.seek(1, 9.0)
+        assertTrue(ctl.dispatch(MidiAction("deck", "loop_out", deck = 1, pressed = true)))
+        ctl.tick()
+        val b = ctl.deck(1)!!
+        assertTrue(b.loopActive)
+        assertEquals(5.0, b.loopStartSec, 1e-9)
+        assertEquals(9.0, b.loopEndSec, 1e-9)
+        // A button release does nothing.
+        ctl.backend.seek(1, 20.0)
+        ctl.dispatch(MidiAction("deck", "loop_in", deck = 1, pressed = false))
+        ctl.tick()
+        assertEquals(5.0, ctl.deck(1)!!.loopStartSec, 1e-9)
+    }
+
     @Test fun searchAndCrates() {
         ctl.search("tide")
         assertEquals(listOf("Low Tide"), ctl.results.map { it.title })

@@ -104,12 +104,164 @@ impl Default for RequestQueue {
     }
 }
 
+/// Characters that draw nothing or re-order their neighbours: controls, zero-width and
+/// bidirectional formatting (overrides, embeddings, isolates, marks), tags and fillers. Text
+/// from a guest made of them would show blank, reversed or spoofed in the DJ's list and on the
+/// other phones, so they are removed before anything is stored or compared.
+///
+/// This is the classification of ONE character. [`strip_hidden`] looks at the neighbours too
+/// and keeps three kinds of them where they do draw something: control white space (a line
+/// break becomes a space), the zero width joiner inside an emoji sequence, and the tag
+/// characters of a subdivision flag.
+pub fn is_hidden_char(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            c,
+            '\u{00AD}'                      // soft hyphen
+                | '\u{034F}'                // combining grapheme joiner
+                | '\u{061C}'                // Arabic letter mark
+                | '\u{115F}' | '\u{1160}'   // Hangul fillers
+                | '\u{17B4}' | '\u{17B5}'   // Khmer inherent vowels (never drawn)
+                | '\u{180B}'..='\u{180F}'   // Mongolian free variation selectors, vowel separator
+                | '\u{200B}'..='\u{200F}'   // zero width space and joiners, LRM, RLM
+                | '\u{202A}'..='\u{202E}'   // bidi embeddings and overrides
+                | '\u{2060}'..='\u{206F}'   // word joiner, invisible operators, bidi isolates
+                | '\u{2800}'                // braille blank
+                | '\u{3164}' | '\u{FFA0}'   // Hangul fillers
+                | '\u{FEFF}'                // byte order mark / zero width no-break space
+                | '\u{FFF9}'..='\u{FFFB}'   // interlinear annotation
+                | '\u{1BCA0}'..='\u{1BCA3}' // shorthand format controls
+                | '\u{1D173}'..='\u{1D17A}' // musical symbol format controls
+                | '\u{E0000}'..='\u{E007F}' // tags
+        )
+}
+
+/// Variation selectors change how the character before them is drawn (text or emoji style)
+/// and draw nothing themselves.
+fn is_variation_selector(c: char) -> bool {
+    matches!(c, '\u{FE00}'..='\u{FE0F}' | '\u{E0100}'..='\u{E01EF}')
+}
+
+/// White space that is a control or a line break: tab, line feed, vertical tab, form feed,
+/// carriage return, next line (U+0085), line and paragraph separator (U+2028, U+2029). A
+/// reader sees a gap there, so it becomes a space instead of being removed with the controls.
+fn is_line_space(c: char) -> bool {
+    (c.is_control() && c.is_whitespace()) || matches!(c, '\u{2028}' | '\u{2029}')
+}
+
+/// Zero width joiner: glues emoji into one picture (family, profession, flags).
+const ZWJ: char = '\u{200D}';
+/// Black flag: with a tag sequence after it, a subdivision flag (England, Scotland, Wales).
+const BLACK_FLAG: char = '\u{1F3F4}';
+/// Ends a tag sequence.
+const CANCEL_TAG: char = '\u{E007F}';
+/// Longest tag sequence kept after a black flag, the cancel tag included (a subdivision code
+/// is at most 6 letters and digits).
+const MAX_FLAG_TAGS: usize = 8;
+
+/// A letter or digit of the Latin script. A joiner next to one draws nothing.
+fn is_latin_alnum(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || (matches!(c, '\u{00AA}'..='\u{024F}' | '\u{1E00}'..='\u{1EFF}') && c.is_alphabetic())
+}
+
+/// Whether a zero width joiner may stand next to `c`: something a reader sees, and not a
+/// Latin letter or digit.
+fn joins(c: char) -> bool {
+    !c.is_whitespace() && !is_hidden_char(c) && !is_variation_selector(c) && !is_latin_alnum(c)
+}
+
+/// Byte length of the tag sequence at the start of `rest` (the text right after a black flag):
+/// 1 or more tag digits / lower-case tag letters, then the cancel tag, at most
+/// [`MAX_FLAG_TAGS`] characters. None = no such sequence.
+fn flag_tags(rest: &str) -> Option<usize> {
+    let mut len = 0;
+    for (n, c) in rest.chars().take(MAX_FLAG_TAGS).enumerate() {
+        len += c.len_utf8();
+        match c {
+            CANCEL_TAG => return (n > 0).then_some(len),
+            '\u{E0030}'..='\u{E0039}' | '\u{E0061}'..='\u{E007A}' => {}
+            _ => return None,
+        }
+    }
+    None
+}
+
+/// `s` as a reader sees it: without hidden characters ([`is_hidden_char`]) and without
+/// variation selectors that have no visible character before them (after an emoji they stay:
+/// they belong to it). A text made only of invisible characters comes back empty or as white
+/// space.
+///
+/// Three kinds of hidden characters are kept or replaced, because they do show:
+///
+/// * Control white space and line breaks (tab, CR, LF, U+0085, U+2028, U+2029) become ONE
+///   space ("a\nb" is "a b", not "ab"); none is added after other white space or at the start
+///   (one can be left at the end: callers trim).
+/// * A zero width joiner stays between two visible characters that are not Latin letters or
+///   digits: an emoji sequence (family, profession with a skin tone, rainbow flag) stays one
+///   picture. Between Latin letters, next to white space or at either end it draws nothing
+///   and is removed.
+/// * Tag characters stay only as the tag sequence of a subdivision flag: right after the
+///   black flag U+1F3F4, tag digits and lower-case tag letters ended by the cancel tag
+///   U+E007F, at most [`MAX_FLAG_TAGS`] of them. Anywhere else they are removed (they are
+///   invisible text).
+pub fn strip_hidden(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    // The last kept character can carry one variation selector.
+    let mut base = false;
+    // The last kept character, variation selectors aside (they belong to it).
+    let mut prev: Option<char> = None;
+    let mut i = 0;
+    while let Some(c) = s[i..].chars().next() {
+        i += c.len_utf8();
+        if is_line_space(c) {
+            if prev.is_some_and(|p| !p.is_whitespace()) {
+                out.push(' ');
+                prev = Some(' ');
+            }
+            base = false;
+            continue;
+        }
+        if c == ZWJ {
+            let next = s[i..].chars().next();
+            if prev.is_some_and(joins) && next.is_some_and(joins) {
+                out.push(c);
+                prev = Some(c);
+                base = false;
+            }
+            continue;
+        }
+        if is_hidden_char(c) {
+            continue;
+        }
+        if is_variation_selector(c) {
+            if base {
+                out.push(c);
+            }
+            base = false;
+            continue;
+        }
+        base = !c.is_whitespace();
+        out.push(c);
+        prev = Some(c);
+        let tags = if c == BLACK_FLAG {
+            flag_tags(&s[i..])
+        } else {
+            None
+        };
+        if let Some(len) = tags {
+            out.push_str(&s[i..i + len]);
+            i += len;
+            base = false;
+        }
+    }
+    out
+}
+
+/// Text as it is stored: hidden characters removed ([`strip_hidden`]), white space collapsed
+/// to single spaces, trimmed. May be empty; too long is an error.
 fn clean(s: &str) -> Result<String, PartyError> {
-    let t: String = s
-        .trim()
-        .chars()
-        .filter(|c| !c.is_control())
-        .collect::<String>()
+    let t: String = strip_hidden(s)
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
@@ -389,5 +541,242 @@ mod tests {
         let mut q = RequestQueue::default();
         q.submit("c1", "Bad\u{0}\u{7}  Title\n", "", "").unwrap();
         assert_eq!(q.list()[0].title, "Bad Title");
+    }
+
+    /// England: black flag, the tags "gbeng", cancel tag.
+    const ENGLAND: &str = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+
+    #[test]
+    fn line_breaks_become_one_space_and_other_controls_still_go() {
+        // Romanian text is left exactly as typed.
+        for keep in [
+            "Ștefan Bănică",
+            "ă â î ș ț Ă Â Î Ș Ț",
+            "Înger și demon în țară",
+            "Zdob și Zdub — Bună dimineața!",
+        ] {
+            assert_eq!(strip_hidden(keep), keep);
+        }
+        for (text, want) in [
+            ("a\nb", "a b"),
+            ("Line1\nLine2", "Line1 Line2"),
+            ("a\r\nb", "a b"),
+            ("a\tb", "a b"),
+            ("a\u{B}\u{C}b", "a b"),
+            ("a\u{85}b", "a b"),
+            ("a\u{2028}b", "a b"),
+            ("a\u{2029}\u{2028}\n\nb", "a b"),
+            // No space is added where one already is, or where the text starts.
+            ("a \nb", "a b"),
+            ("a\n b", "a  b"),
+            ("\n\ta", "a"),
+            ("a\n", "a "),
+            // Controls that are not white space are still removed without a gap.
+            ("a\u{0}b", "ab"),
+            ("a\u{7}\u{1B}b", "ab"),
+            ("a\u{7F}b", "ab"),
+            ("a\u{9F}b", "ab"),
+            // A bidi override is still removed, next to a line break too.
+            ("\u{202E}live", "live"),
+            ("a\u{202E}\n\u{202C}b", "a b"),
+            ("ș\u{200B}\nț", "ș ț"),
+        ] {
+            assert_eq!(strip_hidden(text), want, "{text:?}");
+        }
+        // Through the queue: two lines are two words, in every field.
+        let mut q = RequestQueue::default();
+        q.submit("c1", "Line1\nLine2", "Zdob\r\nși\tZdub", "pls\u{2028}now")
+            .unwrap();
+        let r = &q.list()[0];
+        assert_eq!(
+            (r.title.as_str(), r.artist.as_str(), r.note.as_str()),
+            ("Line1 Line2", "Zdob și Zdub", "pls now")
+        );
+        // Nothing but line breaks is still an empty title.
+        assert_eq!(
+            q.submit("c1", "\n\t\r\u{2028}", "", ""),
+            Err(PartyError::Empty)
+        );
+    }
+
+    #[test]
+    fn emoji_sequences_and_subdivision_flags_stay_whole() {
+        let unchanged = [
+            // Family: man, woman, girl.
+            "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".to_string(),
+            // Profession with a skin tone: woman, medium skin tone, rocket.
+            "\u{1F469}\u{1F3FD}\u{200D}\u{1F680}".to_string(),
+            // Rainbow flag: white flag, emoji style, rainbow.
+            "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}".to_string(),
+            // Heart on fire, pirate flag (black flag, joiner, skull and crossbones).
+            "\u{2764}\u{FE0F}\u{200D}\u{1F525}".to_string(),
+            "\u{1F3F4}\u{200D}\u{2620}\u{FE0F}".to_string(),
+            ENGLAND.to_string(),
+            format!("Party {ENGLAND} tonight {ENGLAND}"),
+            // The longest tag sequence kept: 7 code characters and the cancel tag.
+            format!("\u{1F3F4}{}\u{E007F}", "\u{E0061}".repeat(7)),
+            // A joiner inside a word of a script that shapes with it.
+            "\u{0D9A}\u{0DCA}\u{200D}\u{0DBA}".to_string(),
+        ];
+        for text in &unchanged {
+            assert_eq!(&strip_hidden(text), text, "{text:?}");
+        }
+        let flag = "\u{1F3F4}";
+        for (text, want) in [
+            // A joiner that joins nothing a reader sees is removed.
+            ("a\u{200D}b".to_string(), "ab"),
+            ("ș\u{200D}ț".to_string(), "șț"),
+            ("7\u{200D}7".to_string(), "77"),
+            ("\u{1F3A7}\u{200D}".to_string(), "\u{1F3A7}"),
+            ("\u{200D}\u{1F3A7}".to_string(), "\u{1F3A7}"),
+            ("\u{1F3A7}\u{200D} x".to_string(), "\u{1F3A7} x"),
+            (
+                "\u{1F3A7} \u{200D}\u{1F3A7}".to_string(),
+                "\u{1F3A7} \u{1F3A7}",
+            ),
+            ("\u{1F3A7}\u{200D}a".to_string(), "\u{1F3A7}a"),
+            ("a\u{200D}\u{1F3A7}".to_string(), "a\u{1F3A7}"),
+            (
+                "\u{1F3A7}\u{200D}\n\u{1F3A7}".to_string(),
+                "\u{1F3A7} \u{1F3A7}",
+            ),
+            // ... and never two in a row, or one next to another hidden character.
+            (
+                "\u{1F3A7}\u{200D}\u{200D}\u{1F3A7}".to_string(),
+                "\u{1F3A7}\u{200D}\u{1F3A7}",
+            ),
+            (
+                "\u{1F3A7}\u{200D}\u{200B}\u{1F3A7}".to_string(),
+                "\u{1F3A7}\u{1F3A7}",
+            ),
+            (
+                "\u{1F3A7}\u{200D}\u{202E}\u{1F3A7}".to_string(),
+                "\u{1F3A7}\u{1F3A7}",
+            ),
+            // Tag characters are invisible text everywhere but in a complete flag sequence.
+            ("x\u{E0067}\u{E0062}\u{E007F}".to_string(), "x"),
+            (format!("{flag}\u{E0067}\u{E0062}"), flag),
+            (format!("{flag}\u{E007F}"), flag),
+            (format!("{flag}\u{E0041}\u{E007F}"), flag),
+            (format!("{flag}\u{E0020}\u{E007F}"), flag),
+            (format!("{flag}\u{E0067}x\u{E007F}"), "\u{1F3F4}x"),
+            (format!("{flag}{}\u{E007F}", "\u{E0061}".repeat(8)), flag),
+            (format!("{flag}{}", "\u{E0061}".repeat(500)), flag),
+            (format!("{ENGLAND}\u{E0067}\u{E007F}"), ENGLAND),
+        ] {
+            assert_eq!(strip_hidden(&text), want, "{text:?}");
+        }
+        // Cleaning twice changes nothing more.
+        for text in &unchanged {
+            assert_eq!(strip_hidden(&strip_hidden(text)), strip_hidden(text));
+        }
+        // Through the queue: the flag is stored whole, and what only looks like text is not.
+        let mut q = RequestQueue::default();
+        q.submit("c1", &format!("Football {ENGLAND}"), "", "")
+            .unwrap();
+        assert_eq!(q.list()[0].title, format!("Football {ENGLAND}"));
+        for blank in ["\u{200D}", "\u{E0067}\u{E007F}", "\u{200D}\n\u{200D}"] {
+            assert_eq!(
+                q.submit("c2", blank, "", ""),
+                Err(PartyError::Empty),
+                "{blank:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn bidi_and_zero_width_characters_are_stripped() {
+        // Every code point a guest could use to reverse, hide or spoof a line.
+        let hidden = [
+            '\u{202A}',
+            '\u{202B}',
+            '\u{202C}',
+            '\u{202D}',
+            '\u{202E}',
+            '\u{2066}',
+            '\u{2067}',
+            '\u{2068}',
+            '\u{2069}',
+            '\u{200B}',
+            '\u{200C}',
+            '\u{200D}',
+            '\u{200E}',
+            '\u{200F}',
+            '\u{FEFF}',
+            '\u{2060}',
+            '\u{00AD}',
+            '\u{061C}',
+            '\u{E0041}',
+        ];
+        for c in hidden {
+            assert!(is_hidden_char(c), "U+{:04X}", c as u32);
+            let mut q = RequestQueue::default();
+            q.submit(
+                "c1",
+                &format!("{c}Str{c}obe{c}"),
+                &format!("dead{c}mau5"),
+                &format!("{c}hi"),
+            )
+            .unwrap();
+            let r = &q.list()[0];
+            assert_eq!(
+                (r.title.as_str(), r.artist.as_str(), r.note.as_str()),
+                ("Strobe", "deadmau5", "hi"),
+                "U+{:04X}",
+                c as u32
+            );
+        }
+        // What people really type stays: letters of any script, digits, emoji, punctuation.
+        for c in ['a', 'ș', 'Ж', '中', 'ע', '7', '🎧', '\u{FE0F}', '\'', ' '] {
+            assert!(!is_hidden_char(c), "U+{:04X}", c as u32);
+        }
+        // "evil" written backwards behind an override reads as typed, not as displayed.
+        let mut q = RequestQueue::default();
+        q.submit("c1", "\u{202E}live", "", "").unwrap();
+        assert_eq!(q.list()[0].title, "live");
+    }
+
+    #[test]
+    fn a_title_of_hidden_characters_only_is_empty() {
+        let mut q = RequestQueue::default();
+        for blank in [
+            "\u{200B}",
+            " \u{200B}\u{FEFF} ",
+            "\u{202E}\u{202C}",
+            "\u{2066}\u{2069}\u{200D}",
+            "\u{3164}",
+            "\u{2800} \u{00AD}",
+            // Variation selectors with nothing to vary: nothing is drawn.
+            "\u{FE0F}",
+            "\u{FE0F}\u{FE0E} \u{E0100}",
+            "\u{200B}\u{FE0F}",
+        ] {
+            assert_eq!(
+                q.submit("c1", blank, "artist", ""),
+                Err(PartyError::Empty),
+                "{blank:?}"
+            );
+        }
+        assert!(q.list().is_empty());
+        // After a visible character a variation selector stays (emoji style), once.
+        assert_eq!(
+            strip_hidden("\u{2764}\u{FE0F} Love"),
+            "\u{2764}\u{FE0F} Love"
+        );
+        assert_eq!(strip_hidden("\u{2764}\u{FE0F}\u{FE0F}"), "\u{2764}\u{FE0F}");
+        assert_eq!(strip_hidden(" \u{FE0F}x"), " x");
+        assert_eq!(strip_hidden("a\u{200B}\u{FE0F}b"), "a\u{FE0F}b");
+        assert_eq!(strip_hidden("plain text"), "plain text");
+        assert_eq!(strip_hidden(""), "");
+        // Hidden characters do not count towards the length limit either.
+        let padded = format!("{}{}", "\u{200B}".repeat(500), "x".repeat(MAX_FIELD));
+        assert!(q.submit("c1", &padded, "", "").is_ok());
+        // Two requests that differ only by hidden characters are the same song.
+        let (a, _) = q.submit("c2", "Levels", "Avicii", "").unwrap();
+        let (b, merged) = q
+            .submit("c3", "Le\u{200B}vels", "Avi\u{202E}cii", "")
+            .unwrap();
+        assert!(merged);
+        assert_eq!(a, b);
     }
 }

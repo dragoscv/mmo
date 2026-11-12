@@ -1563,6 +1563,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "decks-link"
+version = "0.1.0"
+
+[[package]]
 name = "decks-mapping"
 version = "0.1.0"
 dependencies = [
@@ -3531,11 +3535,14 @@ dependencies = [
 
 [[package]]
 name = "mixai"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "base64 0.22.1",
  "btleplug",
+ "decks-link",
  "decks-packs",
+ "decks-remote",
+ "decks-transition",
  "ed25519-dalek",
  "env_logger",
  "futures",

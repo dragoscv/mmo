@@ -324,7 +324,7 @@ fun DecksScreen(
                     PanelId.DeckB -> DeckPanel(ctl, 1, m, tier)
                     PanelId.Mixer -> MixerPanel(ctl, m, tier, withCrossfader = !hasCrossfader)
                     PanelId.Crossfader -> CrossfaderPanel(ctl, m, tier)
-                    PanelId.Library -> LibraryPanel(ctl, onScanFolder, m)
+                    PanelId.Library -> LibraryPanel(ctl, onScanFolder, m, tier)
                     PanelId.Waves -> WavesPanel(m, lanes)
                     else -> Unavailable(id, m)
                 }

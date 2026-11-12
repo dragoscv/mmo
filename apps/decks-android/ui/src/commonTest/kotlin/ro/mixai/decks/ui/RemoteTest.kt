@@ -16,11 +16,18 @@ import ro.mixai.decks.ui.engine.RemoteRoleUi
 import ro.mixai.decks.ui.engine.RequestStateUi
 import ro.mixai.decks.ui.engine.SongRequestUi
 
-private class FakeRemote : RemotePort {
+/** A remote server that does nothing on the network (also used by desktopTest/ConnectPanelTest). */
+internal class FakeRemote : RemotePort {
     override val port = 47321
     var rotations = 0
     var open = true
     var closed = false
+    /** The lock this "server" holds; every pump reports it, as the real one does. */
+    var locked = false
+    /** Every `setControlsLocked` call it received, in order. */
+    val lockCalls = mutableListOf<Boolean>()
+    /** True = it ignores `setControlsLocked` (a server that refuses the change). */
+    var refusesLock = false
     val labels = mutableMapOf<Int, Pair<String?, String?>>()
     val pending = ArrayDeque<RemotePumpUi>()
     val reqs = mutableListOf(SongRequestUi(1, "Strobe", "deadmau5", "", 3, RequestStateUi.PENDING))
@@ -28,20 +35,30 @@ private class FakeRemote : RemotePort {
         RemotePairingUi(role, "http://10.0.0.2:$port/?t=$role$rotations", 21, List(21 * 21) { it % 2 == 0 })
     override fun rotate(role: RemoteRoleUi): RemotePairingUi { rotations++; return pairing(role) }
     override fun setTrackLabels(deck: Int, title: String?, artist: String?) { labels[deck] = title to artist }
-    override fun pump() = pending.removeFirstOrNull() ?: RemotePumpUi(0, emptyList(), emptyList())
+    override fun pump() = pending.removeFirstOrNull() ?: RemotePumpUi(0, emptyList(), emptyList(), locked)
     override fun requests() = reqs.toList()
     override fun setRequestState(id: Long, state: RequestStateUi) {
         val i = reqs.indexOfFirst { it.id == id }
         if (i >= 0) reqs[i] = reqs[i].copy(state = state)
     }
     override fun setPartyOpen(open: Boolean) { this.open = open }
+    override fun setControlsLocked(locked: Boolean) {
+        lockCalls += locked
+        if (!refusesLock) this.locked = locked
+    }
     override fun clearDone() { reqs.removeAll { it.state == RequestStateUi.PLAYED || it.state == RequestStateUi.REJECTED } }
     override fun clientCount() = 2
     override fun close() { closed = true }
 }
 
-private class RemoteBackend(val fake: FakeRemote, inner: DecksBackend = DemoBackend { 0.0 }) : DecksBackend by inner {
+internal class RemoteBackend(val fake: FakeRemote, inner: DecksBackend = DemoBackend { 0.0 }) : DecksBackend by inner {
     override fun startRemote(): RemotePort = fake
+}
+
+/** A backend that opens a NEW server at every start, like the real one ([started] = all of them, in order). */
+private class RestartingBackend(inner: DecksBackend = DemoBackend { 0.0 }) : DecksBackend by inner {
+    val started = mutableListOf<FakeRemote>()
+    override fun startRemote(): RemotePort = FakeRemote().also { started += it }
 }
 
 class RemoteTest {
@@ -79,6 +96,7 @@ class RemoteTest {
                 RemoteMixerUi.Volume(0, 0.4f),
                 RemoteMixerUi.Crossfader(-1f),
             ),
+            controlsLocked = false,
         )
         repeat(4) { ctl.tick() }
         assertEquals(-26f, ctl.controls[1].eqLow)
@@ -103,5 +121,86 @@ class RemoteTest {
         assertTrue(fake.closed)
         assertNull(ctl.remote)
         assertTrue(ctl.pairings.isEmpty())
+    }
+
+    @Test fun togglingTheControlsLockTellsTheServer() {
+        val fake = FakeRemote()
+        val ctl = DecksController(RemoteBackend(fake))
+        assertFalse(ctl.controlsLocked, "a session starts unlocked")
+        assertTrue(ctl.setRemoteEnabled(true))
+        assertEquals(listOf(false), fake.lockCalls, "the choice is applied to the new server")
+        ctl.changeControlsLocked(true)
+        assertEquals(listOf(false, true), fake.lockCalls, "locking is one call with true")
+        assertTrue(ctl.controlsLocked)
+        assertTrue(fake.locked)
+        // The server reports the lock at every pump: the state stays on.
+        repeat(8) { ctl.tick() }
+        assertTrue(ctl.controlsLocked, "still locked after two pumps")
+        ctl.changeControlsLocked(false)
+        assertEquals(listOf(false, true, false), fake.lockCalls, "unlocking is one call with false")
+        assertFalse(ctl.controlsLocked)
+        repeat(8) { ctl.tick() }
+        assertFalse(ctl.controlsLocked)
+        assertEquals(3, fake.lockCalls.size, "pumping sends nothing")
+        // The party switch is its own switch: the lock did not move it.
+        assertTrue(fake.open)
+        assertTrue(ctl.partyOpen)
+    }
+
+    @Test fun thePumpReportIsTheSourceOfTheLockState() {
+        val fake = FakeRemote()
+        val ctl = DecksController(RemoteBackend(fake))
+        ctl.setRemoteEnabled(true)
+        // A report that says locked (the lock was set elsewhere): the shell shows it without having asked.
+        fake.pending += RemotePumpUi(0, emptyList(), emptyList(), controlsLocked = true)
+        repeat(4) { ctl.tick() }
+        assertTrue(ctl.controlsLocked, "a pump report with the flag turns the state on")
+        assertEquals(listOf(false), fake.lockCalls, "the shell sent nothing for it")
+        // The next report says unlocked again.
+        repeat(4) { ctl.tick() }
+        assertFalse(ctl.controlsLocked, "a pump report without the flag turns it off")
+        // Set on the server itself (fake.locked), with mixer changes in the same report.
+        fake.locked = true
+        fake.pending += RemotePumpUi(1, emptyList(), listOf(RemoteMixerUi.Crossfader(1f)), controlsLocked = true)
+        repeat(4) { ctl.tick() }
+        assertTrue(ctl.controlsLocked)
+        assertEquals(1f, ctl.crossfader, "the mixer change of the same report was applied")
+        // A server that refuses the change: the switch does not keep showing what did not happen.
+        fake.refusesLock = true
+        ctl.changeControlsLocked(false)
+        assertEquals(listOf(false, false), fake.lockCalls)
+        repeat(4) { ctl.tick() }
+        assertTrue(ctl.controlsLocked, "the server is still locked, and the shell says so")
+    }
+
+    @Test fun theControlsLockSurvivesConnectOffAndOn() {
+        val backend = RestartingBackend()
+        val ctl = DecksController(backend)
+        assertTrue(ctl.setRemoteEnabled(true))
+        ctl.changeControlsLocked(true)
+        ctl.changePartyOpen(false)
+        repeat(4) { ctl.tick() }
+        assertTrue(ctl.setRemoteEnabled(false))
+        assertTrue(backend.started[0].closed)
+        assertTrue(ctl.controlsLocked, "the choice is kept while connected mode is off")
+        repeat(8) { ctl.tick() }
+        assertTrue(ctl.controlsLocked, "nothing pumps while it is off")
+        // A new server starts unlocked (and open): the shell applies both choices again.
+        assertTrue(ctl.setRemoteEnabled(true))
+        assertEquals(2, backend.started.size, "a second server")
+        val second = backend.started[1]
+        assertEquals(listOf(true), second.lockCalls, "the lock is applied to the new server")
+        assertTrue(second.locked)
+        assertFalse(second.open, "like the party switch")
+        repeat(8) { ctl.tick() }
+        assertTrue(ctl.controlsLocked, "and the new server's reports keep it on")
+        // Changed while off: no server to tell, the next one gets it.
+        ctl.setRemoteEnabled(false)
+        ctl.changeControlsLocked(false)
+        assertFalse(ctl.controlsLocked)
+        assertEquals(listOf(true), second.lockCalls, "a closed server is not called")
+        ctl.setRemoteEnabled(true)
+        assertEquals(listOf(false), backend.started[2].lockCalls)
+        assertFalse(backend.started[2].locked)
     }
 }

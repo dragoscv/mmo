@@ -15,8 +15,16 @@
 //! has its own 128-bit token carried in the pairing URL / QR; rotating a token disconnects that
 //! role at once. LAN only, no TLS, no cloud relay, no GPL code (own protocol, not Ableton Link).
 //!
+//! Guards: text from guests loses control, zero-width and bidirectional formatting characters
+//! ([`is_hidden_char`]); at most [`MAX_HANDSHAKES`] connections may be in their HTTP request at
+//! once and the whole request head must arrive within [`HANDSHAKE_TIMEOUT`]; every session is
+//! pinged and dropped after [`DEAD_AFTER`] of silence ([`RemoteServer::is_connected`] tells the
+//! app, so a button a vanished phone was holding can be let go); the DJ can lock the phone
+//! controls ([`RemoteServer::set_controls_locked`]): commands are refused, requests keep working.
+//!
 //! The crate knows nothing about the engine: the app publishes a [`RemoteState`] and drains
-//! validated [`RemoteCommand`]s (polling, same convention as `decks-ffi`). Documentation:
+//! validated [`RemoteCommand`]s (polling, same convention as `decks-ffi`;
+//! [`RemoteServer::drain_commands_from`] also names the connection). Documentation:
 //! `docs/decks/remote.md`.
 
 mod http;
@@ -26,12 +34,18 @@ mod qr;
 mod server;
 mod token;
 
-pub use party::{PartyError, PublicRequest, RequestQueue, RequestStatus, SongRequestView};
+pub use party::{
+    PartyError, PublicRequest, RequestQueue, RequestStatus, SongRequestView, is_hidden_char,
+    strip_hidden,
+};
 pub use protocol::{
     ClientMsg, EqBand, MAX_DECKS, RemoteCommand, RemoteDeck, RemoteState, Role, ServerMsg,
 };
 pub use qr::{QrMatrix, qr_matrix, qr_svg};
-pub use server::{ClientInfo, RemoteConfig, RemoteServer, lan_ip};
+pub use server::{
+    ClientInfo, CommandFrom, DEAD_AFTER, HANDSHAKE_TIMEOUT, MAX_CLIENTS, MAX_HANDSHAKES,
+    PING_INTERVAL, RemoteConfig, RemoteServer, lan_ip,
+};
 pub use token::{ct_eq, new_token};
 
 /// Protocol version announced in [`ServerMsg::Hello`]; bump on breaking message changes.

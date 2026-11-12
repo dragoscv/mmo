@@ -15,6 +15,10 @@ import { wavesMessages } from "./messages-waves";
 import { mixerMessages } from "./messages-mixer";
 import { deckTabsMessages } from "./messages-decktabs";
 import { skinsMessages } from "./messages-skins";
+import { linkMessages } from "./messages-link";
+import { practiceMessages } from "./messages-practice";
+import { remoteMessages } from "./messages-remote";
+import { copilotMessages } from "./messages-copilot";
 
 export const catalogs = [
     appMessages,
@@ -28,6 +32,10 @@ export const catalogs = [
     mixerMessages,
     deckTabsMessages,
     skinsMessages,
+    linkMessages,
+    practiceMessages,
+    remoteMessages,
+    copilotMessages,
 ] as const;
 
 type Merge<T extends readonly { en: Record<string, string> }[]> = T extends readonly [infer H, ...infer R]

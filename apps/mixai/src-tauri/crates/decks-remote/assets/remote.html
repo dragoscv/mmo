@@ -34,6 +34,9 @@
   .requests li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
   .requests ul { list-style: none; margin: 0; padding: 0; }
   .viewer .ctl { display: none; }
+  .lock { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-left: 4px solid var(--destructive);
+    border-radius: var(--radius); background: var(--card); font-weight: 600; }
+  .locked .deck .ctl, .locked .mixer { opacity: 0.4; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -43,6 +46,7 @@
   <span class="status" id="status" role="status" aria-live="polite"></span>
 </header>
 <main>
+  <p class="lock" id="lock" role="status" data-i18n="locked" hidden>Controls locked by the DJ. Requests still work.</p>
   <section class="decks" id="decks" aria-label="Decks"></section>
   <section class="mixer ctl" aria-labelledby="mix-h">
     <h2 id="mix-h" class="sr" data-i18n="mixer">Mixer</h2>
@@ -63,13 +67,15 @@
     connecting: "Se conectează…", connected: "Conectat", viewer: "Doar vizualizare", lost: "Conexiune pierdută, reîncerc…",
     denied: "Cod invalid. Scanează din nou codul QR.", play: "Play", pause: "Pauză", cue: "Cue", sync: "Sync",
     loop: "Loop 4", vol: "Volum", low: "Joase", mid: "Medii", high: "Înalte", empty: "Gol", deck: "Deck",
-    accept: "Acceptă", reject: "Respinge", played: "Pus", votes: "voturi", none: "Nicio cerere"
+    accept: "Acceptă", reject: "Respinge", played: "Pus", votes: "voturi", none: "Nicio cerere",
+    locked: "Comenzi blocate de DJ. Cererile merg în continuare."
   } : {
     title: "MixAI Decks Remote", mixer: "Mixer", xfader: "X-fade", master: "Master", requests: "Requests",
     connecting: "Connecting…", connected: "Connected", viewer: "View only", lost: "Connection lost, retrying…",
     denied: "Invalid code. Scan the QR code again.", play: "Play", pause: "Pause", cue: "Cue", sync: "Sync",
     loop: "Loop 4", vol: "Volume", low: "Low", mid: "Mid", high: "High", empty: "Empty", deck: "Deck",
-    accept: "Accept", reject: "Reject", played: "Played", votes: "votes", none: "No requests"
+    accept: "Accept", reject: "Reject", played: "Played", votes: "votes", none: "No requests",
+    locked: "Controls locked by the DJ. Requests still work."
   };
   document.documentElement.lang = ro ? "ro" : "en";
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T[el.dataset.i18n]; });
@@ -81,8 +87,19 @@
   const status = (txt, ok) => { $("status").textContent = txt; $("status").dataset.ok = String(ok); };
   const letters = ["A", "B", "C", "D"];
   const colors = ["var(--deck-a)", "var(--deck-b)", "var(--deck-c)", "var(--deck-d)"];
-  let ws, role = "viewer", built = 0;
-  const send = cmd => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "command", command: cmd })); };
+  let ws, role = "viewer", built = 0, locked = false;
+  // While the DJ has locked the controls only letting go of CUE is sent (the app refuses the rest anyway).
+  const send = cmd => {
+    if (locked && !(cmd.cmd === "cue" && cmd.pressed === false)) return;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "command", command: cmd }));
+  };
+  // Locked: the deck and mixer controls are dimmed and cannot be focused or touched; the requests stay usable.
+  function setLocked(v) {
+    locked = !!v;
+    document.body.classList.toggle("locked", locked);
+    document.querySelectorAll(".deck .ctl, .mixer").forEach(e => { e.inert = locked; });
+    $("lock").hidden = !locked;
+  }
   const fmt = s => { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
   function el(tag, attrs, text) { const e = document.createElement(tag); Object.assign(e, attrs || {}); if (text != null) e.textContent = text; return e; }
   function slider(label, min, max, step, onInput) {
@@ -114,6 +131,7 @@
       });
       root.append(s);
     }
+    setLocked(locked);
   }
   function setIfIdle(input, v) { if (document.activeElement !== input) input.value = v; }
   function render(st) {
@@ -157,9 +175,10 @@
     let hello = false;
     ws.onmessage = ev => {
       const m = JSON.parse(ev.data);
-      if (m.type === "hello") { hello = true; delay = 500; role = m.role; document.body.classList.toggle("viewer", role !== "controller"); status(role === "controller" ? T.connected : T.viewer, true); }
+      if (m.type === "hello") { hello = true; delay = 500; role = m.role; document.body.classList.toggle("viewer", role !== "controller"); setLocked(false); status(role === "controller" ? T.connected : T.viewer, true); }
       else if (m.type === "state") render(m.state);
       else if (m.type === "requests") renderRequests(m.items);
+      else if (m.type === "controls") setLocked(m.locked);
       else if (m.type === "error") status(m.reason, false);
     };
     ws.onclose = () => {

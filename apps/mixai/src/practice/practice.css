@@ -1,0 +1,116 @@
+/* Practice mode (src/practice/*). Shared vocabulary: src/look/look.css (dk-*), status bar: shell/shell.css (.sb-*). */
+
+/* Chip: the score next to the label only while practice is on. */
+.pr-chip-score {
+    min-width: 2ch;
+    text-align: right;
+    color: var(--foreground);
+}
+
+/* Popover: one fixed column, nothing scrolls. */
+.pr-pop[data-slot="popover-content"] {
+    width: min(92vw, 320px);
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+    border-radius: var(--ctl-radius, 6px);
+}
+.pr-body {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+.pr-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+.pr-score {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0;
+    color: var(--foreground);
+}
+.pr-hint {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted-foreground);
+}
+.pr-rows,
+.pr-tips ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.pr-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 3ch;
+    align-items: center;
+    gap: 8px;
+}
+.pr-row > .dk-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The status-bar meter cells, larger: 5 cells of 14 x 10. */
+.pr-cells > i {
+    width: 14px;
+}
+.pr-row-num {
+    text-align: right;
+    color: var(--muted-foreground);
+}
+.pr-tips {
+    display: grid;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line, var(--border));
+}
+.pr-tips li {
+    display: grid;
+    gap: 2px;
+    padding-left: 8px;
+    border-left: 2px solid var(--warning);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--foreground);
+}
+.pr-tips li[data-kind="good"] {
+    border-left-color: var(--on, var(--primary));
+}
+.pr-tips li > .dk-label {
+    white-space: normal;
+}
+.pr-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line, var(--border));
+    color: var(--muted-foreground);
+}
+.pr-foot > .dk-num {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* "The score is an estimate": the last, quietest line. */
+.pr-note {
+    color: var(--fg-faint, var(--muted-foreground));
+}
+
+/* ── touch mode (styles.css: every button is at least 44 x 44 px) ── */
+/* The Start button is 44 px high next to the 28 px score: centre the pair instead of hanging
+   the score from the button's bottom edge. */
+:root[data-touch="on"] .pr-head {
+    align-items: center;
+}
+:root[data-touch="on"] .pr-body {
+    gap: 8px;
+}

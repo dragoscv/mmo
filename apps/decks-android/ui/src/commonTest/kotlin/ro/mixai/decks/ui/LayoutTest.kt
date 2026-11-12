@@ -8,13 +8,11 @@ import kotlin.test.assertTrue
 import ro.mixai.decks.ui.engine.DemoPacks
 import ro.mixai.decks.ui.engine.PanelId
 import ro.mixai.decks.ui.engine.PanelTier
-import ro.mixai.decks.ui.screens.CROSSFADER_FADER_ONLY_DP
-import ro.mixai.decks.ui.screens.CROSSFADER_LABELLED_DP
 import ro.mixai.decks.ui.screens.NativePanels
-import ro.mixai.decks.ui.screens.contentTier
 import ro.mixai.decks.ui.screens.effectiveLayout
 import ro.mixai.decks.ui.screens.layoutHostSize
 import ro.mixai.decks.ui.screens.layoutRender
+import ro.mixai.decks.ui.screens.tierFor
 import ro.mixai.decks.ui.screens.withLookGap
 import ro.mixai.decks.ui.theme.DecksSkin
 
@@ -83,8 +81,8 @@ class LayoutTest {
 
     @Test fun proKeepsFullDecksAndTheWaveBandDownTo1366x768() {
         // Mirror of solver.test.ts "pro (default) keeps full decks, mixer and waveform band…" (Signature gap = 2).
-        // These are the SOLVER's tiers (the contract shared with TypeScript and Rust); what the Compose panels
-        // render inside those rects is checked by the `…Rendered…` tests below.
+        // These are the SOLVER's tiers (the contract shared with TypeScript and Rust), on the desktop app's host sizes;
+        // the Compose panels draw them as given (`panelsAreDrawnAtTheSolversTier`).
         val pro = DemoPacks.presets.first().copy(gap = 2.0)
         fun tier(w: Double, h: Double, p: PanelId) = DemoPacks.solve(pro, w, h, all).placements.firstOrNull { it.panel == p }?.tier
         for ((w, h) in listOf(1492.0 to 929.0, 1912.0 to 1040.0)) {
@@ -106,18 +104,28 @@ class LayoutTest {
         }
     }
 
-    @Test fun contentTierNeverExceedsWhatThe14SizedPanelsFit() {
-        // Decks 1.5 calls a 480x250 deck `full`; the Compose deck content (jog, button rows) needs 510x390
-        // (340x356 without the jog): sizes measured from the real panels in desktopTest/ContentMinimumsTest.
-        assertEquals(PanelTier.Icon, contentTier(PanelId.DeckA, PanelTier.Full, 480.0, 250.0))
-        assertEquals(PanelTier.Icon, contentTier(PanelId.DeckB, PanelTier.Full, 600.0, 340.0))
-        assertEquals(PanelTier.Compact, contentTier(PanelId.DeckB, PanelTier.Full, 600.0, 360.0))
-        assertEquals(PanelTier.Full, contentTier(PanelId.DeckA, PanelTier.Full, 600.0, 600.0))
-        assertEquals(PanelTier.Compact, contentTier(PanelId.DeckA, PanelTier.Compact, 600.0, 600.0), "never richer than the solver's tier")
-        assertEquals(PanelTier.Compact, contentTier(PanelId.Mixer, PanelTier.Full, 240.0, 250.0))
-        assertEquals(PanelTier.Icon, contentTier(PanelId.Mixer, PanelTier.Full, 240.0, 180.0))
-        assertEquals(PanelTier.Full, contentTier(PanelId.Mixer, PanelTier.Full, 240.0, 540.0))
-        assertEquals(PanelTier.Full, contentTier(PanelId.Waves, PanelTier.Full, 10.0, 10.0), "other panels keep the solver's tier")
+    @Test fun panelsAreDrawnAtTheSolversTier() {
+        // Decks 1.5: the Compose deck / mixer / crossfader / library are sized for the PANEL_SPECS minimums (rendered
+        // in exactly those boxes by desktopTest/ContentMinimumsTest), so the host does not downgrade a tier any more.
+        for (l in DemoPacks.presets + DemoPacks.phone) for ((w, h) in listOf(1350.0 to 684.0, 1904.0 to 996.0, 396.0 to 700.0)) {
+            val sol = DemoPacks.solve(l.copy(gap = l.gap ?: 2.0), w, h, NativePanels)
+            val plan = layoutRender(sol, setOf(PanelId.Waves))
+            for (p in plan.panels) assertEquals(sol.placements.first { it.panel == p.panel }.tier, p.tier, "${l.id} ${p.panel} at ${w}x$h")
+        }
+        // A box the solver did not size (the dock slot under its tabs) gets the solver's own rule, tolerance included.
+        assertEquals(PanelTier.Full, tierFor(PanelId.DeckA, 480.0, 250.0))
+        assertEquals(PanelTier.Full, tierFor(PanelId.DeckA, 479.6, 249.6), "the solver's 0.5 dp tolerance")
+        assertEquals(PanelTier.Compact, tierFor(PanelId.DeckA, 480.0, 249.0))
+        assertEquals(PanelTier.Compact, tierFor(PanelId.DeckA, 479.0, 600.0))
+        assertEquals(PanelTier.Icon, tierFor(PanelId.DeckB, 339.0, 189.0))
+        assertEquals(PanelTier.Icon, tierFor(PanelId.Mixer, 100.0, 60.0), "under every minimum: the icon tier")
+        assertEquals(PanelTier.Full, tierFor(PanelId.Library, 520.0, 240.0))
+        assertEquals(PanelTier.Compact, tierFor(PanelId.Library, 519.0, 240.0))
+        // Classic in a 1350×546 host: the library slot (828×170) carries the dock; under the 48 dp tab strip it is an icon-tier box.
+        val classic = layoutRender(DemoPacks.solve(DemoPacks.presets.first { it.id == "classic" }, 1350.0, 546.0, NativePanels))
+        assertEquals(PanelTier.Icon, classic.dockTier(PanelId.Library))
+        assertEquals(PanelTier.Icon, classic.tier(PanelId.Library), "the host panel is the first dock tab")
+        assertEquals(PanelTier.Full, classic.tier(PanelId.DeckA))
     }
 
     /** Tiers the app draws for [skin] in a [w] × [h] window: solver → [layoutRender], inside the host the shell leaves. */
@@ -128,22 +136,27 @@ class LayoutTest {
         return listOf(PanelId.DeckA, PanelId.DeckB, PanelId.Mixer, PanelId.Crossfader).associateWith { plan.tier(it) }
     }
 
-    @Test fun defaultLayoutRendersDecksAndMixerAboveTheIconTierOnLaptopAndFullHdWindows() {
-        // P1 of the 1.5 review: the default must be a layout the CURRENT Compose deck / mixer content fits.
-        assertEquals("classic", DecksSkin.DEFAULT_LAYOUT)
+    @Test fun defaultLayoutIsProWithCompactDecksOnALaptopWindowAndFullDecksOnFullHd() {
+        assertEquals("pro", DecksSkin.DEFAULT_LAYOUT)
+        assertEquals(DemoPacks.DEFAULT_LAYOUT_ID, DecksSkin.DEFAULT_LAYOUT, "the Compose apps open on the contract default")
         assertEquals(DecksSkin.DEFAULT_LAYOUT, DecksSkin.default.layoutId)
-        for ((w, h) in listOf(1366.0 to 768.0, 1920.0 to 1080.0)) {
-            val t = rendered(DecksSkin.default, w, h)
-            for (p in listOf(PanelId.DeckA, PanelId.DeckB, PanelId.Mixer)) {
-                assertTrue(t[p] == PanelTier.Full || t[p] == PanelTier.Compact, "$p renders ${t[p]} at ${w}x$h")
-            }
-        }
-        assertEquals(PanelTier.Full, rendered(DecksSkin.default, 1920.0, 1080.0)[PanelId.DeckA], "full decks (jog wheel) on a 1080p window")
+        // 1366×768: the shell (60 dp status bar, paddings) leaves a 1350×684 host; Pro's decks are 552×239 there, one
+        // step under the 250 dp a full deck needs, the mixer 242×203, the crossfader row 34 dp.
+        val laptop = rendered(DecksSkin.default, 1366.0, 768.0)
+        assertEquals(PanelTier.Compact, laptop[PanelId.DeckA])
+        assertEquals(PanelTier.Compact, laptop[PanelId.DeckB])
+        assertEquals(PanelTier.Compact, laptop[PanelId.Mixer])
+        assertEquals(PanelTier.Icon, laptop[PanelId.Crossfader])
+        // 1920×1080: decks 780×349, mixer 341×297, crossfader row 50 dp.
+        val hd = rendered(DecksSkin.default, 1920.0, 1080.0)
+        assertEquals(PanelTier.Full, hd[PanelId.DeckA])
+        assertEquals(PanelTier.Full, hd[PanelId.DeckB])
+        assertEquals(PanelTier.Full, hd[PanelId.Mixer])
+        assertEquals(PanelTier.Compact, hd[PanelId.Crossfader])
     }
 
     @Test fun everySignaturePresetRendersDecksAndMixerAboveTheIconTier() {
-        // Mainroom / Pilot use `pro` and Crate `pro-vertical` in TypeScript. Here a preset keeps such a layout
-        // only while this holds at both sizes (Crate does; Mainroom and Pilot are on the default layout).
+        // Mainroom / Pilot use `pro` and Crate `pro-vertical`, as in builtin-skins.ts (compared in BuiltinSkinsDriftTest).
         for (s in DecksSkin.presets.filter { it.signature }) for ((w, h) in listOf(1366.0 to 768.0, 1920.0 to 1080.0)) {
             val t = rendered(s, w, h)
             for (p in listOf(PanelId.DeckA, PanelId.DeckB, PanelId.Mixer)) {
@@ -151,28 +164,18 @@ class LayoutTest {
                 assertTrue(t[p] != null, "${s.id}: $p is placed")
             }
         }
-        assertEquals("pro-vertical", DecksSkin.presets.first { it.id == "crate" }.layoutId)
+        assertEquals(listOf("pro", "pro", "pro-vertical", "pro"), listOf("signature", "mainroom", "crate", "pilot").map { id -> DecksSkin.presets.first { it.id == id }.layoutId })
     }
 
-    @Test fun proRendersIconDecksOnALaptopWindowWhichIsWhyItIsNotTheComposeDefault() {
-        // The solver calls these decks `full` (previous test); the 1.4-sized content only fits the icon tier.
-        val pro = DecksSkin.default.copy(layoutId = "pro")
-        assertEquals(PanelTier.Icon, rendered(pro, 1366.0, 768.0)[PanelId.DeckA])
-        assertEquals(PanelTier.Icon, rendered(pro, 1366.0, 768.0)[PanelId.DeckB])
-    }
-
-    @Test fun crossfaderContentHasItsOwnMinimums() {
-        // Label + fader needs CROSSFADER_LABELLED_DP; a shorter slot renders the fader alone (icon tier).
-        assertEquals(PanelTier.Full, contentTier(PanelId.Crossfader, PanelTier.Full, 300.0, 84.0))
-        assertEquals(PanelTier.Compact, contentTier(PanelId.Crossfader, PanelTier.Compact, 300.0, CROSSFADER_LABELLED_DP))
-        assertEquals(PanelTier.Icon, contentTier(PanelId.Crossfader, PanelTier.Compact, 300.0, 46.0), "2/40 of a 926 dp host")
-        assertEquals(PanelTier.Icon, contentTier(PanelId.Crossfader, PanelTier.Full, 300.0, CROSSFADER_LABELLED_DP - 1.0))
-        // In every built-in layout the crossfader row is tall enough for the fader alone on both window sizes.
+    @Test fun crossfaderRowFitsTheFaderInEveryPresetSkinOnBothWindowSizes() {
+        // The crossfader panel needs 28 dp at its icon tier (a 24 dp fader + 2 × 2 padding).
+        val iconH = DemoPacks.specs.getValue(PanelId.Crossfader).icon.second
+        assertEquals(28.0, iconH)
         for (s in DecksSkin.presets) for ((w, h) in listOf(1366.0 to 768.0, 1920.0 to 1080.0)) {
             val layout = effectiveLayout(s.resolveLayout(DemoPacks.presets)!!, w.toFloat()).withLookGap(s)
             val (hw, hh) = layoutHostSize(w, h, s, layout)
             val cf = DemoPacks.solve(layout, hw, hh, NativePanels).placements.firstOrNull { it.panel == PanelId.Crossfader } ?: continue
-            assertTrue(cf.rect.h >= CROSSFADER_FADER_ONLY_DP, "${s.id} ${w}x$h: crossfader row ${cf.rect.h} dp")
+            assertTrue(cf.rect.h + DemoPacks.FIT_TOLERANCE >= iconH, "${s.id} ${w}x$h: crossfader row ${cf.rect.h} dp")
         }
     }
 

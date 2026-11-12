@@ -28,7 +28,9 @@ pub use beatgrid::{
     BeatGrid, GridAnchor, MAX_BPM, MIN_BPM, TempoMarker, TempoSection, valid_bpm, valid_sec,
 };
 pub use colorfx::ColorFxKind;
-pub use engine::{ClockSource, ClockState, Command, DeckClock, Engine, list_output_devices};
+pub use engine::{
+    ClockSource, ClockState, Command, DeckClock, Engine, host_micros, list_output_devices,
+};
 pub use error::CoreError;
 pub use output::{
     BufferChoice, ConfigChoice, ConfigRange, DefaultConfig, OutputInfo, choose_config,

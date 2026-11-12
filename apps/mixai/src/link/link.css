@@ -1,0 +1,157 @@
+/* LAN tempo sync (src/link/*). Shared vocabulary: src/look/look.css (dk-*), status bar: shell/shell.css (.sb-*). */
+
+/* State dot, in the chip and in the popover: ring = off, half = on and searching, filled =
+   locked to another instance (shape, never colour alone; the words next to it say it too). */
+.lk-chip .sb-dot[data-state="searching"],
+.lk-dot[data-state="searching"] {
+    border-color: var(--warning);
+    background: linear-gradient(90deg, var(--warning) 50%, transparent 50%);
+}
+.lk-chip .sb-dot[data-state="locked"],
+.lk-dot[data-state="locked"] {
+    border-color: var(--on, var(--primary));
+    background: var(--on, var(--primary));
+}
+.lk-chip .sb-word {
+    color: var(--foreground);
+}
+
+/* Popover. */
+.lk-pop {
+    box-sizing: border-box;
+    width: 18rem;
+    max-width: min(92vw, 18rem);
+}
+.lk-body {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+.lk-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.lk-state {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground);
+    white-space: nowrap;
+}
+.lk-role {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+.lk-push {
+    margin-left: auto;
+}
+.lk-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 3px;
+}
+.lk-hint,
+.lk-note {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted-foreground);
+}
+.lk-hint {
+    grid-column: 1 / -1;
+}
+.lk-input {
+    box-sizing: border-box;
+    min-height: var(--ctl-h, 24px);
+    min-width: 0;
+    padding: 0 6px;
+    border-radius: var(--ctl-radius, 6px);
+    border: 1px solid var(--line, var(--border));
+    background: var(--well, var(--secondary));
+    color: var(--foreground);
+    font-size: 12px;
+    font-weight: 600;
+}
+.lk-input:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}
+/* Read-only (the PIN while sync runs, the tempo while a deck sets it): told by shape, a dotted
+   flat field, not by colour; the text stays at full contrast and the field keeps the focus. */
+.lk-input:read-only {
+    border-style: dotted;
+    background: transparent;
+    cursor: default;
+}
+.lk-input[aria-invalid="true"] {
+    border-color: var(--alert, var(--destructive));
+    border-style: dashed;
+}
+/* A button that is off stays focusable (aria-disabled): no hover or press feedback on it. */
+.lk-body .dk-btn[aria-disabled="true"]:hover,
+.lk-body .dk-btn[aria-disabled="true"]:active {
+    background: var(--secondary);
+}
+/* Why a control is off: a sentence next to it, marked by a rule on its leading edge. */
+.lk-reason {
+    padding-inline-start: 6px;
+    border-inline-start: 2px solid var(--line, var(--border));
+    color: var(--foreground);
+}
+.lk-pin {
+    width: 4.75rem;
+    justify-self: start;
+    text-align: center;
+    letter-spacing: 0.2em;
+}
+.lk-bpm {
+    width: 4.5rem;
+    text-align: right;
+}
+.lk-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+    margin: 0;
+}
+.lk-stats > div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 4px 6px;
+    border-radius: var(--ctl-radius, 6px);
+    background: var(--well, var(--secondary));
+}
+.lk-stats dd {
+    margin: 0;
+    color: var(--foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lk-pending {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+.lk-nudge {
+    min-width: 5ch;
+    text-align: center;
+    color: var(--foreground);
+}
+.lk-error {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    font-weight: 600;
+    color: var(--alert, var(--destructive));
+}
+:root[data-touch="on"] .lk-input {
+    min-height: 44px;
+}

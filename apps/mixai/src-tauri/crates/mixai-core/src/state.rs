@@ -127,6 +127,25 @@ pub struct DeckState {
     pub stems_active: bool,
     /// Per-stem gains [vocals, drums, bass, melody], 0..1.5.
     pub stem_gains: Vec<f32>,
+    /// Per-stem crossfader [vocals, drums, bass, melody], −1 (side A) .. +1 (side B); 0 = the
+    /// stem follows the deck. Moving it to the side the deck is NOT on fades that stem out.
+    #[serde(default = "default_stem_xf")]
+    pub stem_xf: Vec<f32>,
+    /// Stem mute FX: muting a stem leaves an echo tail of it instead of a hard cut.
+    #[serde(default)]
+    pub stem_mute_fx: bool,
+    /// Echo time of the stem mute FX in beats.
+    #[serde(default = "default_stem_mute_fx_beats")]
+    pub stem_mute_fx_beats: f64,
+    /// Loop length in beats stored on each hot cue (None = a plain cue), 8 slots. Jumping to a
+    /// cue that carries a loop starts that loop at the cue.
+    #[serde(default = "default_hot_cue_loops")]
+    pub hot_cue_loops: Vec<Option<f64>>,
+    /// Level each stem had when it was last muted with the mute command (what an unmute brings
+    /// back). Bookkeeping of the UI mirror, not part of the wire form: see
+    /// [`DeckState::mirror_stem_mute`].
+    #[serde(skip, default = "default_stem_pre_mute")]
+    pub stem_pre_mute: [f32; 4],
     /// Active FX (0=off, 1=echo, 2=reverb).
     pub fx_kind: u8,
     /// FX wet/dry mix, 0..1.
@@ -135,7 +154,66 @@ pub struct DeckState {
     pub fx_beats: f64,
 }
 
+/// Default echo time of the stem mute FX in beats.
+pub const STEM_MUTE_FX_BEATS: f64 = 0.5;
+
+fn default_stem_xf() -> Vec<f32> {
+    vec![0.0; 4]
+}
+
+fn default_stem_mute_fx_beats() -> f64 {
+    STEM_MUTE_FX_BEATS
+}
+
+fn default_hot_cue_loops() -> Vec<Option<f64>> {
+    vec![None; 8]
+}
+
+fn default_stem_pre_mute() -> [f32; 4] {
+    [1.0; 4]
+}
+
+/// What the stem mute command does to one stem's level. `gain` = its level now, `remembered` =
+/// the level kept from its last mute. Returns `(level, remembered)` after the command, or
+/// `None` when the stem is already in that state (a muted stem muted again, an audible one
+/// unmuted).
+///
+/// A mute keeps the level the stem had and an unmute brings it back (unity when nothing usable
+/// was kept). Level moves in between do not touch the kept level, so the audio thread
+/// ([`crate::deck::Deck::set_stem_mute`]) and the UI mirror ([`DeckState::mirror_stem_mute`])
+/// reach the same level from the mute commands alone.
+pub fn stem_mute_step(gain: f32, remembered: f32, on: bool) -> Option<(f32, f32)> {
+    let muted = gain <= crate::deck::STEM_SILENT;
+    if on == muted {
+        return None;
+    }
+    if on {
+        Some((0.0, if gain.is_finite() { gain } else { 1.0 }))
+    } else if remembered.is_finite() && remembered > crate::deck::STEM_SILENT {
+        Some((remembered, 1.0))
+    } else {
+        Some((1.0, 1.0))
+    }
+}
+
 impl DeckState {
+    /// The UI mirror's side of [`crate::deck::Deck::set_stem_mute`]: mute (`on`) or unmute stem
+    /// `idx` in `stem_gains`, an unmute returning to the level the stem had before the mute.
+    /// Returns the stem's level afterwards, `None` when nothing changed (already in that
+    /// state, or `idx` out of range).
+    pub fn mirror_stem_mute(&mut self, idx: usize, on: bool) -> Option<f32> {
+        if idx >= self.stem_pre_mute.len() {
+            return None;
+        }
+        if self.stem_gains.len() < self.stem_pre_mute.len() {
+            self.stem_gains.resize(self.stem_pre_mute.len(), 1.0);
+        }
+        let (gain, keep) = stem_mute_step(self.stem_gains[idx], self.stem_pre_mute[idx], on)?;
+        self.stem_gains[idx] = gain;
+        self.stem_pre_mute[idx] = keep;
+        Some(gain)
+    }
+
     pub fn empty(id: DeckId) -> Self {
         let assign = match id {
             DeckId::A | DeckId::C => CrossfaderAssign::A,
@@ -171,6 +249,11 @@ impl DeckState {
             has_stems: false,
             stems_active: false,
             stem_gains: vec![1.0; 4],
+            stem_xf: default_stem_xf(),
+            stem_mute_fx: false,
+            stem_mute_fx_beats: STEM_MUTE_FX_BEATS,
+            hot_cue_loops: default_hot_cue_loops(),
+            stem_pre_mute: default_stem_pre_mute(),
             fx_kind: 0,
             fx_wet: 0.0,
             fx_beats: 0.5,
@@ -230,4 +313,41 @@ pub struct AudioDevice {
     pub name: String,
     pub channels: u16,
     pub is_default: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stem_mute_step_keeps_the_level_and_brings_it_back() {
+        // Mute: the level goes to 0 and is kept.
+        assert_eq!(stem_mute_step(0.6, 1.0, true), Some((0.0, 0.6)));
+        assert_eq!(stem_mute_step(1.5, 0.3, true), Some((0.0, 1.5)));
+        // Unmute: the kept level comes back and the memory is cleared.
+        assert_eq!(stem_mute_step(0.0, 0.6, false), Some((0.6, 1.0)));
+        // Nothing usable kept (silence, junk): unity.
+        for kept in [0.0, 0.001, -1.0, f32::NAN, f32::INFINITY] {
+            assert_eq!(stem_mute_step(0.0, kept, false), Some((1.0, 1.0)), "{kept}");
+        }
+        // Already in that state: nothing to do.
+        assert_eq!(stem_mute_step(0.0, 0.6, true), None);
+        assert_eq!(stem_mute_step(0.001, 0.6, true), None);
+        assert_eq!(stem_mute_step(0.4, 0.6, false), None);
+        // A junk level never becomes the kept level.
+        assert_eq!(stem_mute_step(f32::NAN, 0.6, true), Some((0.0, 1.0)));
+    }
+
+    #[test]
+    fn mirror_stem_mute_fills_a_short_gain_list() {
+        let mut d = DeckState::empty(DeckId::A);
+        d.stem_gains = vec![0.5];
+        assert_eq!(d.mirror_stem_mute(2, true), Some(0.0));
+        assert_eq!(d.stem_gains, vec![0.5, 1.0, 0.0, 1.0]);
+        assert_eq!(d.mirror_stem_mute(0, true), Some(0.0));
+        assert_eq!(d.mirror_stem_mute(0, false), Some(0.5));
+        assert_eq!(d.mirror_stem_mute(0, false), None);
+        assert_eq!(d.mirror_stem_mute(9, true), None);
+        assert_eq!(d.stem_gains, vec![0.5, 1.0, 0.0, 1.0]);
+    }
 }

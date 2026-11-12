@@ -9,7 +9,7 @@
     --dt-min: 44px;
 }
 
-/* ── HOT CUE: pads (2 x 4, 1 x 8 or 4 at a time) + page button + "clear one cue" ──
+/* ── HOT CUE: pads (2 x 4, 1 x 8 or 4 at a time) + page button + "loop on a cue" + "clear one cue" ──
    The pad grid never gets narrower than its pads: a row that does not fit pushes the clear
    button out of the box, which is what makes the body step to its next form (use-fit.ts). */
 .dt-cues {
@@ -30,6 +30,8 @@
 .dt-pad {
     min-width: 0;
     cursor: pointer;
+    /* What a pad shows depends on its own width (cue-loop badge, below). */
+    container-type: inline-size;
 }
 /* An empty pad keeps a faint bar in the colour its cue will get. */
 .dt-pad[data-set="false"]::before {
@@ -50,14 +52,109 @@
     align-self: center;
     color: var(--alert, var(--destructive));
 }
-.dt-cue-clear,
+/* Cue loop: a loop glyph and the length in beats in the pad's corner. A narrow pad drops the
+    cue time, then the number (the pad's name and tooltip always say it), then the glyph. The
+    widths are the pad's CONTENT box: number 7 + time 27 + badge up to 30 ("1/16") + gaps. */
+.dt-pad[data-loop] {
+    gap: 3px;
+}
+.dt-pad-loop {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 1px;
+    margin-left: auto;
+    color: var(--foreground);
+    font-size: 9px;
+    line-height: 12px;
+    font-weight: 700;
+}
+/* An armed pad shows what the press will do (cross / loop glyph) instead of the badge. */
+.dt-pad:is([data-clear], [data-loop-target]) > .dt-pad-loop {
+    display: none;
+}
+@container (max-width: 69px) {
+    .dt-pad[data-loop] > .dt-pad-time {
+        display: none;
+    }
+}
+@container (max-width: 39px) {
+    .dt-pad-loop > .dk-num {
+        display: none;
+    }
+}
+@container (max-width: 18px) {
+    .dt-pad-loop {
+        display: none;
+    }
+}
+/* Armed: the next press stores the running loop here (frame + loop glyph) or takes the pad's
+   loop off (alert frame + cross). */
+.dt-pad[data-loop-target="save"] {
+    border: 1px solid var(--on, var(--primary));
+}
+.dt-pad[data-loop-target="remove"] {
+    border: 1px solid var(--alert, var(--destructive));
+}
+.dt-pad-loop-arm {
+    margin-left: auto;
+    flex-shrink: 0;
+    align-self: center;
+    color: var(--on, var(--primary));
+}
+/* An armed pad must show its action glyph whole (the frame colour alone is not a state): a pad
+   too narrow for number 7 + time 27 + glyph 11 + gaps drops the cue time while armed, and the
+   narrowest pads pin the glyph in their top right corner, above the number. */
+@container (max-width: 54px) {
+    .dt-pad:is([data-clear], [data-loop-target]) > .dt-pad-time {
+        display: none;
+    }
+}
+@container (max-width: 22px) {
+    .dt-pad:is([data-clear], [data-loop-target]) > :is(.dt-pad-x, .dt-pad-loop-arm) {
+        position: absolute;
+        top: 1px;
+        right: 1px;
+    }
+}
 .dt-cue-page {
     flex: none;
     height: 100%;
     min-height: var(--dt-min);
 }
-.dt-cue-clear {
+/* "Loop on a cue" + "clear one cue": stacked next to two rows of pads, side by side otherwise. */
+.dt-cue-tools {
+    display: flex;
+    flex: none;
+    gap: 4px;
+    min-height: 0;
+}
+.dt-cue-tools > .dk-btn {
+    flex: none;
     width: max(var(--dt-min), var(--ctl-h, 24px));
+    height: auto;
+    min-height: var(--dt-min);
+}
+.dt-cue-tools[data-rows="2"] {
+    flex-direction: column;
+}
+.dt-cue-tools[data-rows="2"] > .dk-btn {
+    flex: 1 1 0;
+}
+/* Armed (the next pad pressed is cleared / gets the loop / loses its loop): besides the ON look
+   of the button, a notch in its corner, so the armed state is a shape and not a colour only. */
+.dt-cue-tools > .dk-btn[aria-pressed="true"] {
+    position: relative;
+}
+.dt-cue-tools > .dk-btn[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 1px;
+    background: var(--on-fg, var(--primary-foreground));
 }
 .dt-cue-page {
     min-width: 40px;
@@ -212,24 +309,38 @@
     cursor: not-allowed;
 }
 
-/* ── STEMS: per stem a mute button (it carries the name), solo and level + stems on/off ──
-   level 0 = mute + solo over the level; 1 = mute, solo, level stacked; 2 = one row of mute + solo;
-   3 = one row of mute. From level 2 the levels (and at 3 the solos) are in the popover. */
+/* ── STEMS: per stem a mute button (it carries the name), solo, level and stem crossfader; at
+   the side stems on/off, MUTE FX and its echo time ──
+   level 0 = mute + solo over the level over the stem crossfader, side controls at the right;
+   1 = the four stacked, side controls in a row underneath (narrow and tall); 2 = mute + solo over
+   the level; 3 = mute, solo, level stacked, side controls underneath; 4 = one row of mute + solo;
+   5 = one row of mute. What a level drops is in the "more" popover (2-3: the stem crossfaders;
+   4: the levels too; 5: the solos too). */
 .dt-stems {
     height: 100%;
     min-height: 0;
     min-width: 0;
 }
 /* A cell never shrinks below its buttons (min-content tracks): a row that does not fit pushes
-   the last control out of the box and the body steps to its next form (use-fit.ts). */
+   the side controls out of the box and the body steps to its next form (use-fit.ts). */
 .dt-stems-grid {
     display: grid;
-    grid-auto-flow: column;
-    grid-template-columns: repeat(4, minmax(min-content, 1fr));
-    grid-auto-columns: auto;
+    grid-template-columns: minmax(min-content, 1fr) auto;
     align-items: center;
+    align-content: center;
     gap: 6px;
     height: 100%;
+    min-height: 0;
+}
+.dt-stems:is([data-level="1"], [data-level="3"]) .dt-stems-grid {
+    grid-template-columns: minmax(min-content, 1fr);
+}
+.dt-stems-cells {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(min-content, 1fr));
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
     min-height: 0;
 }
 .dt-stem {
@@ -240,13 +351,7 @@
     min-width: 0;
     min-height: 0;
 }
-.dt-stems[data-level="1"] .dt-stem {
-    grid-template-columns: minmax(min-content, 1fr);
-}
-.dt-stems[data-level="2"] .dt-stem {
-    grid-template-columns: minmax(min-content, 1fr) auto;
-}
-.dt-stems[data-level="3"] .dt-stem {
+.dt-stems:is([data-level="1"], [data-level="3"], [data-level="5"]) .dt-stem {
     grid-template-columns: minmax(min-content, 1fr);
 }
 .dt-stem > .dk-btn {
@@ -257,24 +362,70 @@
     padding: 0;
     width: max(var(--dt-min), var(--ctl-h, 24px));
 }
-.dt-stems[data-level="1"] .dt-stem > .dt-stem-s {
+.dt-stems:is([data-level="1"], [data-level="3"]) .dt-stem > .dt-stem-s {
     width: auto;
 }
-.dt-stems[data-level="0"] .dt-stem > .dt-range {
+/* The level and the stem crossfader take the width their cell has and ask for none themselves
+   (three classes: the touch-mode rule of styles.css gives every range a 44 px min-width). */
+.dt-stems .dt-stem > .dt-range {
     grid-column: 1 / -1;
-}
-/* The level takes the width its cell has and asks for none itself. */
-.dt-stem > .dt-range {
     width: 0;
     min-width: 100%;
+}
+.dt-stem > .dt-xf {
+    grid-column: 1 / -1;
 }
 .dt-stem-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* Stem crossfader: A | track with a centre tick | B. The track is filled from the centre to the
+   thumb (`--lo` .. `--hi`), so the side it leans to shows as a shape, not only as a colour. */
+.dt-xf {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+}
+.dt-xf > .dk-label {
+    line-height: 1;
+}
+.dt-xf-range {
+    --lo: 50%;
+    --hi: 50%;
+    background: linear-gradient(var(--fg-faint, var(--muted-foreground)), var(--fg-faint, var(--muted-foreground))) center / 1px 12px no-repeat;
+}
+.dt-xf-range::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--secondary) 0 var(--lo), var(--dt-fill, var(--deck, var(--on))) var(--lo) var(--hi), var(--secondary) var(--hi) 100%);
+}
+.dt-xf-range::-moz-range-track {
+    background: linear-gradient(to right, var(--secondary) 0 var(--lo), var(--dt-fill, var(--deck, var(--on))) var(--lo) var(--hi), var(--secondary) var(--hi) 100%);
+}
+:is(.dt-stems-grid, .dt-stems-pop)[data-on="false"] .dt-xf > .dk-label {
+    opacity: 0.4;
+}
+/* Deck on THRU: the stem crossfader does nothing. A THRU tag takes the place of the A / B ends
+   and the track is dashed with no fill (text and shape, not a colour only); the reason is the
+   control's description. The position can still be set for when the deck gets a side again. */
+.dt-xf[data-thru] {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+.dt-xf > .dt-xf-thru {
+    padding: 1px 3px;
+    border: 1px dashed var(--fg-faint, var(--muted-foreground));
+    border-radius: 2px;
+    color: var(--muted-foreground);
+}
+.dt-xf[data-thru] > .dt-xf-range::-webkit-slider-runnable-track {
+    background: repeating-linear-gradient(to right, var(--fg-faint, var(--muted-foreground)) 0 3px, transparent 3px 6px);
+}
+.dt-xf[data-thru] > .dt-xf-range::-moz-range-track {
+    background: repeating-linear-gradient(to right, var(--fg-faint, var(--muted-foreground)) 0 3px, transparent 3px 6px);
+}
 /* Muted: dimmed, struck-through name, a "muted" icon and a grey level. NOT the ON accent: on
-   this tab only "stems on" is lit green. */
+   this tab only "stems on" and "mute FX on" are lit green. */
 .dt-stems .dt-stem > .dk-btn.dt-stem-m[aria-pressed="true"] {
     background: var(--well, var(--secondary));
     border-color: var(--line, var(--border));
@@ -292,43 +443,101 @@
 .dt-stems-pop-row[data-muted="true"] > .dt-stem-name {
     color: var(--fg-faint, var(--muted-foreground));
 }
+/* Side controls. Two rows in the wide forms (0, 2): stems on/off (+ the "more" popover), then
+   MUTE FX and its echo time. One row in the others. */
+.dt-stems-side {
+    display: grid;
+    grid-template-columns: minmax(min-content, 1fr) auto;
+    align-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 0;
+}
+.dt-stems-side > .dk-btn {
+    min-width: var(--dt-min);
+}
 .dt-stems-toggle {
-    flex-direction: column;
-    gap: 2px;
-    height: 100%;
-    max-height: 76px;
-    align-self: center;
+    grid-column: 1 / -1;
+    /* Two words ("STEMS" + "ON"): side by side when the column has room, else on two lines. */
+    flex-wrap: wrap;
+    gap: 0 4px;
     min-width: 56px;
 }
-.dt-stems:is([data-level="2"], [data-level="3"]) .dt-stems-toggle {
-    flex-direction: row;
-    gap: 4px;
-    height: auto;
+.dt-stems[data-level="2"] .dt-stems-toggle {
+    grid-column: 1;
 }
-/* Levels (and solos) of the one-row forms. */
+.dt-mutefx-time {
+    padding-inline: 4px;
+}
+.dt-stems:is([data-level="1"], [data-level="3"], [data-level="4"], [data-level="5"]) .dt-stems-side {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: auto;
+    justify-content: start;
+}
+.dt-stems:is([data-level="1"], [data-level="3"], [data-level="4"], [data-level="5"]) .dt-stems-toggle {
+    grid-column: auto;
+}
+/* One-row forms (4, 5) in a box that is narrow but tall (touch mode in the compact deck's stems
+   popover, 288 x 176: four 44 px mute buttons and the side controls do not fit side by side):
+   the side controls wrap under the stems instead of sticking out. `min-content` bases, so the
+   row only wraps where the one-row grid would overflow; a low box that cannot hold the second
+   row still reports it (use-fit.ts) exactly as before. */
+.dt-stems:is([data-level="4"], [data-level="5"]) .dt-stems-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: center;
+}
+.dt-stems:is([data-level="4"], [data-level="5"]) .dt-stems-cells {
+    flex: 1 0 min-content;
+}
+.dt-stems:is([data-level="4"], [data-level="5"]) .dt-stems-side {
+    flex: 0 0 auto;
+}
+/* What the smaller forms drop: a small table (stem | solo | level | stem crossfader). Every row
+    is a grid of its own, so the columns have fixed or fractional widths (never `auto`). In the
+    one-row forms the mute FX echo time sits under the table. */
 .dt-stems-pop {
     display: grid;
     gap: 6px;
-    width: min(88vw, 16rem);
+    width: min(88vw, 14rem);
     min-width: 0;
+}
+.dt-stems-pop:is([data-cols="levels"], [data-cols="all"]) {
+    width: min(88vw, 20rem);
 }
 .dt-stems-pop-row {
     display: grid;
-    grid-template-columns: 5ch auto minmax(0, 1fr);
+    grid-template-columns: 5ch minmax(0, 1fr);
     align-items: center;
     gap: 6px;
     min-width: 0;
 }
+.dt-stems-pop[data-cols="levels"] > .dt-stems-pop-row {
+    grid-template-columns: 5ch minmax(0, 1fr) minmax(0, 1.2fr);
+}
+.dt-stems-pop[data-cols="all"] > .dt-stems-pop-row {
+    grid-template-columns: 5ch max(var(--dt-min), var(--ctl-h, 24px)) minmax(0, 1fr) minmax(0, 1.2fr);
+}
+.dt-stems-pop-head > .dk-label {
+    text-align: center;
+}
 .dt-stems-pop-row > .dt-stem-name {
     color: var(--foreground);
 }
-.dt-stems-pop-row > .dt-range {
-    grid-column: 3;
-}
 .dt-stems-pop-row > .dk-btn {
-    grid-column: 2;
     padding: 0;
     width: max(var(--dt-min), var(--ctl-h, 24px));
+}
+.dt-stems-pop-time {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--line, var(--border));
 }
 
 /* No stems yet: note + "separate" + job progress. */
