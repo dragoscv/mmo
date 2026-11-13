@@ -93,6 +93,26 @@ driver really runs.
   for bindgen). **Licence**: the ASIO SDK is dual GPLv3 / proprietary Steinberg licence, which is why it is an
   opt-in feature (ADR-0015 §8). A binary built with it may only be redistributed under the Steinberg licence
   agreement or GPLv3 terms; the default build contains no ASIO code.
+  - **Building it on this PC** (checked against `cpal 0.18.2` / `asio-sys 0.4.0` in the local cargo registry on
+   2026-11-13; the SDK is not in the repository and cannot be):
+   1. Download the SDK from <https://www.steinberg.net/asiosdk> and accept its licence there. That download is
+     the acceptance; `asio-sys` would otherwise do it by itself into the temp folder when `CPAL_ASIO_DIR` is
+     unset, which is a decision to take deliberately, not by accident.
+   2. Unzip it and set `CPAL_ASIO_DIR` to the folder that **directly contains** `common\` and `host\` (the
+     `ASIOSDK2.x` root, not its parent: `asio-sys/build.rs` pushes `common`, `host` and `host/pc` onto it and
+     looks for `asio.h`, `asiosys.h`, `asiodrivers.h` under them).
+   3. Tools: a C++ compiler for the SDK's own sources (the MSVC toolchain this repo already builds with) and
+     `libclang` for bindgen — LLVM is installed here (`C:\Program Files\LLVM\bin\libclang.dll`) and `clang`
+     is on PATH; if bindgen cannot find it, set `LIBCLANG_PATH` to that `bin` folder.
+   4. ```powershell
+     $env:CPAL_ASIO_DIR = 'E:\asio\ASIOSDK2'
+     pwsh -NoProfile -File "$env:USERPROFILE\.copilot\hooks\run-build.ps1" -Command 'cargo build --release -p live-cli --features asio --manifest-path apps/live/engine/Cargo.toml'
+     ```
+   5. Run it with the interface's own driver on both sides:
+     `mixai-live-engine periods --device "<ASIO device>"` then
+     `mixai-live-engine latency --host ASIO --input "<device>" --output "<device>" --buffer 64`.
+   6. Do not ship the binary (or a beta) before both signatures are on the agreement; the repository stores no
+     SDK file, so CI cannot build this tier at all.
   - **Before any ASIO build leaves this PC** (decided 2026-11-12, tracker WP21-27; terms as read on Steinberg's
     pinned "ASIO SDK Proprietary Licensing FAQ" of 2026-10-21 — the agreement PDF and the ASIO Usage Guidelines
     are the binding texts and were not read here):
