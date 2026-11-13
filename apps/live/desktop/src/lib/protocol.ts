@@ -20,6 +20,10 @@ export interface MixState {
     main_db: number;
     monitor_db: number;
     monitor_dry: number;
+    /** Monitor option "tuned only for the audience": the ears get the chain without the pitch
+     *  effects, so without the shifter's 256 samples (5.3 ms). Not persisted by the engine: a
+     *  client must send it again after every restart. */
+    monitor_untuned: boolean;
     bypass: boolean;
     mute: boolean;
 }
@@ -138,6 +142,9 @@ export interface Meters {
     tune: Tune | null;
     latency_probe: LatencyProbe;
     chain_latency_samples?: number;
+    /** Latency of the chain the ears hear: equal to `chain_latency_samples` while
+     *  `mix.monitor_untuned` is off. */
+    monitor_chain_latency_samples?: number;
 }
 
 export interface RunningInfo {

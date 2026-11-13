@@ -1,5 +1,5 @@
-/** Mix strip: input/main/monitor gains, monitor dry, BYPASS, MUTE, PANIC (with confirmation). */
-import { OctagonAlert, VolumeX, Waves } from "lucide-react";
+/** Mix strip: input/main/monitor gains, monitor dry, tuned-for-the-audience, BYPASS, MUTE, PANIC. */
+import { Ear, OctagonAlert, VolumeX, Waves } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -15,6 +15,7 @@ import {
 } from "@mmo/ui";
 import { useT } from "../i18n";
 import type { ParamSpec } from "../lib/params";
+import { useMeterSample } from "../lib/meter-bus";
 import { useStore } from "../store";
 import { Knob } from "./Knob";
 import { MidiLearnButton } from "./MidiLearn";
@@ -28,15 +29,26 @@ export function MixStrip() {
     const mix = useStore((s) => s.proto.state?.mix);
     const send = useStore((s) => s.send);
     const sendCoalesced = useStore((s) => s.sendCoalesced);
+    const m = useMeterSample(4);
+    const monLat = m?.monitor_chain_latency_samples;
+    const untunedLatency = m?.chain_latency_samples;
     const disabled = !mix;
-    const m = mix ?? { input_db: 0, main_db: 0, monitor_db: 0, monitor_dry: 0, bypass: false, mute: false };
+    const s = mix ?? {
+        input_db: 0,
+        main_db: 0,
+        monitor_db: 0,
+        monitor_dry: 0,
+        monitor_untuned: false,
+        bypass: false,
+        mute: false,
+    };
     const knob = (key: "input_db" | "main_db" | "monitor_db" | "monitor_dry", label: string, spec: ParamSpec) => (
         <div className="relative">
             <Knob
                 spec={spec}
-                value={m[key]}
+                value={s[key]}
                 label={label}
-                valueText={valueLabel(t, spec, m[key])}
+                valueText={valueLabel(t, spec, s[key])}
                 size={48}
                 disabled={disabled}
                 onChange={(v) => sendCoalesced(`mix:${key}`, { type: "set_mix", [key]: v })}
@@ -52,14 +64,30 @@ export function MixStrip() {
             {knob("monitor_db", t("mix.monitor"), GAIN)}
             {knob("monitor_dry", t("mix.monitorDry"), DRY)}
             <div className="ms-2 flex flex-col gap-1.5">
+                <Button
+                    size="sm"
+                    variant={s.monitor_untuned ? "default" : "outline"}
+                    aria-pressed={s.monitor_untuned}
+                    disabled={disabled}
+                    title={t("mix.monitorUntunedHint")}
+                    onClick={() => send({ type: "set_mix", monitor_untuned: !s.monitor_untuned })}
+                    className={cn("w-28 justify-start", s.monitor_untuned && "bg-accent text-accent-foreground hover:bg-accent/90")}
+                >
+                    <Ear /> {t("mix.monitorUntuned")}
+                </Button>
+                {monLat != null && untunedLatency != null ? (
+                    <span className="w-28 text-[11px] leading-tight text-muted-foreground">
+                        {t("mix.chainLatency", { ears: monLat, main: untunedLatency })}
+                    </span>
+                ) : null}
                 <div className="flex items-center gap-0.5">
                     <Button
                         size="sm"
-                        variant={m.bypass ? "default" : "outline"}
-                        aria-pressed={m.bypass}
+                        variant={s.bypass ? "default" : "outline"}
+                        aria-pressed={s.bypass}
                         disabled={disabled}
-                        onClick={() => send({ type: "set_mix", bypass: !m.bypass })}
-                        className={cn("w-28 justify-start", m.bypass && "bg-warning text-primary-foreground hover:bg-warning/90")}
+                        onClick={() => send({ type: "set_mix", bypass: !s.bypass })}
+                        className={cn("w-28 justify-start", s.bypass && "bg-warning text-primary-foreground hover:bg-warning/90")}
                     >
                         <Waves /> {t("mix.bypass")}
                     </Button>
@@ -68,11 +96,11 @@ export function MixStrip() {
                 <div className="flex items-center gap-0.5">
                     <Button
                         size="sm"
-                        variant={m.mute ? "default" : "outline"}
-                        aria-pressed={m.mute}
+                        variant={s.mute ? "default" : "outline"}
+                        aria-pressed={s.mute}
                         disabled={disabled}
-                        onClick={() => send({ type: "set_mix", mute: !m.mute })}
-                        className={cn("w-28 justify-start", m.mute && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}
+                        onClick={() => send({ type: "set_mix", mute: !s.mute })}
+                        className={cn("w-28 justify-start", s.mute && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}
                     >
                         <VolumeX /> {t("mix.mute")}
                     </Button>

@@ -25,7 +25,15 @@ describe("shortcuts", () => {
     });
 
     it("toggles from the current mix", () => {
-        const mix = { input_db: 0, main_db: 0, monitor_db: 0, monitor_dry: 0, bypass: true, mute: false };
+        const mix = {
+            input_db: 0,
+            main_db: 0,
+            monitor_db: 0,
+            monitor_dry: 0,
+            monitor_untuned: false,
+            bypass: true,
+            mute: false,
+        };
         expect(toggleFor("bypass", mix)).toEqual({ bypass: false });
         expect(toggleFor("mute", mix)).toEqual({ mute: true });
         expect(toggleFor("mute", undefined)).toEqual({ mute: true });

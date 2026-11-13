@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — the desktop app can use the monitor option (2026-11-13)
+
+The mix strip carries an **Ears untuned** switch (`set_mix {monitor_untuned:true}`), with the ears' and
+the main chain latency in samples under it — the first line of the latency budget. `MixState` and
+`Meters` in `protocol.ts` know the two new engine fields, and a mix from an older engine (without
+`monitor_untuned`) still parses, with the switch reading as off. Desktop: `tsc --noEmit` clean,
+31 tests green.
+
 ## MixAI Live — fast pitch mode wired into the corrector (WP21-26, 2026-11-13)
 
 `autotune` has a **`fast`** switch (off by default): the period-synchronous shifter of

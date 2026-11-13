@@ -28,7 +28,7 @@ const state = (revision: number, over: Partial<SessionState> = {}): SessionState
         { id: 2, fx: "compressor", enabled: true, params: [["ratio", 3]] },
         { id: 3, fx: "reverb", enabled: false, params: [["mix", 0.2]] },
     ],
-    mix: { input_db: 0, main_db: 0, monitor_db: -6, monitor_dry: 0, bypass: false, mute: false },
+    mix: { input_db: 0, main_db: 0, monitor_db: -6, monitor_dry: 0, monitor_untuned: false, bypass: false, mute: false },
     setlist: null,
     position: null,
     presets: ["Natural Vocal", "Pop Polish"],
@@ -38,6 +38,20 @@ const state = (revision: number, over: Partial<SessionState> = {}): SessionState
 });
 
 describe("parseServer", () => {
+    /// An engine from before the monitor option sends a mix without `monitor_untuned`, and one from
+    /// before the ears' latency figure a meters message without it. Neither may break the app, and
+    /// the switch must read as off so that turning it on sends `true`.
+    it("reads a mix from an engine that does not know the ears-untuned switch", () => {
+        const mix: Record<string, unknown> = { ...state(1).mix };
+        delete mix.monitor_untuned;
+        const parsed = parseServer(JSON.stringify({ type: "state", state: { ...state(1), mix } }));
+        if (parsed?.type !== "state") throw new Error("state did not parse");
+        const untuned = Boolean(parsed.state.mix.monitor_untuned);
+        expect(untuned).toBe(false);
+        // Turning it on from there is a plain `true` on the wire, which the engine accepts.
+        expect({ type: "set_mix", monitor_untuned: !untuned }).toEqual({ type: "set_mix", monitor_untuned: true });
+    });
+
     it("accepts known types and ignores unknown ones (forward compatible)", () => {
         expect(parseServer('{"type":"ack","id":4}')).toEqual({ type: "ack", id: 4 });
         expect(parseServer('{"type":"future_thing","x":1}')).toBeNull();
