@@ -1548,7 +1548,7 @@ dependencies = [
 name = "decks-library"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "flate2",
  "lofty",
  "quick-xml 0.39.4",
@@ -1583,7 +1583,7 @@ dependencies = [
 name = "decks-packs"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "ed25519-dalek",
  "serde",
  "serde_json",
@@ -3537,7 +3537,7 @@ dependencies = [
 name = "mixai"
 version = "1.7.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "btleplug",
  "decks-link",
  "decks-packs",
