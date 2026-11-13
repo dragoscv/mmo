@@ -67,6 +67,9 @@ pub enum Control {
         bypass: Option<bool>,
         #[serde(default)]
         mute: Option<bool>,
+        /// Monitor option "tuned only for the audience" (`MixState::monitor_untuned`).
+        #[serde(default)]
+        monitor_untuned: Option<bool>,
     },
     LoadSetlist {
         setlist: Setlist,
@@ -195,6 +198,7 @@ impl Session {
                 monitor_dry,
                 bypass,
                 mute,
+                monitor_untuned,
             } => self.set_mix(|m| {
                 let db = |v: f32| v.clamp(-60.0, 12.0);
                 if let Some(v) = input_db.filter(|v| v.is_finite()) {
@@ -214,6 +218,9 @@ impl Session {
                 }
                 if let Some(v) = mute {
                     m.mute = v;
+                }
+                if let Some(v) = monitor_untuned {
+                    m.monitor_untuned = v;
                 }
             }),
             Control::LoadSetlist { setlist } => {
@@ -412,6 +419,72 @@ mod tests {
             serde_json::from_str(r#"{"type":"add_insert","fx":"reverb","at":3}"#).unwrap();
         assert_eq!(p.required_role(), Role::Controller);
         assert!(Role::Controller > Role::Performer && Role::Performer > Role::Viewer);
+    }
+
+    /// The monitor option "tuned only for the audience" as a client message: it round-trips,
+    /// a message from a client that predates it still parses and leaves it alone, and it needs
+    /// the role the other mix fields need.
+    #[test]
+    fn monitor_untuned_message() {
+        let on: Control =
+            serde_json::from_str(r#"{"type":"set_mix","monitor_untuned":true}"#).unwrap();
+        match &on {
+            Control::SetMix {
+                input_db: None,
+                main_db: None,
+                monitor_db: None,
+                monitor_dry: None,
+                bypass: None,
+                mute: None,
+                monitor_untuned: Some(true),
+            } => {}
+            other => panic!("{other:?}"),
+        }
+        let json = serde_json::to_string(&on).unwrap();
+        assert!(json.contains(r#""monitor_untuned":true"#), "{json}");
+        assert_eq!(serde_json::from_str::<Control>(&json).unwrap(), on);
+        assert_eq!(on.required_role(), Role::Performer);
+        let old: Control = serde_json::from_str(r#"{"type":"set_mix","mute":false}"#).unwrap();
+        assert!(matches!(
+            old,
+            Control::SetMix {
+                monitor_untuned: None,
+                mute: Some(false),
+                ..
+            }
+        ));
+        assert_eq!(old.required_role(), on.required_role());
+
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Pop Polish").unwrap();
+        let t0 = Instant::now();
+        let cmds = s.apply_control(on.clone(), t0).unwrap();
+        assert!(s.mix.monitor_untuned);
+        assert!(matches!(
+            cmds.as_slice(),
+            [Command::SetMonitorChain { chain: Some(_) }]
+        ));
+        // The old message changes what it names and nothing else.
+        let cmds = s.apply_control(old, t0).unwrap();
+        assert!(cmds.is_empty() && s.mix.monitor_untuned);
+        // Sent again: no second chain.
+        assert!(s.apply_control(on, t0).unwrap().is_empty());
+        let off: Control =
+            serde_json::from_str(r#"{"type":"set_mix","monitor_untuned":false,"mute":true}"#)
+                .unwrap();
+        let cmds = s.apply_control(off, t0).unwrap();
+        assert!(!s.mix.monitor_untuned && s.mix.mute);
+        assert!(matches!(
+            cmds.as_slice(),
+            [
+                Command::Mute(true),
+                Command::SetMonitorChain { chain: None }
+            ]
+        ));
+        // Not a boolean: the message is refused, as for `bypass` and `mute`.
+        assert!(
+            serde_json::from_str::<Control>(r#"{"type":"set_mix","monitor_untuned":1}"#).is_err()
+        );
     }
 
     #[test]

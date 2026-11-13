@@ -519,6 +519,11 @@ fn run(a: Args, ready: mpsc::SyncSender<Result<Opened, IoError>>) {
         }
         let _ = ready.send(Ok(opened));
 
+        // Capture first, on purpose: with `bWaitAll = false` WaitForMultipleObjects returns the
+        // LOWEST index among the signalled handles, so when the capture and the render event are
+        // both set the capture packet is queued before the render pulls. The duplex cushion
+        // (`io::Tracker`) counts on it: with the order reversed every such pair would find the
+        // ring one packet short. Keep the capture event at index 0.
         let events = [inp.event, out.event];
         let mut first_capture = true;
         // Output frames rendered since the last capture packet: a capture side that stops

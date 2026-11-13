@@ -27,7 +27,7 @@ time, rotatable. Roles:
 | Role | May |
 |---|---|
 | `controller` | everything |
-| `performer` | scenes/setlist navigation, mix (input/main/monitor/monitor_dry), bypass, mute, tap tempo, tuner view |
+| `performer` | scenes/setlist navigation, mix (input/main/monitor/monitor_dry/monitor_untuned), bypass, mute, tap tempo, tuner view |
 | `viewer` | read state + meters only |
 
 Limits: 32 clients, 16 KiB per message, 200 messages/s per client (excess dropped with an `error`), cross-origin
@@ -44,7 +44,7 @@ matching `ack` or `error`.
 |---|---|---|
 | `hello` | `protocol: 1, version, role, engine_name, sample_rate, buffer_frames, devices: RunningInfo`, and when OSC is on, for `performer` and `controller` only: `osc: { port, performer_key, controller_key? }` | after connect |
 | `state` | `state: SessionState` | after `hello`, and after every change (debounced 30 ms) |
-| `meters` | `in_peak, in_rms, out_peak:[l,r], out_rms:[l,r], gr:[dB per insert], dsp_load, dsp_load_max, xruns, clipped, safety_gr:[main dB, monitor dB], tune: {freq, midi, cents, target, correction_cents} \| null, latency_probe: "idle"\|"running"\|{"done_ms":x}\|"failed"` | 30 Hz to clients that sent `subscribe` with `meters:true` (watches: 10 Hz with `meters_hz`) |
+| `meters` | `in_peak, in_rms, out_peak:[l,r], out_rms:[l,r], gr:[dB per insert], dsp_load, dsp_load_max, xruns, clipped, safety_gr:[main dB, monitor dB], chain_latency_samples, monitor_chain_latency_samples, tune: {freq, midi, cents, target, correction_cents} \| null, latency_probe: "idle"\|"running"\|{"done_ms":x}\|"failed"` | 30 Hz to clients that sent `subscribe` with `meters:true` (watches: 10 Hz with `meters_hz`) |
 | `ack` | `id` | command applied |
 | `error` | `id?, code, message` | codes: `unauthorized`, `forbidden`, `bad_request`, `unknown_insert`, `unknown_param`, `unknown_preset`, `unknown_fx`, `chain_full`, `no_setlist`, `factory_preset`, `unknown_binding`, `rate_limited` |
 
@@ -66,7 +66,7 @@ types are described in [MIDI control](midi.md).
 | `load_preset` | `name` | performer |
 | `save_preset` | `name` | controller |
 | `delete_preset` | `name` (a modified factory preset reverts to factory; an unmodified one → `factory_preset`) | controller |
-| `set_mix` | any of `input_db, main_db, monitor_db, monitor_dry, bypass, mute` | performer |
+| `set_mix` | any of `input_db, main_db, monitor_db, monitor_dry, monitor_untuned, bypass, mute` | performer |
 | `load_setlist` | `setlist: Setlist` | controller |
 | `goto` | `song, part` | performer |
 | `next` / `prev` | — | performer |
@@ -89,11 +89,31 @@ either value is above 0.1 dB, which means the signal after the faders was too ho
 `input_db`, `main_db` and `monitor_db` accept −60…+12 dB. A move **up** ramps over 300 ms, a move **down** over
 10 ms.
 
+## Tuned only for the audience (`monitor_untuned`)
+
+`set_mix {monitor_untuned: true}` feeds the **monitor** bus from a second chain instead of the main one: the same
+inserts, parameters, order and enabled flags, minus every pitch effect (`autotune`, `harmonizer`). The ears get
+the voice without the shifter's latency (256 samples, 5.3 ms) plus everything else — EQ, compressor, de-esser,
+reverb, delay — while the main bus (FOH, stream, recording) keeps the full chain with correction and harmonies,
+sample for sample unchanged. `monitor_dry`, the monitor gain, `mute`, `bypass`, the latency click and the safety
+stage keep working on the monitor bus exactly as before.
+
+`meters.monitor_chain_latency_samples` is the chain latency the ears hear: equal to `chain_latency_samples` while
+the option is off (there is no second chain then, and nothing extra is computed), the monitor chain's own figure
+while it is on. Every later edit of the main chain — parameter, enable, add, remove, move, preset or scene load,
+setlist navigation, MIDI, `reset` — reaches the monitor chain too; inserts are linked by id, so an operation on a
+pitch insert simply does not apply there.
+
+The option is not persisted: the engine starts with it off, so a client that wants it must send `set_mix` again
+after every restart. Switching it on or off while singing crossfades the monitor bus over 10 ms, and a scene
+change lets the old monitor chain ring out on the monitor bus just as the old main chain does on the main bus.
+
 ## OSC address space
 
 OSC is off unless the engine was started with it (`serve --osc`, `HostConfig.osc`). Every address carries a key:
 
-`/<key>/live/mix/{input,main,monitor}` f (dB) · `/<key>/live/mix/monitor_dry` f (0..1) · `/<key>/live/bypass` i ·
+`/<key>/live/mix/{input,main,monitor}` f (dB) · `/<key>/live/mix/monitor_dry` f (0..1) ·
+`/<key>/live/mix/monitor_untuned` i (0/1, no argument = 1) · `/<key>/live/bypass` i ·
 `/<key>/live/mute` i · `/<key>/live/scene/next` · `/<key>/live/scene/prev` · `/<key>/live/goto` i i ·
 `/<key>/live/tap` · `/<key>/live/fx/<insert>/<param>` f (value) · `/<key>/live/fx/<insert>/enabled` i ·
 `/<key>/live/panic`.

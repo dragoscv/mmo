@@ -410,6 +410,7 @@ impl LiveEngine {
             monitor_dry: None,
             bypass: None,
             mute: Some(mute),
+            monitor_untuned: None,
         })
     }
 

@@ -10,6 +10,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — latency slice: Voicemeeter insert, adaptive cushion, untuned monitor, fast shifter (WP21-25/26, 2026-11-13)
+
+Five of the six things the owner asked for on 2026-11-12, all of them in the engine and all gated
+(`fmt` + `clippy --all-targets -D warnings` + 186 workspace tests green on the combined tree):
+
+- **Voicemeeter insert host** (`live-engine/src/voicemeeter.rs`, CLI `voicemeeter`): the engine now runs
+  inside Voicemeeter's own audio callback on the microphone strip through the Remote API — no audio device
+  opened, every other channel passed through untouched, restart on Voicemeeter's `CHANGE`, a panic barrier
+  that falls back to the dry microphone, and a teardown that frees the engine only once the callback is
+  provably silent. Snapshots (`Command.Save`), buffer changes and restore are exposed; `crash`-free reading
+  of the strip map tells which insert channels are the microphone.
+- **Adaptive duplex cushion** in the exclusive WASAPI host: the frames kept queued between input and output
+  start at one period and are trimmed to what actually stands idle, with a period added back after an
+  underrun (72 tests, 14 mutants).
+- **Monitor option "tuned only for the audience"**: `set_mix {monitor_untuned:true}` feeds the in-ear bus from a
+  second chain = the same inserts minus the pitch effects, so the singer hears the voice without the
+  shifter's 256 samples (5.3 ms) while the main bus keeps the full chain, sample for sample. 10 ms crossfade
+  on toggle, own scene tail, every later edit (parameter, enable, add, remove, move, preset, setlist, MIDI,
+  reset) reaches it; `meters.monitor_chain_latency_samples` reports what the ears hear.
+- **System checkup**: `checkup` reports, read-only, what outside the engine adds delay or breaks small
+  buffers — exclusive permission, Windows enhancements, sample rate, endpoint volume/mute, output kind
+  (Bluetooth/HDMI), power plan and whether Voicemeeter holds the interface.
+- **Fast pitch mode** (`live-dsp/src/psola.rs`): a period-synchronous shifter, 1 sample of delay at rest
+  instead of a fixed 256 (5.3 ms), within 3 cents on tones and voice fixtures, 17 tests. It is a library
+  with tests: wiring it into the pitch effect is the next slice.
+
+Probe diagnostics also landed: `latency` prints the loudest output sample, xruns, driver xruns, the Windows
+endpoint volume/mute and says which part of the loop failed. Docs updated (`docs/live/{architecture,cli,
+remote-protocol}.md`). Not done: the latency-budget UI, the ASIO build, and the live measurement on the
+owner's rig (the numbers above are from unit tests, not from the interface).
+
 ## The web build no longer eats the machine's memory (web 3.6.1, 2026-11-12)
 
 `next build` grew to ~100 GB of memory and left the machine with 8 GB free (and sometimes

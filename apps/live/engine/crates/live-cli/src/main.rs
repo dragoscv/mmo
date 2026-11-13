@@ -5,12 +5,15 @@
 //!   mixai-live-engine run --input <id|name> --output <id|name> --preset "Natural Vocal" [--buffer 128]
 //!       [--host "WASAPI Exclusive" | "WASAPI Low Latency" | ASIO]
 //!   mixai-live-engine latency --input <..> --output <..>     (needs a loopback)
+//!   mixai-live-engine checkup --input <..> --output <..>     (read-only system checkup)
+//!   mixai-live-engine voicemeeter [--save f.xml] [--buffer wdm=160] [--load f.xml]
 //!   mixai-live-engine render --in voice.wav --out processed.wav --preset "Pop Polish"
 //!   mixai-live-engine serve --input <..> --output <..> [--lan] [--port 17920] [--data-dir D] [--no-midi]
 //!   mixai-live-engine midi-ports
 
 use clap::{Parser, Subcommand};
-use live_engine::{Buses, Core, IoConfig, ProbeState, Session, Store, io};
+use live_engine::checkup::{self, EndpointLevel};
+use live_engine::{Buses, Core, IoConfig, ProbeState, Session, Store, io, voicemeeter};
 use live_remote::{EngineHost, HostConfig};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
@@ -81,6 +84,24 @@ enum Cmd {
         #[command(flatten)]
         dev: DevArgs,
     },
+    /// Read-only: things outside the engine that add delay or break low buffers, as JSON.
+    Checkup {
+        #[command(flatten)]
+        dev: DevArgs,
+    },
+    /// What the local Voicemeeter runs, as JSON. The options change Voicemeeter: `--save`
+    /// writes its configuration to a file, `--buffer` needs `--save` in the same call.
+    Voicemeeter {
+        /// Save Voicemeeter's whole configuration to this file first.
+        #[arg(long)]
+        save: Option<PathBuf>,
+        /// Set a buffer size and restart Voicemeeter's audio, e.g. `wdm=160` (mme, wdm, ks, asio).
+        #[arg(long, requires = "save", conflicts_with = "load")]
+        buffer: Option<String>,
+        /// Load a configuration saved with `--save` (Voicemeeter restarts its audio).
+        #[arg(long, conflicts_with = "save")]
+        load: Option<PathBuf>,
+    },
     /// Offline: process a WAV file through a preset (CI / A-B listening / benchmarks).
     Render {
         #[arg(long = "in")]
@@ -138,6 +159,57 @@ fn pair(s: &str) -> Result<[u16; 2], String> {
         [a] => Ok([*a, *a]),
         _ => Err(format!("expected a channel pair, got `{s}`")),
     }
+}
+
+/// `wdm=160` → ("wdm", 160).
+fn buffer_arg(s: &str) -> Result<(String, u32), String> {
+    let (driver, frames) = s
+        .split_once('=')
+        .ok_or_else(|| format!("expected <driver>=<frames>, got `{s}`"))?;
+    let driver = driver.trim().to_ascii_lowercase();
+    if !["mme", "wdm", "ks", "asio"].contains(&driver.as_str()) {
+        return Err(format!(
+            "unknown driver type `{driver}` (mme, wdm, ks, asio)"
+        ));
+    }
+    let frames: u32 = frames
+        .trim()
+        .parse()
+        .map_err(|_| format!("`{frames}` is not a buffer size"))?;
+    if !(64..=2048).contains(&frames) {
+        return Err(format!("buffer {frames} is outside 64..2048 frames"));
+    }
+    Ok((driver, frames))
+}
+
+/// The click must come back above this level to count (0.02 of full scale, see `latency.rs`).
+const CLICK_FLOOR_DB: f32 = -34.0;
+
+/// Which part of the loop failed, from what the probe run saw: the loudest sample the engine
+/// wrote to the main bus, the loudest input sample, and the Windows level of the output device.
+fn probe_diagnosis(out_peak_db: f32, in_peak_db: f32, output: Option<EndpointLevel>) -> String {
+    if out_peak_db < -6.0 {
+        return format!(
+            "the engine did not write the click to its output (loudest output sample {out_peak_db:.1} dBFS)"
+        );
+    }
+    if let Some(l) = output {
+        if l.muted {
+            return "the click left the engine, but Windows has the output device muted".into();
+        }
+        if l.volume_db < -20.0 {
+            return format!(
+                "the click left the engine, but the Windows volume of the output device is at {:.0} dB",
+                l.volume_db
+            );
+        }
+    }
+    if in_peak_db <= -120.0 {
+        return "the click left the engine; the input is digitally silent (wrong input device or channel, or the device is muted)".into();
+    }
+    format!(
+        "the click left the engine at {out_peak_db:.1} dBFS; the input is alive but nothing above {CLICK_FLOOR_DB:.0} dBFS came back: check the cable or speaker, the output pair (--main), the input channel (--in-ch) and the output level"
+    )
 }
 
 fn io_config(d: &DevArgs) -> Result<IoConfig, String> {
@@ -242,6 +314,9 @@ fn run(cli: Cli) -> Result<(), String> {
         }
         Cmd::Latency { dev } => {
             let cfg = io_config(&dev)?;
+            // Read before the stream opens: an exclusive stream may hide the endpoint.
+            let in_level = checkup::endpoint_level(cfg.input.as_deref(), true);
+            let out_level = checkup::endpoint_level(cfg.output.as_deref(), false);
             let mut running = io::start(&cfg).map_err(|e| e.to_string())?;
             // Only the click may reach the output: through a loopback the dry path would feed back.
             running
@@ -252,7 +327,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 .send(live_engine::Command::StartLatencyProbe)
                 .map_err(|_| "command ring full")?;
             let t0 = Instant::now();
-            let mut in_peak = 0.0f32;
+            let (mut in_peak, mut out_peak) = (0.0f32, 0.0f32);
             loop {
                 std::thread::sleep(Duration::from_millis(50));
                 if !running.alive() {
@@ -268,6 +343,7 @@ fn run(cli: Cli) -> Result<(), String> {
                     // Frames from before the probe started (start-up thumps) do not count.
                     if m.latency_probe != ProbeState::Idle {
                         in_peak = in_peak.max(m.in_peak);
+                        out_peak = out_peak.max(m.out_peak[0].max(m.out_peak[1]));
                     }
                     match m.latency_probe {
                         ProbeState::Done(ms) => {
@@ -275,16 +351,25 @@ fn run(cli: Cli) -> Result<(), String> {
                                 "round_trip_ms": ms,
                                 "nominal_ms": running.info.nominal_latency_ms,
                                 "chain_latency_samples": m.chain_latency_samples,
+                                // Equal to the main chain while "tuned only for the audience" is off.
+                                "monitor_chain_latency_samples": m.monitor_chain_latency_samples,
                                 "in_peak_db": live_dsp::lin_to_db(in_peak),
+                                "out_peak_db": live_dsp::lin_to_db(out_peak),
+                                "xruns": m.xruns,
+                                "driver_xruns": running.driver_xruns(),
+                                "input_level": in_level,
+                                "output_level": out_level,
                                 "info": running.info,
                             });
                             println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
                             return Ok(());
                         }
                         ProbeState::Failed => {
+                            let (i, o) =
+                                (live_dsp::lin_to_db(in_peak), live_dsp::lin_to_db(out_peak));
                             return Err(format!(
-                                "no click came back (loudest input during the probe: {:.1} dBFS): route the output to the input (cable, Voicemeeter strip, or speaker → mic) and retry",
-                                live_dsp::lin_to_db(in_peak)
+                                "no click came back (loudest input during the probe: {i:.1} dBFS): {}. Route the output to the input (cable, Voicemeeter strip, or speaker → mic) and retry",
+                                probe_diagnosis(o, i, out_level)
                             ));
                         }
                         _ => {}
@@ -292,11 +377,36 @@ fn run(cli: Cli) -> Result<(), String> {
                 }
                 if t0.elapsed() > Duration::from_secs(10) {
                     return Err(format!(
-                        "latency probe timed out (loudest input: {:.1} dBFS)",
-                        live_dsp::lin_to_db(in_peak)
+                        "latency probe timed out (loudest input: {:.1} dBFS, loudest output: {:.1} dBFS)",
+                        live_dsp::lin_to_db(in_peak),
+                        live_dsp::lin_to_db(out_peak)
                     ));
                 }
             }
+        }
+        Cmd::Checkup { dev } => {
+            let report = checkup::run(&io_config(&dev)?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).unwrap_or_default()
+            );
+        }
+        Cmd::Voicemeeter { save, buffer, load } => {
+            // Parse before anything is changed.
+            let buffer = buffer.as_deref().map(buffer_arg).transpose()?;
+            if let Some(path) = &save {
+                voicemeeter::save_snapshot(path)?;
+            }
+            if let Some((driver, frames)) = &buffer {
+                voicemeeter::set_buffer(driver, *frames)?;
+            }
+            if let Some(path) = &load {
+                voicemeeter::load_snapshot(path)?;
+            }
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&voicemeeter::info()).unwrap_or_default()
+            );
         }
         Cmd::Render {
             input,
@@ -508,5 +618,53 @@ mod wav {
             b.extend_from_slice(&x.to_le_bytes());
         }
         fs::write(path, b).map_err(|e| format!("{path}: {e}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn level(volume_db: f32, muted: bool) -> Option<EndpointLevel> {
+        Some(EndpointLevel {
+            volume: 10f32.powf(volume_db / 20.0),
+            volume_db,
+            muted,
+        })
+    }
+
+    /// Each cause gets its own sentence, in the order the signal travels: engine output,
+    /// Windows mute, Windows volume, dead input, and only then "check the loop".
+    #[test]
+    fn probe_diagnosis_names_the_first_broken_stage() {
+        let d = probe_diagnosis(-60.0, -45.0, level(0.0, false));
+        assert!(d.contains("did not write the click"), "{d}");
+        // A muted output wins over everything after it, even with a dead input.
+        let d = probe_diagnosis(-1.0, -180.0, level(0.0, true));
+        assert!(
+            d.contains("muted") && !d.contains("digitally silent"),
+            "{d}"
+        );
+        let d = probe_diagnosis(-1.0, -45.0, level(-40.0, false));
+        assert!(d.contains("-40 dB"), "{d}");
+        let d = probe_diagnosis(-1.0, -180.0, level(0.0, false));
+        assert!(d.contains("digitally silent"), "{d}");
+        // The run of 2026-11-10: click out at -1 dBFS, input alive at -45, nothing came back.
+        let d = probe_diagnosis(-1.0, -45.0, level(0.0, false));
+        assert!(d.contains("input is alive") && d.contains("--in-ch"), "{d}");
+        // No level readable (other systems): the Windows branches are skipped, not guessed.
+        let d = probe_diagnosis(-1.0, -45.0, None);
+        assert!(d.contains("input is alive"), "{d}");
+    }
+
+    #[test]
+    fn buffer_arg_accepts_only_known_drivers_and_sane_sizes() {
+        assert_eq!(buffer_arg("wdm=160"), Ok(("wdm".into(), 160)));
+        assert_eq!(buffer_arg(" KS = 144 "), Ok(("ks".into(), 144)));
+        for bad in [
+            "160", "wdm", "usb=160", "wdm=abc", "wdm=32", "wdm=4096", "wdm=-1",
+        ] {
+            assert!(buffer_arg(bad).is_err(), "`{bad}` must be refused");
+        }
     }
 }

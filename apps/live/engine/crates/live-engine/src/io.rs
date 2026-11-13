@@ -78,6 +78,14 @@ pub enum IoError {
 pub const WASAPI_EXCLUSIVE: &str = "WASAPI Exclusive";
 /// Own WASAPI backend, shared mode at the smallest engine period (`IAudioClient3`).
 pub const WASAPI_LOW_LATENCY: &str = "WASAPI Low Latency";
+/// The engine runs inside Voicemeeter's own audio callback as an input insert (Windows, Voicemeeter
+/// Remote API): no device is opened, the "device" is Voicemeeter's input channels.
+pub const VOICEMEETER_INSERT: &str = "Voicemeeter Insert";
+
+#[cfg(windows)]
+fn is_vm_insert(host: Option<&str>) -> bool {
+    host.is_some_and(|h| h.eq_ignore_ascii_case(VOICEMEETER_INSERT))
+}
 
 #[cfg(windows)]
 fn native_mode(host: Option<&str>) -> Option<crate::wasapi::Mode> {
@@ -100,7 +108,12 @@ pub fn hosts() -> Vec<String> {
         .map(|h| h.name().to_string())
         .collect();
     #[cfg(windows)]
-    all.extend([WASAPI_EXCLUSIVE.to_string(), WASAPI_LOW_LATENCY.to_string()]);
+    {
+        all.extend([WASAPI_EXCLUSIVE.to_string(), WASAPI_LOW_LATENCY.to_string()]);
+        if crate::voicemeeter::installed() {
+            all.push(VOICEMEETER_INSERT.to_string());
+        }
+    }
     all
 }
 
@@ -144,6 +157,10 @@ pub fn classify(name: &str) -> (bool, bool) {
 pub fn list_devices(host: Option<&str>) -> Result<Vec<DeviceInfo>, IoError> {
     if is_null(host) {
         return Ok(vec![null_device()]);
+    }
+    #[cfg(windows)]
+    if is_vm_insert(host) {
+        return crate::voicemeeter::devices();
     }
     // The native WASAPI hosts list the same endpoints as cpal's WASAPI host, under their own name.
     #[cfg(windows)]
@@ -243,6 +260,353 @@ pub struct Running {
     alive: Arc<AtomicBool>,
     last_error: Arc<Mutex<Option<String>>>,
     driver_xruns: Arc<AtomicU32>,
+    /// Live figures of the adaptive cushion; None = fixed cushion.
+    cushion: Option<Arc<CushionStats>>,
+}
+
+/// Audio callbacks of a duplex backend: interleaved input in, interleaved output out.
+pub(crate) type InCb = Box<dyn FnMut(&[f32]) + Send>;
+pub(crate) type OutCb = Box<dyn FnMut(&mut [f32]) + Send>;
+
+/// What a backend needs to run the engine: call `on_input` with every captured block and
+/// `on_output` for every block to play; hand `ends` to [`Running::assemble`].
+pub(crate) struct Duplex {
+    pub on_input: InCb,
+    pub on_output: OutCb,
+    pub ends: Ends,
+}
+
+/// Checks the routing against the device's channel counts and builds the rings, the core and the
+/// two callbacks. `cushion` = frames kept queued between input and output before the output
+/// starts pulling (one period on separate streams; 0 when input and output are the same
+/// callback, so the input of a block is already queued when its output is rendered).
+pub(crate) fn duplex(
+    cfg: &IoConfig,
+    rate: u32,
+    in_ch: u16,
+    out_ch: u16,
+    cushion: u32,
+    max_block: usize,
+) -> Result<Duplex, IoError> {
+    check_routing(cfg, in_ch, out_ch)?;
+    let (mut p, ends) = plumbing(rate, max_block);
+    let in_tx = std::mem::replace(&mut p.in_tx, rtrb::RingBuffer::new(1).0);
+    let on_input = input_callback(in_ch, cfg.input_channels.clone(), in_tx);
+    let main = cfg.main_channels.map(|c| c as usize);
+    let mon = cfg.monitor_channels.map(|m| m.map(|c| c as usize));
+    let on_output = output_callback(out_ch, Cushion::Fixed(cushion), max_block, main, mon, p);
+    Ok(Duplex {
+        on_input: Box::new(on_input),
+        on_output: Box::new(on_output),
+        ends,
+    })
+}
+
+/// [`duplex`] with the adaptive cushion (see [`Tracker`]): the output side starts pulling at
+/// one `period` queued, like the fixed mode, then trims the frames it measures as standing
+/// idle in the ring down to `margin` and backs off on underruns. For hosts whose input and
+/// output run whole blocks of `period` frames on one clock (the exclusive WASAPI host).
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows exclusive host uses it so far
+pub(crate) fn duplex_adaptive(
+    cfg: &IoConfig,
+    rate: u32,
+    in_ch: u16,
+    out_ch: u16,
+    period: u32,
+    margin: u32,
+    max_block: usize,
+) -> Result<(Duplex, Arc<CushionStats>), IoError> {
+    check_routing(cfg, in_ch, out_ch)?;
+    let stats = Arc::new(CushionStats::default());
+    let (mut p, ends) = plumbing(rate, max_block);
+    let in_tx = std::mem::replace(&mut p.in_tx, rtrb::RingBuffer::new(1).0);
+    let on_input = input_callback(in_ch, cfg.input_channels.clone(), in_tx);
+    let main = cfg.main_channels.map(|c| c as usize);
+    let mon = cfg.monitor_channels.map(|m| m.map(|c| c as usize));
+    let tracker = Tracker::new(period, margin, rate, stats.clone());
+    let on_output = output_callback(out_ch, Cushion::Adaptive(tracker), max_block, main, mon, p);
+    Ok((
+        Duplex {
+            on_input: Box::new(on_input),
+            on_output: Box::new(on_output),
+            ends,
+        },
+        stats,
+    ))
+}
+
+/// Figures of the adaptive cushion, written by the audio thread with relaxed stores (no lock,
+/// no syscall) and read by the control side.
+#[derive(Default)]
+pub(crate) struct CushionStats {
+    /// Frames standing in the ring after a pull (the largest of the last 16 to 32 pulls, so the
+    /// figure does not flicker when the order of the two events flips).
+    cushion: AtomicU32,
+    /// Trims decided (one per observation window that found idle frames).
+    lowered: AtomicU32,
+    /// Backoffs: one per underrun.
+    raised: AtomicU32,
+}
+
+/// Frames removed per splice (0.33 ms at 48 kHz).
+const TRIM_SPLICE: usize = 16;
+/// Crossfade of a splice, frames: the block blends from the frames before the cut into the
+/// frames after it over this length (`a_trim_splice_stays_below_the_bound`).
+const TRIM_XFADE: usize = 64;
+/// Smallest surplus worth a trim, frames: one splice.
+const TRIM_STEP: usize = 16;
+/// First observation window, seconds of audio (counted in frames rendered: no clock).
+const OBSERVE_S: usize = 4;
+/// Every underrun multiplies the window by 4, this many times at most: 4, 16, 64, 256 s.
+const MAX_WINDOW_STEPS: u32 = 3;
+/// Splices are at least 1/20 s apart.
+const SPLICE_GAP_DIV: usize = 20;
+/// Underruns that follow an own trim before the cushion stops lowering for good.
+const MAX_STRIKES: u32 = 2;
+/// Priming threshold ceiling, periods.
+const MAX_THRESHOLD_PERIODS: usize = 3;
+/// Pulls per bucket of the published figure.
+const PUBLISH_PULLS: u32 = 16;
+
+/// Adaptive duplex cushion (tracker WP21-26).
+///
+/// What it can and cannot remove. A frame waits in the ring for `spare + phase`: the frames
+/// standing in the ring after the output pulled its block (the spare), plus the time from the
+/// capture event to the next render event (the phase, between 0 and one period, a property of
+/// the device that the ring cannot see or change). Input and output exchange whole blocks of
+/// one `period` here, so the spare is a whole number of periods: none in a clean start, one
+/// when the output started late or after any hiccup (the fixed cushion re-primes with the late
+/// packet AND the next one queued, and keeps that period for the rest of the session). The
+/// tracker removes exactly that standing spare; it does not shave the phase.
+///
+/// Lowering. The output primes at `threshold` frames queued (one period at start, as the fixed
+/// cushion does) and notes the spare after every pull. A spare that never went below
+/// `margin + TRIM_STEP` during a whole observation window is idle delay: `min - margin` frames
+/// are removed, [`TRIM_SPLICE`] frames per splice, each splice crossfaded over [`TRIM_XFADE`]
+/// frames and 1/20 s after the previous one (a 144-frame period goes in 9 splices). A spare
+/// below one period cannot cover a late packet when blocks are whole, so the exclusive host
+/// passes `margin = 0`; the parameter is the floor for hosts that would need one.
+///
+/// Backing off. An underrun counts as an engine xrun as before, and then: the priming
+/// threshold goes up one period (ceiling [`MAX_THRESHOLD_PERIODS`]), or back to what the last
+/// trim removed when the underrun follows a trim (a strike). After a LATE packet the raise
+/// changes nothing (the re-prime finds the late packet and the next one queued, one period
+/// stands, exactly as with the fixed cushion); it matters after a MISSING packet, where the
+/// fixed cushion re-primes with nothing in reserve. The observation window is multiplied by 4
+/// (4, 16, 64, 256 s), so jitter that comes back within the window is seen as a dip of the
+/// spare and nothing is trimmed; after [`MAX_STRIKES`] strikes the cushion never lowers again.
+/// Worst case against the fixed cushion: [`MAX_STRIKES`] extra underruns in a session, then
+/// the same standing period as the fixed cushion.
+///
+/// Two clocks (input and output on different devices). Input faster: a packet accumulates
+/// every period/drift and is trimmed with splices instead of the hard drop (the drop-oldest
+/// rule stays as the backstop above `threshold` + one block). Input slower: packets go missing
+/// at that rate whatever the cushion does; the threshold climbs to its ceiling, up to two
+/// periods stand in the ring and drain, and the output underruns less often but for longer
+/// (calculated: once per three periods of drift, against once per period for the fixed
+/// cushion; simulated at 100 ppm with a 144-frame period: 5 underruns in 5 minutes against 10,
+/// `slow_input_clock_stays_bounded`). Only a resampler removes those.
+struct Tracker {
+    period: usize,
+    margin: usize,
+    /// Frames the ring must hold before the output pulls.
+    threshold: usize,
+    cap: usize,
+    primed: bool,
+    trimmed_since_prime: bool,
+    /// The spare the last trim found standing; restored on an underrun after that trim.
+    safe_spare: usize,
+    base_window: usize,
+    window: usize,
+    elapsed: usize,
+    min_spare: usize,
+    backoffs: u32,
+    strikes: u32,
+    latched: bool,
+    /// Frames still to remove.
+    pending: usize,
+    /// Frames rendered since the last splice.
+    since_splice: usize,
+    gap: usize,
+    /// Largest spare of the current and of the previous bucket of [`PUBLISH_PULLS`] pulls.
+    recent: [usize; 2],
+    recent_n: u32,
+    stats: Arc<CushionStats>,
+}
+
+impl Tracker {
+    fn new(period: u32, margin: u32, rate: u32, stats: Arc<CushionStats>) -> Self {
+        let period = period.max(1) as usize;
+        stats.cushion.store(period as u32, Ordering::Relaxed);
+        let base_window = rate as usize * OBSERVE_S;
+        Self {
+            period,
+            margin: margin as usize,
+            threshold: period,
+            cap: period * MAX_THRESHOLD_PERIODS,
+            primed: false,
+            trimmed_since_prime: false,
+            safe_spare: 0,
+            base_window,
+            window: base_window,
+            elapsed: 0,
+            min_spare: usize::MAX,
+            backoffs: 0,
+            strikes: 0,
+            latched: false,
+            pending: 0,
+            since_splice: 0,
+            gap: rate as usize / SPLICE_GAP_DIV,
+            recent: [0; 2],
+            recent_n: 0,
+            stats,
+        }
+    }
+
+    fn underrun(&mut self) {
+        self.primed = false;
+        self.pending = 0;
+        if self.trimmed_since_prime {
+            self.strikes += 1;
+            self.latched |= self.strikes >= MAX_STRIKES;
+            self.threshold = self.threshold.max(self.period + self.safe_spare);
+        } else {
+            self.threshold += self.period;
+        }
+        self.threshold = self.threshold.min(self.cap);
+        self.backoffs = (self.backoffs + 1).min(MAX_WINDOW_STEPS);
+        self.window = self.base_window << (2 * self.backoffs);
+        self.elapsed = 0;
+        self.min_spare = usize::MAX;
+        self.stats.raised.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn publish(&mut self, spare: usize) {
+        self.recent[0] = self.recent[0].max(spare);
+        let shown = self.recent[0].max(self.recent[1]);
+        self.stats.cushion.store(shown as u32, Ordering::Relaxed);
+        self.recent_n += 1;
+        if self.recent_n == PUBLISH_PULLS {
+            self.recent = [0, self.recent[0]];
+            self.recent_n = 0;
+        }
+    }
+
+    /// Pulls `frames` frames into `il`/`ir` (zeros when not primed or short), applies a splice
+    /// of the pending trim when one is due, keeps the ring bounded and runs the observation.
+    /// Returns true on an underrun.
+    fn pull(&mut self, rx: &mut rtrb::Consumer<f32>, il: &mut [f32], ir: &mut [f32]) -> bool {
+        let frames = il.len();
+        let avail = rx.slots() / 2;
+        if !self.primed && avail >= self.threshold {
+            self.primed = true;
+            self.trimmed_since_prime = false;
+        }
+        let take = if self.primed { avail.min(frames) } else { 0 };
+        let xrun = self.primed && take < frames;
+        if xrun {
+            self.underrun();
+        }
+        // A splice removes `r` frames right after the first `x` frames of this block, which
+        // crossfade from the frames before the cut into the frames after it.
+        let (mut r, mut x) = (0, 0);
+        if !xrun && take > 0 && self.pending > 0 && self.since_splice >= self.gap {
+            let want = self.pending.min(TRIM_SPLICE);
+            if avail - take >= want {
+                r = want;
+                x = TRIM_XFADE.min(take);
+            } else {
+                // The surplus is gone (the order of the two events flipped): observe again.
+                self.pending = 0;
+            }
+        }
+        let mut got = 0;
+        if take > 0
+            && let Ok(chunk) = rx.read_chunk((take + r) * 2)
+        {
+            let (s1, s2) = chunk.as_slices();
+            let at = |j: usize| {
+                if j < s1.len() {
+                    s1[j]
+                } else {
+                    s2[j - s1.len()]
+                }
+            };
+            for f in 0..take {
+                let (bl, br) = (at((f + r) * 2), at((f + r) * 2 + 1));
+                if f < x {
+                    let w = (f + 1) as f32 / (x + 1) as f32;
+                    let (al, ar) = (at(f * 2), at(f * 2 + 1));
+                    il[f] = al + (bl - al) * w;
+                    ir[f] = ar + (br - ar) * w;
+                } else {
+                    il[f] = bl;
+                    ir[f] = br;
+                }
+            }
+            chunk.commit_all();
+            got = take;
+        }
+        il[got..].fill(0.0);
+        ir[got..].fill(0.0);
+        if r > 0 {
+            self.pending -= r;
+            self.since_splice = 0;
+        } else {
+            self.since_splice = self.since_splice.saturating_add(frames);
+        }
+        // Backstop against drift: at most threshold + one block queued (drop the oldest).
+        let queued = rx.slots() / 2;
+        let excess = queued.saturating_sub(self.threshold + frames);
+        for _ in 0..excess * 2 {
+            let _ = rx.pop();
+        }
+        // From the count taken before the pull: a packet pushed meanwhile by another thread
+        // must not look like standing spare.
+        let spare = (avail - take - r).min(queued - excess);
+        self.publish(spare);
+        if self.primed && self.pending == 0 && !self.latched {
+            self.min_spare = self.min_spare.min(spare);
+            self.elapsed += frames;
+            if self.elapsed >= self.window {
+                if self.min_spare >= self.margin + TRIM_STEP {
+                    self.pending = self.min_spare - self.margin;
+                    self.safe_spare = self.min_spare;
+                    self.trimmed_since_prime = true;
+                    self.stats.lowered.fetch_add(1, Ordering::Relaxed);
+                }
+                self.elapsed = 0;
+                self.min_spare = usize::MAX;
+            }
+        }
+        xrun
+    }
+}
+
+/// How the output side handles the frames queued between the two callbacks.
+enum Cushion {
+    /// Pull once this many frames are queued, keep at most that plus one block: the rule every
+    /// host used before the adaptive mode, kept sample for sample.
+    Fixed(u32),
+    Adaptive(Tracker),
+}
+
+/// Environment variable that switches the adaptive cushion off for diagnosis, read once when a
+/// stream starts: any value except empty or `0` keeps the fixed cushion in the exclusive host
+/// (`MIXAI_LIVE_FIXED_CUSHION=1`).
+pub const FIXED_CUSHION_ENV: &str = "MIXAI_LIVE_FIXED_CUSHION";
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn fixed_cushion_forced(value: Option<&std::ffi::OsStr>) -> bool {
+    value.is_some_and(|v| !v.is_empty() && v != "0")
+}
+
+/// The adaptive cushion runs where its premise holds: the exclusive host (whole blocks, both
+/// events on one thread) with equal periods. Unequal periods and the shared host keep the fixed
+/// cushion: there the ring also has to bridge the difference between the block sizes.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn wants_adaptive(exclusive: bool, in_period: u32, out_period: u32, forced_fixed: bool) -> bool {
+    exclusive && in_period == out_period && !forced_fixed
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -256,12 +620,66 @@ pub struct RunningInfo {
     pub output_channels: u16,
     /// Theoretical in→out latency from buffer sizes (the probe measures the real one).
     pub nominal_latency_ms: f32,
+    /// The three buffer terms behind `nominal_latency_ms`, in frames: one input period, the
+    /// frames kept queued between input and output, one output period.
+    #[serde(default)]
+    pub input_period_frames: u32,
+    #[serde(default)]
+    pub cushion_frames: u32,
+    #[serde(default)]
+    pub output_period_frames: u32,
     pub notes: Vec<String>,
 }
 
 impl Running {
+    /// Put a started backend together. `streams` is whatever keeps the audio running; dropping
+    /// it must stop the callbacks.
+    pub(crate) fn assemble(
+        streams: Box<dyn std::any::Any>,
+        ends: Ends,
+        info: RunningInfo,
+        alive: Arc<AtomicBool>,
+        last_error: Arc<Mutex<Option<String>>>,
+        driver_xruns: Arc<AtomicU32>,
+    ) -> Running {
+        Running {
+            _streams: streams,
+            commands: ends.commands,
+            garbage: ends.garbage,
+            meters: ends.meters,
+            info,
+            alive,
+            last_error,
+            driver_xruns,
+            cushion: None,
+        }
+    }
+
     pub fn alive(&self) -> bool {
         self.alive.load(Ordering::Relaxed)
+    }
+
+    /// Frames queued between input and output right now: the adaptive cushion's live figure, or
+    /// the configured value (`info.cushion_frames`) on a fixed cushion.
+    pub fn cushion_frames(&self) -> u32 {
+        self.cushion.as_ref().map_or(self.info.cushion_frames, |c| {
+            c.cushion.load(Ordering::Relaxed)
+        })
+    }
+
+    /// Whether the cushion adapts (exclusive WASAPI host with equal periods).
+    pub fn cushion_adaptive(&self) -> bool {
+        self.cushion.is_some()
+    }
+
+    /// (times the adaptive cushion was lowered, times an underrun raised it); (0, 0) when fixed.
+    pub fn cushion_changes(&self) -> (u32, u32) {
+        self.cushion.as_ref().map_or((0, 0), |c| {
+            (
+                c.lowered.load(Ordering::Relaxed),
+                c.raised.load(Ordering::Relaxed),
+            )
+        })
     }
 
     /// Last error reported by either stream callback (device removed, driver reset...).
@@ -312,10 +730,10 @@ struct Plumbing {
     in_rx: rtrb::Consumer<f32>,
 }
 
-struct Ends {
-    commands: rtrb::Producer<Command>,
-    garbage: rtrb::Consumer<Garbage>,
-    meters: rtrb::Consumer<Meters>,
+pub(crate) struct Ends {
+    pub(crate) commands: rtrb::Producer<Command>,
+    pub(crate) garbage: rtrb::Consumer<Garbage>,
+    pub(crate) meters: rtrb::Consumer<Meters>,
 }
 
 fn plumbing(rate: u32, max_block: usize) -> (Plumbing, Ends) {
@@ -375,7 +793,7 @@ fn input_callback(
 #[allow(clippy::too_many_arguments)]
 fn output_callback(
     out_ch: u16,
-    buf: u32,
+    cushion: Cushion,
     max_block: usize,
     main: [usize; 2],
     mon: Option<[usize; 2]>,
@@ -389,7 +807,12 @@ fn output_callback(
         in_tx: _,
         mut in_rx,
     } = p;
-    let target = buf as usize * 2; // samples (L+R) in the ring before we start pulling
+    let mut cushion = cushion;
+    // Fixed mode: samples (L+R) in the ring before we start pulling.
+    let target = match &cushion {
+        Cushion::Fixed(buf) => *buf as usize * 2,
+        Cushion::Adaptive(_) => 0,
+    };
     let mut scratch: [Vec<f32>; 6] = core::array::from_fn(|_| vec![0.0; max_block]);
     let mut primed = false;
     move |data: &mut [f32]| {
@@ -402,29 +825,38 @@ fn output_callback(
             });
         }
         let [il, ir, ml, mr, ol, or] = &mut scratch;
-        let avail = in_rx.slots() / 2;
-        if !primed {
-            primed = avail * 2 >= target;
-        }
-        let take = if primed { avail.min(frames) } else { 0 };
-        if primed && take < frames {
-            core.xruns += 1;
-            primed = false;
-        }
-        for f in 0..frames {
-            if f < take {
-                il[f] = in_rx.pop().unwrap_or(0.0);
-                ir[f] = in_rx.pop().unwrap_or(0.0);
-            } else {
-                il[f] = 0.0;
-                ir[f] = 0.0;
+        match &mut cushion {
+            Cushion::Fixed(_) => {
+                let avail = in_rx.slots() / 2;
+                if !primed {
+                    primed = avail * 2 >= target;
+                }
+                let take = if primed { avail.min(frames) } else { 0 };
+                if primed && take < frames {
+                    core.xruns += 1;
+                    primed = false;
+                }
+                for f in 0..frames {
+                    if f < take {
+                        il[f] = in_rx.pop().unwrap_or(0.0);
+                        ir[f] = in_rx.pop().unwrap_or(0.0);
+                    } else {
+                        il[f] = 0.0;
+                        ir[f] = 0.0;
+                    }
+                }
+                // Drift: keep at most target + one period queued (drop the oldest frames).
+                let excess = (in_rx.slots() / 2).saturating_sub(target / 2 + frames);
+                if excess > 0 {
+                    for _ in 0..excess * 2 {
+                        let _ = in_rx.pop();
+                    }
+                }
             }
-        }
-        // Drift: keep at most target + one period queued (drop the oldest frames).
-        let excess = (in_rx.slots() / 2).saturating_sub(target / 2 + frames);
-        if excess > 0 {
-            for _ in 0..excess * 2 {
-                let _ = in_rx.pop();
+            Cushion::Adaptive(t) => {
+                if t.pull(&mut in_rx, &mut il[..frames], &mut ir[..frames]) {
+                    core.xruns += 1;
+                }
             }
         }
         core.render(
@@ -438,13 +870,16 @@ fn output_callback(
             },
         );
         data.fill(0.0);
+        // A pair routed to ONE channel (`--main 8`) gets the mono mix, not L + R (+6 dB).
+        let side = |pair: [usize; 2]| if pair[0] == pair[1] { 0.5 } else { 1.0 };
+        let (mg, og) = (side(main), mon.map_or(1.0, side));
         for f in 0..frames {
             let o = f * ch;
-            data[o + main[0]] += ml[f];
-            data[o + main[1]] += mr[f];
+            data[o + main[0]] += ml[f] * mg;
+            data[o + main[1]] += mr[f] * mg;
             if let Some([a, b]) = mon {
-                data[o + a] += ol[f];
-                data[o + b] += or[f];
+                data[o + a] += ol[f] * og;
+                data[o + b] += or[f] * og;
             }
         }
         if let Some(t) = core.take_finished_tail() {
@@ -493,6 +928,20 @@ fn native_label(mode: crate::wasapi::Mode) -> &'static str {
     }
 }
 
+/// Windows endpoint id (`{0.0.0.00000000}.{guid}`) and display name of a device given by name
+/// or id as in [`list_devices`]; `None` = the default device of that direction.
+#[cfg(windows)]
+pub(crate) fn wasapi_endpoint(
+    device: Option<&str>,
+    input: bool,
+) -> Result<(String, String), IoError> {
+    let host = host_named(Some("WASAPI"))?;
+    let d = find(&host, device, input)?;
+    let id = dev_id(&d);
+    let endpoint = id.split_once(':').map_or(id.clone(), |(_, e)| e.to_owned());
+    Ok((endpoint, dev_name(&d)))
+}
+
 /// Smallest periods a Windows endpoint offers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct DevicePeriods {
@@ -511,14 +960,11 @@ pub struct DevicePeriods {
 pub fn device_periods(device: &str, rate: u32) -> Result<Option<DevicePeriods>, IoError> {
     #[cfg(windows)]
     {
-        let host = host_named(Some("WASAPI"))?;
         // A name or id is looked up among capture and render devices alike.
-        let d = find(&host, Some(device), false)?;
-        let id = dev_id(&d);
-        let endpoint = id.split_once(':').map_or(id.as_str(), |(_, e)| e);
+        let (endpoint, name) = wasapi_endpoint(Some(device), false)?;
         Ok(
-            crate::wasapi::periods(endpoint, rate).map(|(exclusive_min, shared)| DevicePeriods {
-                device: dev_name(&d),
+            crate::wasapi::periods(&endpoint, rate).map(|(exclusive_min, shared)| DevicePeriods {
+                device: name.clone(),
                 exclusive_min,
                 shared_min: shared.map(|s| s.0),
                 shared_default: shared.map(|s| s.1),
@@ -553,25 +999,27 @@ fn start_native(cfg: &IoConfig, mode: crate::wasapi::Mode) -> Result<Running, Io
     let alive = Arc::new(AtomicBool::new(true));
     let last_error: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let driver_xruns = Arc::new(AtomicU32::new(0));
-    let (ends_tx, ends_rx) = std::sync::mpsc::sync_channel::<Ends>(1);
+    let (ends_tx, ends_rx) = std::sync::mpsc::sync_channel::<(Ends, Option<Arc<CushionStats>>)>(1);
     let routing = cfg.clone();
+    let exclusive = mode == wasapi::Mode::Exclusive;
+    let forced_fixed = fixed_cushion_forced(std::env::var_os(FIXED_CUSHION_ENV).as_deref());
     let make: wasapi::Make = Box::new(move |o: &wasapi::Opened| {
-        check_routing(&routing, o.in_ch, o.out_ch)?;
         // The ring has to hold a whole capture packet plus one render block, so the target is
         // the larger period (a 480-frame input into a 144-frame output would underrun forever).
         let target = o.in_period.max(o.out_period);
         let max_block = (target as usize * 8).max(2048);
-        let (mut p, ends) = plumbing(rate, max_block);
-        let in_tx = std::mem::replace(&mut p.in_tx, rtrb::RingBuffer::new(1).0);
-        let on_input = input_callback(o.in_ch, routing.input_channels.clone(), in_tx);
-        let main = routing.main_channels.map(|c| c as usize);
-        let mon = routing.monitor_channels.map(|m| m.map(|c| c as usize));
-        let on_output = output_callback(o.out_ch, target, max_block, main, mon, p);
-        let _ = ends_tx.send(ends);
-        Ok((
-            Box::new(on_input) as wasapi::InCb,
-            Box::new(on_output) as wasapi::OutCb,
-        ))
+        let (d, stats) = if wants_adaptive(exclusive, o.in_period, o.out_period, forced_fixed) {
+            // Margin 0: with whole blocks a reserve below one period covers no late packet (see
+            // `Tracker`); the backoff adds whole periods where the machine needs them.
+            let (d, stats) =
+                duplex_adaptive(&routing, rate, o.in_ch, o.out_ch, target, 0, max_block)?;
+            (d, Some(stats))
+        } else {
+            let d = duplex(&routing, rate, o.in_ch, o.out_ch, target, max_block)?;
+            (d, None)
+        };
+        let _ = ends_tx.send((d.ends, stats));
+        Ok((d.on_input, d.on_output))
     });
     let shared = wasapi::Shared {
         alive: alive.clone(),
@@ -579,7 +1027,7 @@ fn start_native(cfg: &IoConfig, mode: crate::wasapi::Mode) -> Result<Running, Io
         driver_xruns: driver_xruns.clone(),
     };
     let (handle, opened) = wasapi::start(mode, in_id, out_id, rate, buf, make, shared)?;
-    let ends = ends_rx
+    let (ends, cushion) = ends_rx
         .recv()
         .map_err(|_| IoError::Device("audio thread sent no control rings".into()))?;
     let mut notes = opened.notes;
@@ -594,6 +1042,16 @@ fn start_native(cfg: &IoConfig, mode: crate::wasapi::Mode) -> Result<Running, Io
             "requested {buf} frames, the driver runs {} frames",
             opened.out_period
         ));
+    }
+    if cushion.is_some() {
+        notes.push(format!(
+            "adaptive cushion: starts at one period ({} frames), removes frames that stand idle in the queue, adds a period back after an underrun ({FIXED_CUSHION_ENV}=1 keeps it fixed)",
+            opened.out_period
+        ));
+    } else if exclusive && forced_fixed {
+        notes.push(format!("fixed cushion: {FIXED_CUSHION_ENV} is set"));
+    } else if exclusive {
+        notes.push("fixed cushion: the input and output periods differ".into());
     }
     Ok(Running {
         _streams: Box::new(handle),
@@ -614,11 +1072,15 @@ fn start_native(cfg: &IoConfig, mode: crate::wasapi::Mode) -> Result<Running, Io
                 + opened.out_period) as f32
                 / rate as f32
                 * 1000.0,
+            input_period_frames: opened.in_period,
+            cushion_frames: opened.in_period.max(opened.out_period),
+            output_period_frames: opened.out_period,
             notes,
         },
         alive,
         last_error,
         driver_xruns,
+        cushion,
     })
 }
 
@@ -648,6 +1110,10 @@ pub fn start(cfg: &IoConfig) -> Result<Running, IoError> {
     #[cfg(windows)]
     if let Some(mode) = native_mode(cfg.host.as_deref()) {
         return start_native(cfg, mode);
+    }
+    #[cfg(windows)]
+    if is_vm_insert(cfg.host.as_deref()) {
+        return crate::voicemeeter::start(cfg);
     }
     let host = host_named(cfg.host.as_deref())?;
     let mmcss = host.id().name().eq_ignore_ascii_case("WASAPI");
@@ -734,7 +1200,7 @@ pub fn start(cfg: &IoConfig) -> Result<Running, IoError> {
 
     let main = cfg.main_channels.map(|c| c as usize);
     let mon = cfg.monitor_channels.map(|m| m.map(|c| c as usize));
-    let mut on_output = output_callback(out_ch, buf, max_block, main, mon, p);
+    let mut on_output = output_callback(out_ch, Cushion::Fixed(buf), max_block, main, mon, p);
     let out_err_alive = alive.clone();
     let out_err_text = last_error.clone();
     let out_xr = driver_xruns.clone();
@@ -777,11 +1243,15 @@ pub fn start(cfg: &IoConfig) -> Result<Running, IoError> {
             input_channels: in_ch,
             output_channels: out_ch,
             nominal_latency_ms: nominal_ms(buf, rate),
+            input_period_frames: buf,
+            cushion_frames: buf,
+            output_period_frames: buf,
             notes,
         },
         alive,
         last_error,
         driver_xruns,
+        cushion: None,
     })
 }
 
@@ -804,16 +1274,15 @@ impl Drop for NullDevice {
 /// previous output block (main pair) as the input block, then renders the next one.
 fn start_null(cfg: &IoConfig) -> Result<Running, IoError> {
     let (in_ch, out_ch) = (2u16, 4u16);
-    check_routing(cfg, in_ch, out_ch)?;
     let rate = cfg.sample_rate.clamp(8_000, 192_000);
     let buf = cfg.buffer_frames.clamp(16, 4096);
     let max_block = (buf as usize * 8).max(2048);
-    let (mut p, ends) = plumbing(rate, max_block);
-    let in_tx = std::mem::replace(&mut p.in_tx, rtrb::RingBuffer::new(1).0);
-    let mut on_input = input_callback(in_ch, cfg.input_channels.clone(), in_tx);
+    let Duplex {
+        mut on_input,
+        mut on_output,
+        ends,
+    } = duplex(cfg, rate, in_ch, out_ch, buf, max_block)?;
     let main = cfg.main_channels.map(|c| c as usize);
-    let mon = cfg.monitor_channels.map(|m| m.map(|c| c as usize));
-    let mut on_output = output_callback(out_ch, buf, max_block, main, mon, p);
     let stop = Arc::new(AtomicBool::new(false));
     let s2 = stop.clone();
     let thread = std::thread::Builder::new()
@@ -841,15 +1310,13 @@ fn start_null(cfg: &IoConfig) -> Result<Running, IoError> {
             }
         })
         .map_err(|e| IoError::Device(format!("null device thread: {e}")))?;
-    Ok(Running {
-        _streams: Box::new(NullDevice {
+    Ok(Running::assemble(
+        Box::new(NullDevice {
             stop,
             thread: Some(thread),
         }),
-        commands: ends.commands,
-        garbage: ends.garbage,
-        meters: ends.meters,
-        info: RunningInfo {
+        ends,
+        RunningInfo {
             host: NULL_HOST.into(),
             input: "Null loopback in".into(),
             output: "Null loopback out".into(),
@@ -858,12 +1325,15 @@ fn start_null(cfg: &IoConfig) -> Result<Running, IoError> {
             input_channels: in_ch,
             output_channels: out_ch,
             nominal_latency_ms: nominal_ms(buf, rate),
+            input_period_frames: buf,
+            cushion_frames: buf,
+            output_period_frames: buf,
             notes: vec!["simulated device: the main output is looped back into the input".into()],
         },
-        alive: Arc::new(AtomicBool::new(true)),
-        last_error: Arc::new(Mutex::new(None)),
-        driver_xruns: Arc::new(AtomicU32::new(0)),
-    })
+        Arc::new(AtomicBool::new(true)),
+        Arc::new(Mutex::new(None)),
+        Arc::new(AtomicU32::new(0)),
+    ))
 }
 
 fn null_device() -> DeviceInfo {
@@ -885,6 +1355,636 @@ fn null_device() -> DeviceInfo {
 mod tests {
     use super::*;
     use crate::{ProbeState, Session};
+    use std::collections::VecDeque;
+
+    /// Deterministic generator, the same sequence on every platform.
+    struct Lcg(u64);
+
+    impl Lcg {
+        fn next(&mut self) -> u32 {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (self.0 >> 33) as u32
+        }
+
+        /// Uniform in [-0.5, 0.5): below the safety ceiling, so an empty chain is the identity.
+        fn sample(&mut self) -> f32 {
+            self.next() as f32 / (1u64 << 31) as f32 - 0.5
+        }
+    }
+
+    /// The fixed cushion, as it was before the adaptive mode existed: an irregular schedule
+    /// (bursts, droughts, odd block sizes) through `duplex` must give, sample for sample, what
+    /// this plain model of the old rules gives - prime at one period, underrun = xrun + re-prime,
+    /// at most cushion + one block left queued - and the same output hash as the code had then.
+    #[test]
+    fn the_fixed_cushion_is_unchanged_sample_for_sample() {
+        const P: usize = 144;
+        // Hash of the output of the code before the adaptive mode (measured on it, 2026-11-12).
+        const GOLDEN: u64 = 0xdf38_a1b6_96af_79f9;
+        let cfg = IoConfig {
+            input_channels: vec![0],
+            main_channels: [0, 1],
+            ..IoConfig::default()
+        };
+        let mut d = duplex(&cfg, 48_000, 2, 2, P as u32, 2048).unwrap();
+        let mut rng = Lcg(0x5EED);
+        let mut model: VecDeque<f32> = VecDeque::new();
+        let (mut primed, mut model_xruns, mut model_drops) = (false, 0u32, 0u32);
+        let (mut xruns, mut hash) = (0u32, 0xcbf2_9ce4_8422_2325u64);
+        let mut inp = vec![0.0f32; 240 * 2];
+        let mut out = vec![0.0f32; 200 * 2];
+        for step in 0..6060 {
+            let r = rng.next();
+            // Mostly alternating, with bursts of captures and droughts; a regular tail at the
+            // end so the last xrun count is published.
+            let regular = step >= 6000;
+            let capture = match r % 16 {
+                0 if !regular => true,
+                1 if !regular => false,
+                _ => step % 2 == 0,
+            };
+            if capture {
+                let n = if regular {
+                    P
+                } else {
+                    [144, 144, 144, 48, 240][(r >> 8) as usize % 5]
+                };
+                for f in 0..n {
+                    let v = rng.sample();
+                    inp[f * 2] = v;
+                    inp[f * 2 + 1] = 0.25; // channel 1 is not routed
+                    model.push_back(v);
+                }
+                (d.on_input)(&inp[..n * 2]);
+            } else {
+                let n = if regular {
+                    P
+                } else {
+                    [144, 144, 144, 96, 200][(r >> 8) as usize % 5]
+                };
+                (d.on_output)(&mut out[..n * 2]);
+                let avail = model.len();
+                if !primed {
+                    primed = avail >= P;
+                }
+                let take = if primed { avail.min(n) } else { 0 };
+                if primed && take < n {
+                    model_xruns += 1;
+                    primed = false;
+                }
+                for f in 0..n {
+                    let want = if f < take {
+                        model.pop_front().unwrap()
+                    } else {
+                        0.0
+                    };
+                    for c in 0..2 {
+                        let got = out[f * 2 + c];
+                        assert_eq!(got.to_bits(), want.to_bits(), "step {step} frame {f}");
+                        hash = (hash ^ got.to_bits() as u64).wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                }
+                let excess = model.len().saturating_sub(P + n);
+                if excess > 0 {
+                    model_drops += 1;
+                    model.drain(..excess);
+                }
+            }
+            while let Ok(m) = d.ends.meters.pop() {
+                xruns = m.xruns;
+            }
+        }
+        // The schedule must exercise both rules, or the comparison proves little.
+        assert!(
+            model_xruns > 20 && model_drops > 20,
+            "{model_xruns} underruns, {model_drops} drops"
+        );
+        assert_eq!(xruns, model_xruns);
+        assert_eq!(hash, GOLDEN, "output hash {hash:#018x}");
+    }
+
+    /// Simulated exclusive host: whole packets of `p` frames in, whole buffers of `p` frames
+    /// out, no threads, no clock, event times in frames. Input channel 0 carries
+    /// `signal(frame index)`; impulses in it are timed on the way in and on the way out.
+    struct Sim {
+        d: Duplex,
+        /// None = the fixed cushion.
+        stats: Option<Arc<CushionStats>>,
+        p: usize,
+        rate: u32,
+        in_idx: usize,
+        inp: Vec<f32>,
+        out: Vec<f32>,
+        xruns: u32,
+        /// Largest sample-to-sample step seen on the output.
+        max_step: f32,
+        last: f32,
+        /// Event time + offset in the block of every impulse captured / played.
+        impulse_in: Vec<f64>,
+        impulse_out: Vec<f64>,
+    }
+
+    const IMPULSE: f32 = 0.75;
+
+    impl Sim {
+        /// `margin` = Some: adaptive cushion with that margin; None: fixed cushion of one period.
+        fn new(p: usize, margin: Option<u32>) -> Sim {
+            Sim::at_rate(p, margin, 48_000)
+        }
+
+        fn at_rate(p: usize, margin: Option<u32>, rate: u32) -> Sim {
+            let cfg = IoConfig {
+                input_channels: vec![0],
+                main_channels: [0, 1],
+                ..IoConfig::default()
+            };
+            let (d, stats) = match margin {
+                Some(m) => {
+                    let (d, s) = duplex_adaptive(&cfg, rate, 2, 2, p as u32, m, 2048).unwrap();
+                    (d, Some(s))
+                }
+                None => (duplex(&cfg, rate, 2, 2, p as u32, 2048).unwrap(), None),
+            };
+            Sim {
+                d,
+                stats,
+                p,
+                rate,
+                in_idx: 0,
+                inp: vec![0.0; p * 2],
+                out: vec![0.0; p * 2],
+                xruns: 0,
+                max_step: 0.0,
+                last: 0.0,
+                impulse_in: Vec::with_capacity(8),
+                impulse_out: Vec::with_capacity(8),
+            }
+        }
+
+        /// A capture event at time `t`: the packet holds the `p` frames captured up to `t`.
+        fn capture(&mut self, signal: &dyn Fn(usize) -> f32, t: f64) {
+            for f in 0..self.p {
+                let v = signal(self.in_idx + f);
+                if v == IMPULSE {
+                    self.impulse_in.push(t - self.p as f64 + f as f64);
+                }
+                self.inp[f * 2] = v;
+                self.inp[f * 2 + 1] = 0.0;
+            }
+            self.in_idx += self.p;
+            // The callbacks must not allocate (the crate's test allocator aborts if they do).
+            assert_no_alloc::assert_no_alloc(|| (self.d.on_input)(&self.inp));
+        }
+
+        /// A render event at time `t`: frame f of the buffer is timed `t + f` (the output
+        /// period and the converters come on top, the same for every case).
+        fn render(&mut self, t: f64) {
+            assert_no_alloc::assert_no_alloc(|| (self.d.on_output)(&mut self.out));
+            for f in 0..self.p {
+                let v = self.out[f * 2];
+                self.max_step = self.max_step.max((v - self.last).abs());
+                self.last = v;
+                if v == IMPULSE {
+                    self.impulse_out.push(t + f as f64);
+                }
+            }
+            while let Ok(m) = self.d.ends.meters.pop() {
+                self.xruns = m.xruns;
+            }
+        }
+
+        /// Reported cushion (adaptive only).
+        fn cushion(&self) -> usize {
+            self.stats.as_ref().unwrap().cushion.load(Ordering::Relaxed) as usize
+        }
+
+        /// (lowered, raised).
+        fn changes(&self) -> (u32, u32) {
+            let s = self.stats.as_ref().unwrap();
+            (
+                s.lowered.load(Ordering::Relaxed),
+                s.raised.load(Ordering::Relaxed),
+            )
+        }
+
+        /// Frames impulse `n` waited between its capture event and the render event that
+        /// played it: what the ring adds (standing frames + the phase between the two events).
+        fn ring_wait(&self, n: usize) -> i64 {
+            (self.impulse_out[n] - self.impulse_in[n]).round() as i64 - self.p as i64
+        }
+
+        /// Runs `seconds` of simulated audio. Capture packet i is delivered at
+        /// `(i + 1) * p / (1 + ppm) + k + late(i)` frames of output time, render event j at
+        /// `(j + 1) * p`: `k < 0` = capture before render each period, `k > 0` = after.
+        /// `leftover` extra packets are queued before anything else (an output that started
+        /// that many periods late).
+        /// `at(seconds)` is called before every render event.
+        #[allow(clippy::too_many_arguments)]
+        fn run(
+            &mut self,
+            seconds: f64,
+            ppm: f64,
+            k: f64,
+            leftover: usize,
+            signal: &dyn Fn(usize) -> f32,
+            late: &mut dyn FnMut(usize) -> f64,
+            at: &mut dyn FnMut(&Sim, f64),
+        ) {
+            let p = self.p as f64;
+            let rate = self.rate as f64;
+            let end = seconds * rate;
+            for _ in 0..leftover {
+                self.capture(signal, 0.0);
+            }
+            let (mut i, mut j) = (0usize, 0usize);
+            loop {
+                let tc = (i + 1) as f64 * p / (1.0 + ppm * 1e-6) + k + late(i);
+                let tr = (j + 1) as f64 * p;
+                if tr > end {
+                    break;
+                }
+                if tc <= tr {
+                    self.capture(signal, tc);
+                    i += 1;
+                } else {
+                    at(self, tr / rate);
+                    self.render(tr);
+                    j += 1;
+                }
+            }
+        }
+    }
+
+    fn silence(_: usize) -> f32 {
+        0.0
+    }
+
+    /// Impulses at two input frames.
+    fn impulses(at: [usize; 2]) -> impl Fn(usize) -> f32 {
+        move |i| if at.contains(&i) { IMPULSE } else { 0.0 }
+    }
+
+    /// The baseline the adaptive mode is measured against, on the same simulated host: the
+    /// fixed cushion has nothing standing after a clean start, and keeps a whole period for
+    /// good once the output started one packet late (148 = 144 standing + 4 of phase, at 1 s
+    /// and still at 7 s). The adaptive cushion starts the same and is back at the phase by 7 s.
+    #[test]
+    fn the_fixed_cushion_keeps_a_standing_period_the_adaptive_one_removes_it() {
+        let wait = |margin: Option<u32>, leftover: usize| {
+            let mut sim = Sim::new(144, margin);
+            sim.run(
+                8.0,
+                0.0,
+                -4.0,
+                leftover,
+                &two_impulses,
+                &mut |_| 0.0,
+                &mut |_, _| {},
+            );
+            (sim.ring_wait(0), sim.ring_wait(1), sim.xruns)
+        };
+        assert_eq!(wait(None, 0), (4, 4, 0), "fixed, clean start");
+        assert_eq!(wait(Some(0), 0), (4, 4, 0), "adaptive, clean start");
+        assert_eq!(wait(None, 1), (148, 148, 0), "fixed, late output start");
+        assert_eq!(wait(Some(0), 1), (148, 4, 0), "adaptive, late output start");
+    }
+
+    /// One hiccup in a session on one clock: a single packet 40 frames late at 2 s. Both
+    /// cushions underrun once and re-prime with a period standing. The fixed one keeps it (148
+    /// frames of wait at 30 s); the adaptive one observes for 16 s, splices it away, and the
+    /// wait at 30 s is the 4 frames of phase again.
+    #[test]
+    fn after_one_hiccup_the_standing_period_goes_away() {
+        let late_packet = 2 * 48_000 / 144;
+        let wait = |margin: Option<u32>| {
+            let mut sim = Sim::new(144, margin);
+            sim.run(
+                31.0,
+                0.0,
+                -4.0,
+                0,
+                &impulses([48_000, 30 * 48_000]),
+                &mut |i| if i == late_packet { 40.0 } else { 0.0 },
+                &mut |_, _| {},
+            );
+            (sim.ring_wait(0), sim.ring_wait(1), sim.xruns)
+        };
+        assert_eq!(wait(None), (4, 148, 1), "fixed");
+        assert_eq!(wait(Some(0)), (4, 4, 1), "adaptive");
+    }
+
+    /// Impulses at these input frames: 1 s (before the first observation window ends) and 7 s
+    /// (after a trim of up to two periods has finished).
+    fn two_impulses(i: usize) -> f32 {
+        if i == 48_000 || i == 7 * 48_000 {
+            IMPULSE
+        } else {
+            0.0
+        }
+    }
+
+    /// The convergence table (P = 144 frames at 48 kHz, one clock, capture k frames after the
+    /// render event, negative = before). What an impulse waits between its capture event and
+    /// the render event that plays it equals, to the frame, the reported cushion plus the phase
+    /// between the two events - before the trim and after it. The cushion converges to the
+    /// margin (0) for every k; the phase stays, it belongs to the device.
+    #[test]
+    fn convergence_table_same_clock() {
+        const P: i64 = 144;
+        let ms = |frames: i64| frames as f32 / 48.0;
+        println!(
+            "TABLE k | late start | phase | cushion start -> settled | ring wait start -> settled"
+        );
+        let mut trimmed_cases = 0;
+        for leftover in [0usize, 1, 2] {
+            for k in [-140i64, -72, -4, 4, 72, 140] {
+                let mut sim = Sim::new(P as usize, Some(0));
+                let mut c0 = 0;
+                sim.run(
+                    8.0,
+                    0.0,
+                    k as f64,
+                    leftover,
+                    &two_impulses,
+                    &mut |_| 0.0,
+                    &mut |s, t| {
+                        if t < 1.0 {
+                            c0 = s.cushion() as i64;
+                        }
+                    },
+                );
+                let (w0, w1, c1) = (sim.ring_wait(0), sim.ring_wait(1), sim.cushion() as i64);
+                let phase = if k < 0 { -k } else { P - k };
+                println!(
+                    "TABLE {k:>4} | {leftover} | {phase:>3} ({:.2} ms) | {c0:>3} ({:.2} ms) -> {c1} ({:.2} ms) | {w0:>3} ({:.2} ms) -> {w1:>3} ({:.2} ms)",
+                    ms(phase),
+                    ms(c0),
+                    ms(c1),
+                    ms(w0),
+                    ms(w1)
+                );
+                let case = format!("k={k} leftover={leftover}");
+                assert_eq!(w0, c0 + phase, "start, {case}");
+                assert_eq!(w1, c1 + phase, "settled, {case}");
+                assert_eq!(c1, 0, "settled cushion, {case}");
+                assert_eq!(sim.xruns, 0, "underruns, {case}");
+                trimmed_cases += usize::from(c0 > 0);
+            }
+        }
+        // Without cases that start with a standing period the table would prove nothing.
+        assert!(
+            trimmed_cases >= 9,
+            "{trimmed_cases} cases had something to trim"
+        );
+    }
+
+    /// A late output start leaves one packet standing: trimmed to the margin within 5 s of
+    /// audio (one window + nine splices), no underrun, one lowering, no raise.
+    #[test]
+    fn a_standing_period_is_trimmed_within_five_seconds() {
+        let mut sim = Sim::new(144, Some(0));
+        let mut when = None;
+        sim.run(12.0, 0.0, -4.0, 1, &silence, &mut |_| 0.0, &mut |s, t| {
+            if when.is_none() && s.cushion() == 0 && t > 0.1 {
+                when = Some(t);
+            }
+        });
+        let when = when.expect("never reached the margin");
+        assert!(when < 5.0, "reached the margin after {when:.2} s");
+        assert_eq!((sim.cushion(), sim.xruns, sim.changes()), (0, 0, (1, 0)));
+    }
+
+    /// `margin` is a floor: a standing period over a 48-frame margin settles at 48 frames,
+    /// reported and measured (48 + the 4 frames of phase).
+    #[test]
+    fn the_cushion_never_goes_below_the_margin() {
+        let mut sim = Sim::new(144, Some(48));
+        sim.run(
+            8.0,
+            0.0,
+            -4.0,
+            1,
+            &two_impulses,
+            &mut |_| 0.0,
+            &mut |_, _| {},
+        );
+        assert_eq!((sim.ring_wait(0), sim.ring_wait(1)), (144 + 4, 48 + 4));
+        assert_eq!((sim.cushion(), sim.xruns, sim.changes()), (48, 0, (1, 0)));
+    }
+
+    /// Runs with the capture 4 frames before the render, except the packets `is_late` names:
+    /// those come 40 frames late, after the render. Returns the underruns at the end of the run
+    /// and at `mark` seconds into it.
+    fn underruns(
+        sim: &mut Sim,
+        seconds: f64,
+        ppm: f64,
+        is_late: &dyn Fn(usize) -> bool,
+        mark: f64,
+    ) -> (u32, u32) {
+        let mut at_mark = None;
+        sim.run(
+            seconds,
+            ppm,
+            -4.0,
+            0,
+            &silence,
+            &mut |i| if is_late(i) { 40.0 } else { 0.0 },
+            &mut |s, t| {
+                if t >= mark && at_mark.is_none() {
+                    at_mark = Some(s.xruns);
+                }
+            },
+        );
+        (sim.xruns, at_mark.unwrap())
+    }
+
+    /// Capture normally 4 frames before the render; every 48th packet (7 times a second) is 40
+    /// frames late and lands after the render. The first late packet underruns; the re-prime
+    /// finds it and the next packet queued, so one period stands and covers every later late
+    /// packet. One underrun in 60 s, and the standing period is never trimmed: every
+    /// observation window sees the dips to zero.
+    #[test]
+    fn jitter_settles_one_period_up_without_oscillating() {
+        const P: usize = 144;
+        let mut sim = Sim::new(P, Some(0));
+        let (total, at_1s) = underruns(&mut sim, 60.0, 0.0, &|i| i % 48 == 47, 1.0);
+        assert_eq!(
+            (total, at_1s),
+            (1, 1),
+            "underruns in 60 s / in the first second"
+        );
+        assert_eq!((sim.cushion(), sim.changes()), (P, (0, 1)));
+    }
+
+    /// A late packet every 30 s (rarer than the first window): the underrun at 30 s is followed
+    /// by a trim, the underrun at 60 s punishes it and stretches the window to 64 s, which then
+    /// always sees a dip. Two underruns in 200 s, one lowering, cushion one period.
+    #[test]
+    fn rare_jitter_stops_the_trimming_after_one_strike() {
+        const P: usize = 144;
+        let mut sim = Sim::new(P, Some(0));
+        let (total, at_70s) = underruns(&mut sim, 200.0, 0.0, &|i| i % 10_000 == 9_999, 70.0);
+        assert_eq!(
+            (total, at_70s),
+            (2, 2),
+            "underruns in 200 s / in the first 70 s"
+        );
+        assert_eq!((sim.cushion(), sim.changes()), (P, (1, 2)));
+    }
+
+    /// Late packets at 30, 60, 140 and 420 s, each after the window that followed the previous
+    /// underrun: 30 s underruns (window 16 s, trim at 46 s), 60 s punishes that trim (window
+    /// 64 s, trim at 124 s), 140 s punishes the second one and latches the cushion. Without the
+    /// latch the 256 s window would end at 396 s, trim again, and the packet at 420 s would
+    /// underrun. Run at 8 kHz with a 24-frame period (the same 3 ms, a sixth of the samples):
+    /// there the 40 frames of lateness are 5 ms, longer than a period, the late packet misses
+    /// two renders, and the cushion that covers it - where it latches - is two periods.
+    #[test]
+    fn two_punished_trims_latch_the_cushion() {
+        const P: usize = 24;
+        let mut sim = Sim::at_rate(P, Some(0), 8_000);
+        let late_at = [30usize, 60, 140, 420].map(|s| s * 8_000 / P);
+        let (total, at_150s) = underruns(&mut sim, 430.0, 0.0, &|i| late_at.contains(&i), 150.0);
+        assert_eq!(
+            (total, at_150s),
+            (3, 3),
+            "underruns in 430 s / in the first 150 s"
+        );
+        assert_eq!((sim.cushion(), sim.changes()), (2 * P, (2, 3)));
+    }
+
+    /// Input clock 100 ppm fast (two devices): one packet too many every 30 s. The adaptive
+    /// cushion splices each one away within two windows: no underrun in 120 s, never more than
+    /// one period standing. The fixed cushion lets two periods accumulate and hard-cuts.
+    #[test]
+    fn fast_input_clock_is_trimmed_without_underruns() {
+        const P: usize = 144;
+        let mut sim = Sim::new(P, Some(0));
+        let (mut max, mut sum, mut n) = (0, 0usize, 0usize);
+        sim.run(
+            120.0,
+            100.0,
+            -4.0,
+            0,
+            &silence,
+            &mut |_| 0.0,
+            &mut |s, _| {
+                max = max.max(s.cushion());
+                sum += s.cushion();
+                n += 1;
+            },
+        );
+        println!(
+            "DRIFT +100 ppm, 120 s: underruns {}, cushion max {max}, mean {:.1} frames, lowered {}",
+            sim.xruns,
+            sum as f64 / n as f64,
+            sim.changes().0
+        );
+        assert_eq!(sim.xruns, 0);
+        assert_eq!(max, P, "largest standing cushion");
+        assert_eq!(sim.changes(), (3, 0));
+    }
+
+    /// Input clock 100 ppm slow (two devices): one packet is missing every 30 s whatever the
+    /// cushion does. The fixed cushion underruns every 30 s; the adaptive one climbs to its
+    /// ceiling of three periods and then underruns every 90 s: at most 6 in 5 minutes, at most
+    /// 2 in the last 2 minutes, never more than two periods standing.
+    #[test]
+    fn slow_input_clock_stays_bounded() {
+        const P: usize = 144;
+        let mut fixed = Sim::new(P, None);
+        let fixed_runs = underruns(&mut fixed, 300.0, -100.0, &|_| false, 180.0);
+        let mut sim = Sim::new(P, Some(0));
+        let (mut max, mut at_180) = (0, None);
+        sim.run(
+            300.0,
+            -100.0,
+            -4.0,
+            0,
+            &silence,
+            &mut |_| 0.0,
+            &mut |s, t| {
+                max = max.max(s.cushion());
+                if t >= 180.0 && at_180.is_none() {
+                    at_180 = Some(s.xruns);
+                }
+            },
+        );
+        let last = sim.xruns - at_180.unwrap();
+        println!(
+            "DRIFT -100 ppm, 300 s: adaptive underruns {} ({last} in the last 120 s), cushion max {max}, changes {:?}; fixed underruns {} ({} in the last 120 s)",
+            sim.xruns,
+            sim.changes(),
+            fixed_runs.0,
+            fixed_runs.0 - fixed_runs.1
+        );
+        assert!((9..=12).contains(&fixed_runs.0), "fixed: {fixed_runs:?}");
+        assert!(
+            (3..=6).contains(&sim.xruns),
+            "{} underruns in 5 min",
+            sim.xruns
+        );
+        assert!(last <= 2, "{last} underruns in the last 2 min");
+        assert_eq!(max, 2 * P, "largest standing cushion");
+    }
+
+    /// A trim of one period is nine splices of 16 frames, each crossfaded over 64 frames. On a
+    /// 1 kHz sine (16 frames = 120° of phase, the hard cut would jump by up to 1.73× the
+    /// amplitude = 13× the sine's own steepest step) the largest sample-to-sample step of the
+    /// whole run stays within 1.25× that steepest step.
+    #[test]
+    fn a_trim_splice_stays_below_the_bound() {
+        let amp = 0.5f32;
+        // 48 frames per cycle, phase from the frame index modulo 48: no precision loss late on.
+        let sine = move |i: usize| amp * ((i % 48) as f32 * core::f32::consts::TAU / 48.0).sin();
+        let mut sim = Sim::new(144, Some(0));
+        sim.run(8.0, 0.0, -4.0, 1, &sine, &mut |_| 0.0, &mut |_, _| {});
+        assert_eq!((sim.cushion(), sim.changes().0), (0, 1), "no trim happened");
+        let natural = amp * core::f32::consts::TAU * 1000.0 / 48_000.0;
+        assert!(
+            sim.max_step <= natural * 1.25,
+            "step {} vs natural {natural}",
+            sim.max_step
+        );
+    }
+
+    /// A bus routed to one channel carries the mono mix. It used to carry L + R: a mono
+    /// microphone came out 6 dB hotter on `--main 8` than on `--main 8,9`.
+    #[test]
+    fn a_pair_routed_to_one_channel_is_not_doubled() {
+        let run = |main: [u16; 2]| {
+            let cfg = IoConfig {
+                input_channels: vec![0],
+                main_channels: main,
+                ..IoConfig::default()
+            };
+            // Cushion 0: the input of a block is queued before its output is rendered.
+            let mut d = duplex(&cfg, 48_000, 2, 4, 0, 2048).unwrap();
+            let input: Vec<f32> = (0..256).flat_map(|_| [0.25f32, 0.0]).collect();
+            let mut out = vec![0.0f32; 256 * 4];
+            for _ in 0..8 {
+                (d.on_input)(&input);
+                (d.on_output)(&mut out);
+            }
+            let peak = |c: usize| out.chunks(4).map(|f| f[c].abs()).fold(0.0f32, f32::max);
+            [peak(0), peak(1), peak(2), peak(3)]
+        };
+        let mono = run([2, 2]);
+        assert!((mono[2] - 0.25).abs() < 1e-4, "{mono:?}");
+        assert!(
+            mono[0] == 0.0 && mono[1] == 0.0 && mono[3] == 0.0,
+            "{mono:?}"
+        );
+        let stereo = run([2, 3]);
+        assert!(
+            (stereo[2] - 0.25).abs() < 1e-4 && (stereo[3] - 0.25).abs() < 1e-4,
+            "{stereo:?}"
+        );
+    }
 
     #[test]
     fn classify_names() {
@@ -898,6 +1998,89 @@ mod tests {
         );
         assert_eq!(classify("BlackHole 2ch"), (false, true));
         assert_eq!(classify("Audio Interface IN (2- HD-II)"), (false, false));
+    }
+
+    /// Only the exclusive host with equal periods adapts, and the switch turns it off.
+    #[test]
+    fn the_adaptive_cushion_is_for_the_exclusive_host_with_equal_periods() {
+        assert!(wants_adaptive(true, 144, 144, false));
+        assert!(!wants_adaptive(false, 144, 144, false), "shared host");
+        assert!(!wants_adaptive(true, 480, 144, false), "unequal periods");
+        assert!(!wants_adaptive(true, 144, 144, true), "switched off");
+        let forced = |v: Option<&str>| fixed_cushion_forced(v.map(std::ffi::OsStr::new));
+        assert!(forced(Some("1")) && forced(Some("true")));
+        assert!(!forced(None) && !forced(Some("")) && !forced(Some("0")));
+    }
+
+    /// `Running` reports the live cushion of an adaptive stream and the configured one of a
+    /// fixed stream, without touching the audio side.
+    #[test]
+    fn running_reports_the_live_cushion() {
+        const P: usize = 144;
+        let info = |cushion: u32| RunningInfo {
+            host: "test".into(),
+            input: "in".into(),
+            output: "out".into(),
+            sample_rate: 48_000,
+            buffer_frames: P as u32,
+            input_channels: 2,
+            output_channels: 2,
+            nominal_latency_ms: 9.0,
+            input_period_frames: P as u32,
+            cushion_frames: cushion,
+            output_period_frames: P as u32,
+            notes: Vec::new(),
+        };
+        let mut sim = Sim::new(P, Some(0));
+        let stats = sim.stats.clone().unwrap();
+        let (_, ends) = plumbing(48_000, 64);
+        let running = Running {
+            cushion: Some(stats),
+            ..Running::assemble(
+                Box::new(()),
+                ends,
+                info(P as u32),
+                Arc::new(AtomicBool::new(true)),
+                Arc::new(Mutex::new(None)),
+                Arc::new(AtomicU32::new(0)),
+            )
+        };
+        // Before the first block: the start value, as in `info`.
+        assert_eq!(
+            (running.cushion_frames(), running.cushion_adaptive()),
+            (P as u32, true)
+        );
+        let mut seen = Vec::new();
+        sim.run(8.0, 0.0, -4.0, 1, &silence, &mut |_| 0.0, &mut |_, t| {
+            if seen.len() < (t / 2.0) as usize + 1 {
+                seen.push(running.cushion_frames());
+            }
+        });
+        // One period standing for the first window (4 s), then trimmed away.
+        assert_eq!(seen, [144, 144, 144, 0], "every 2 s");
+        assert_eq!(running.cushion_changes(), (1, 0));
+        assert_eq!(
+            running.info.cushion_frames, P as u32,
+            "info keeps the start value"
+        );
+
+        let (_, ends) = plumbing(48_000, 64);
+        let fixed = Running::assemble(
+            Box::new(()),
+            ends,
+            info(96),
+            Arc::new(AtomicBool::new(true)),
+            Arc::new(Mutex::new(None)),
+            Arc::new(AtomicU32::new(0)),
+        );
+        assert_eq!(
+            (
+                fixed.cushion_frames(),
+                fixed.cushion_adaptive(),
+                fixed.cushion_changes()
+            ),
+            (96, false, (0, 0))
+        );
     }
 
     fn null_cfg(buf: u32) -> IoConfig {

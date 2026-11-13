@@ -20,6 +20,7 @@ pub mod modulation;
 pub mod param;
 pub mod pitch;
 pub mod processor;
+pub mod psola;
 pub mod reverb;
 pub mod tune;
 

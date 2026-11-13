@@ -73,6 +73,7 @@ pub fn to_control(addr: &str, args: &[OscType]) -> Option<Control> {
             monitor_dry: None,
             bypass: None,
             mute: None,
+            monitor_untuned: None,
         };
         if let Control::SetMix {
             input_db,
@@ -92,18 +93,29 @@ pub fn to_control(addr: &str, args: &[OscType]) -> Option<Control> {
         }
         Some(c)
     };
-    let flag = |bypass: bool, on: bool| Control::SetMix {
+    // Which on/off field of the mix an address sets.
+    #[derive(PartialEq)]
+    enum Flag {
+        Bypass,
+        Mute,
+        MonitorUntuned,
+    }
+    let flag = |which: Flag, on: bool| Control::SetMix {
         input_db: None,
         main_db: None,
         monitor_db: None,
         monitor_dry: None,
-        bypass: bypass.then_some(on),
-        mute: (!bypass).then_some(on),
+        bypass: (which == Flag::Bypass).then_some(on),
+        mute: (which == Flag::Mute).then_some(on),
+        monitor_untuned: (which == Flag::MonitorUntuned).then_some(on),
     };
+    // On/off values: 0 / 1, and no argument means "on" (a button that only sends its address).
+    let on = || f(args, 0).unwrap_or(1.0) > 0.5;
     match parts.as_slice() {
+        ["live", "mix", "monitor_untuned"] => Some(flag(Flag::MonitorUntuned, on())),
         ["live", "mix", field] => mix(field, f(args, 0)?),
-        ["live", "bypass"] => Some(flag(true, f(args, 0).unwrap_or(1.0) > 0.5)),
-        ["live", "mute"] => Some(flag(false, f(args, 0).unwrap_or(1.0) > 0.5)),
+        ["live", "bypass"] => Some(flag(Flag::Bypass, on())),
+        ["live", "mute"] => Some(flag(Flag::Mute, on())),
         ["live", "scene", "next"] => Some(Control::Next),
         ["live", "scene", "prev"] => Some(Control::Prev),
         ["live", "goto"] => Some(Control::Goto {
@@ -214,6 +226,57 @@ mod tests {
             None
         );
         assert_eq!(to_control("/other", &[]), None);
+    }
+
+    /// The monitor option "tuned only for the audience": an on/off value at
+    /// `/live/mix/monitor_untuned`, read like `/live/bypass` and `/live/mute`.
+    #[test]
+    fn maps_monitor_untuned() {
+        let only = |on: bool| Control::SetMix {
+            input_db: None,
+            main_db: None,
+            monitor_db: None,
+            monitor_dry: None,
+            bypass: None,
+            mute: None,
+            monitor_untuned: Some(on),
+        };
+        let addr = "/live/mix/monitor_untuned";
+        for (arg, on) in [
+            (OscType::Int(1), true),
+            (OscType::Int(0), false),
+            (OscType::Float(1.0), true),
+            (OscType::Float(0.0), false),
+            (OscType::Bool(true), true),
+            (OscType::Bool(false), false),
+        ] {
+            assert_eq!(
+                to_control(addr, std::slice::from_ref(&arg)),
+                Some(only(on)),
+                "{arg:?}"
+            );
+        }
+        // A button that only sends its address: on, as for bypass and mute.
+        assert_eq!(to_control(addr, &[]), Some(only(true)));
+        // The neighbours are untouched: the dry blend is still a number, bypass and mute do
+        // not set the new field.
+        assert!(matches!(
+            to_control("/live/mix/monitor_dry", &[OscType::Float(0.5)]),
+            Some(Control::SetMix { monitor_dry: Some(v), monitor_untuned: None, .. }) if v == 0.5
+        ));
+        for a in ["/live/bypass", "/live/mute"] {
+            assert!(matches!(
+                to_control(a, &[OscType::Int(1)]),
+                Some(Control::SetMix {
+                    monitor_untuned: None,
+                    ..
+                })
+            ));
+        }
+        assert_eq!(
+            to_control(addr, &[]).map(|c| c.required_role()),
+            to_control("/live/mute", &[]).map(|c| c.required_role())
+        );
     }
 
     #[test]

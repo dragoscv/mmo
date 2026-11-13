@@ -48,6 +48,9 @@ pub fn meters_json(m: &Meters) -> String {
         "safety_gr": m.safety_gr,
         "tune": tune, "latency_probe": probe,
         "chain_latency_samples": m.chain_latency_samples,
+        // Latency of the chain the in-ear monitor hears while "tuned only for the audience" is on
+        // (the main chain minus the pitch effects); equal to `chain_latency_samples` when it is off.
+        "monitor_chain_latency_samples": m.monitor_chain_latency_samples,
     })
     .to_string()
 }

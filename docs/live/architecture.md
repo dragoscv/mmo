@@ -97,7 +97,13 @@ flowchart LR
   sum --> byp["bypass blend<br/>(dry ↔ processed)"]
   dry --> byp
   byp --> main["main bus<br/>× main gain × mute"]
-  byp --> mon["monitor bus<br/>monitor_dry blend<br/>× monitor gain × mute"]
+  sum --> msum(("+"))
+  mtail["previous monitor chain tail<br/>(fed silence, fading)"] --> msum
+  ig --> mchain["monitor chain<br/>(only while monitor_untuned:<br/>same inserts minus pitch fx)"]
+  mchain --> msum
+  byp --> msel["monitor source blend<br/>(10 ms crossfade)"]
+  msum --> msel
+  msel --> mon["monitor bus<br/>monitor_dry blend<br/>× monitor gain × mute"]
   dry --> mon
   probe -.->|"click train"| main
   probe -.-> mon
@@ -108,6 +114,13 @@ flowchart LR
 - **main** — FOH / stream / recording, routed to `--main` (default channels `0,1`).
 - **monitor** — the performer's in-ear mix, routed to `--monitor` (optional). `monitor_dry` 0 = processed only,
   1 = dry only; the singer can keep a dry reference while the audience hears the full chain.
+- **monitor chain** (`monitor_untuned`, "tuned only for the audience") — an optional second chain that feeds the
+  monitor bus: the same inserts, parameters, order and enabled flags as the main chain, minus the pitch effects
+  (`autotune`, `harmonizer`), so the ears do not pay the shifter's 256 samples (5.3 ms) while the main bus keeps
+  the full chain. It is built and edited on the control thread, charges nothing while the option is off, and its
+  effects have their own state (its reverb is not the main chain's reverb). A 10 ms crossfade moves the monitor
+  bus between the two sources; a scene change gives the monitor its own tail, so the ears get no click and no
+  reverb cut that the audience does not get.
 - `bypass` blends every bus to the dry input (instant safe mode); `mute` silences every bus; both ramp 10 ms.
 - The **safety limiter** is the last stage of each bus and is not an insert: nothing can remove or disable it,
   and bypass, the dry monitor blend and the latency click go through it. Zero latency, stereo-linked, instant
@@ -119,7 +132,9 @@ flowchart LR
 ## Scene swap with tail spill
 
 Loading a preset (directly, or by navigating a setlist) builds a new chain on the control thread and sends
-`SwapChain`. The audio thread swaps pointers and keeps the **old chain** as a tail:
+`SwapChain` — or `SwapChains { chain, monitor }` while `monitor_untuned` is on, which carries both chains in one
+command so the ears change scene in the same sample as the audience. The audio thread swaps pointers and keeps
+the **old chain** as a tail (and the old monitor chain as its own tail on the monitor bus):
 
 1. Tail length = old chain `tail_seconds()` (max over enabled inserts: reverb `decay + pre_delay`, delay echoes
    to −60 dB, chorus/doubler ~50–60 ms), capped at 6 s. Zero → the old chain goes straight to garbage.

@@ -3,12 +3,12 @@
 //! intents into [`Command`]s.
 
 use crate::control::TapTempo;
-use crate::core::Command;
+use crate::core::{Command, is_pitch_fx};
 use crate::midi::{MidiRouter, MidiState};
 use crate::preset::{Preset, PresetError, Setlist, factory, parse_key};
 use crate::store::Store;
 use live_dsp::param::param_index;
-use live_dsp::{FxKind, Insert};
+use live_dsp::{Chain, FxKind, Insert};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -28,6 +28,10 @@ pub struct MixState {
     pub monitor_dry: f32,
     pub bypass: bool,
     pub mute: bool,
+    /// Monitor option "tuned only for the audience": the in-ear bus gets the chain without the
+    /// pitch effects (so without their delay); the main bus keeps the full chain.
+    #[serde(default)]
+    pub monitor_untuned: bool,
 }
 
 impl Default for MixState {
@@ -39,6 +43,7 @@ impl Default for MixState {
             monitor_dry: 0.0,
             bypass: false,
             mute: false,
+            monitor_untuned: false,
         }
     }
 }
@@ -110,6 +115,14 @@ pub enum SessionError {
     UnknownBinding(u32),
     #[error(transparent)]
     Preset(#[from] PresetError),
+}
+
+/// Drop the pitch effects ([`is_pitch_fx`]) of a freshly built chain: what is left feeds the
+/// monitor bus while `mix.monitor_untuned` is on. Control thread only (frees the dropped boxes);
+/// the vector keeps its full capacity, so the audio thread can still add inserts to it.
+fn without_pitch(mut chain: Box<Chain>) -> Box<Chain> {
+    chain.inserts.retain(|i| !is_pitch_fx(i.kind));
+    chain
 }
 
 /// Factory presets renamed since the first release: setlists, MIDI maps and remotes saved with the
@@ -198,7 +211,28 @@ impl Session {
         self.revision += 1;
     }
 
-    /// Load a preset by name: returns the chain swap command.
+    /// The chain that feeds the monitor bus when `mix.monitor_untuned` is switched on: the
+    /// current chain without the pitch effects — same insert ids, order, parameters and enabled
+    /// flags, built the way a preset is built. Its effects start with empty state: it is a
+    /// second set of effects, not a tap on the main chain, so its reverb and delay fill up from
+    /// the moment it is switched on. Allocates: control thread only.
+    fn monitor_chain(&self) -> Option<Box<Chain>> {
+        let mut chain = match self.capture("").build(self.sr, self.max_block, 0) {
+            Ok(built) => built.chain,
+            Err(e) => {
+                log::warn!("monitor chain: {e}");
+                return None;
+            }
+        };
+        // Insert ids are the link between the two chains.
+        for (ins, st) in chain.inserts.iter_mut().zip(&self.chain) {
+            ins.id = st.id;
+        }
+        Some(without_pitch(chain))
+    }
+
+    /// Load a preset by name: returns the chain swap command (one command: with
+    /// `mix.monitor_untuned` on it carries the monitor chain too).
     pub fn load_preset(&mut self, name: &str) -> Result<Command, SessionError> {
         let name = if self.presets.iter().any(|p| p.name == name) {
             name
@@ -216,6 +250,14 @@ impl Session {
 
     pub fn load(&mut self, preset: &Preset) -> Result<Command, SessionError> {
         let built = preset.build(self.sr, self.max_block, self.next_id)?;
+        // With the monitor option on, the same preset is built a second time for the monitor
+        // bus (same ids) and loses its pitch effects.
+        let monitor = if self.mix.monitor_untuned {
+            let again = preset.build(self.sr, self.max_block, self.next_id)?;
+            Some(without_pitch(again.chain))
+        } else {
+            None
+        };
         for w in &built.warnings {
             log::warn!("preset {}: {w}", preset.name);
         }
@@ -239,7 +281,13 @@ impl Session {
             .collect();
         self.preset_name = preset.name.clone();
         self.bump();
-        Ok(Command::SwapChain { chain: built.chain })
+        Ok(match monitor {
+            Some(monitor) => Command::SwapChains {
+                chain: built.chain,
+                monitor,
+            },
+            None => Command::SwapChain { chain: built.chain },
+        })
     }
 
     /// Current chain captured as a preset (for "save as").
@@ -353,9 +401,19 @@ impl Session {
         let at = at.min(self.chain.len());
         self.chain.insert(at, state);
         self.bump();
-        Ok(Command::AddInsert {
-            at,
-            insert: Box::new(ins),
+        // The monitor chain gets its own instance (same id), unless it is a pitch effect.
+        let monitor = (self.mix.monitor_untuned && !is_pitch_fx(kind))
+            .then(|| Box::new(Insert::new(id, kind, self.sr, self.max_block)));
+        Ok(match monitor {
+            Some(monitor) => Command::AddInsertBoth {
+                at,
+                insert: Box::new(ins),
+                monitor,
+            },
+            None => Command::AddInsert {
+                at,
+                insert: Box::new(ins),
+            },
         })
     }
 
@@ -405,6 +463,17 @@ impl Session {
         }
         if m.mute != before.mute {
             out.push(Command::Mute(m.mute));
+        }
+        let untuned = m.monitor_untuned;
+        if untuned != before.monitor_untuned {
+            // On: the monitor chain is built from the chain as it is now. Off: the audio thread
+            // fades back to the main chain and hands the monitor chain back.
+            match untuned.then(|| self.monitor_chain()) {
+                // The chain could not be built: the option stays off rather than lying.
+                Some(None) => self.mix.monitor_untuned = false,
+                Some(chain) => out.push(Command::SetMonitorChain { chain }),
+                None => out.push(Command::SetMonitorChain { chain: None }),
+            }
         }
         if !out.is_empty() {
             self.bump();
@@ -605,5 +674,499 @@ mod tests {
                 .iter()
                 .any(|p| p.name == "Mine" && p.chain.len() == 7)
         );
+    }
+
+    // ─── Monitor option "tuned only for the audience" ───────────────────────
+
+    use crate::control::Control;
+    use crate::core::{Buses, Core, Ledger};
+    use std::time::Instant;
+
+    /// The pitch effects, spelled out: the tests must not share the list they check.
+    fn is_pitch(fx: &str) -> bool {
+        ["autotune", "harmonizer"].contains(&fx)
+    }
+
+    fn first(s: &Session, fx: &str) -> Option<u32> {
+        s.chain.iter().find(|i| i.fx == fx).map(|i| i.id)
+    }
+
+    /// One thing a user, a remote or a pedal does. Effects are addressed by kind (the first
+    /// insert of that effect): insert ids differ between the sessions that are compared.
+    #[derive(Clone, Copy, Debug)]
+    enum Edit {
+        Param(&'static str, &'static str, f32),
+        Enable(&'static str, bool),
+        Add(&'static str, usize),
+        Remove(&'static str),
+        Move(&'static str, usize),
+        Load(&'static str),
+        Goto(usize, usize),
+        Next,
+        Prev,
+        /// A raw MIDI message.
+        Midi(&'static [u8]),
+        /// A client message (protocol JSON).
+        Message(&'static str),
+        /// The panic button (mute + reset), then unmute.
+        Panic,
+        /// The monitor option, through the client message.
+        Untuned(bool),
+        /// The option off and on again with no audio in between.
+        OffOn,
+    }
+
+    fn edit(s: &mut Session, e: Edit) -> Vec<Command> {
+        let now = Instant::now();
+        let untuned = |s: &mut Session, on: bool| {
+            let json = format!(r#"{{"type":"set_mix","monitor_untuned":{on}}}"#);
+            s.apply_control(serde_json::from_str(&json).unwrap(), now)
+                .unwrap()
+        };
+        match e {
+            Edit::Param(fx, param, value) => first(s, fx)
+                .map(|id| s.set_param(id, param, value).unwrap())
+                .into_iter()
+                .collect(),
+            Edit::Enable(fx, on) => first(s, fx)
+                .map(|id| s.set_enabled(id, on).unwrap())
+                .into_iter()
+                .collect(),
+            Edit::Add(fx, at) => vec![s.add_insert(fx, at).unwrap()],
+            Edit::Remove(fx) => first(s, fx)
+                .map(|id| s.remove_insert(id).unwrap())
+                .into_iter()
+                .collect(),
+            Edit::Move(fx, to) => first(s, fx)
+                .map(|id| s.move_insert(id, to).unwrap())
+                .into_iter()
+                .collect(),
+            Edit::Load(name) => vec![s.load_preset(name).unwrap()],
+            Edit::Goto(song, part) => s.goto(song, part).unwrap(),
+            Edit::Next => s.next_part().unwrap(),
+            Edit::Prev => s.prev_part().unwrap(),
+            Edit::Midi(bytes) => s.apply_midi(bytes, now),
+            Edit::Message(json) => s
+                .apply_control(serde_json::from_str(json).unwrap(), now)
+                .unwrap(),
+            Edit::Panic => {
+                let mut v = s.apply_control(Control::Panic, now).unwrap();
+                v.extend(s.set_mix(|m| m.mute = false));
+                v
+            }
+            Edit::Untuned(on) => untuned(s, on),
+            Edit::OffOn => {
+                let mut v = untuned(s, false);
+                v.extend(untuned(s, true));
+                v
+            }
+        }
+    }
+
+    /// One block through a core: (main L then R, monitor L then R).
+    fn render(core: &mut Core, input: &[f32]) -> (Vec<f32>, Vec<f32>) {
+        let n = input.len();
+        let (mut ml, mut mr, mut ol, mut or) =
+            (vec![0.0; n], vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+        core.render(
+            input,
+            input,
+            Buses {
+                main_l: &mut ml,
+                main_r: &mut mr,
+                mon_l: &mut ol,
+                mon_r: &mut or,
+            },
+        );
+        ml.extend(mr);
+        ol.extend(or);
+        (ml, ol)
+    }
+
+    /// A sung note (226 Hz, 47 cents sharp of A3, with harmonics) with a 3 Hz tremolo, so
+    /// pitch correction, compressors and echoes all have something to do.
+    fn signal(from: usize, n: usize) -> Vec<f32> {
+        (from..from + n)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let w = core::f32::consts::TAU * 226.0 * t;
+                let voice = 0.2 * w.sin() + 0.1 * (2.0 * w).sin() + 0.05 * (3.0 * w).sin();
+                (0.6 + 0.4 * (core::f32::consts::TAU * 3.0 * t).sin()) * voice
+            })
+            .collect()
+    }
+
+    /// A chain as (id, effect, enabled, parameter values).
+    type Shape = Vec<(u32, String, bool, Vec<f32>)>;
+
+    fn shape(chain: &Chain) -> Shape {
+        chain
+            .inserts
+            .iter()
+            .map(|i| {
+                let params = (0..i.fx.specs().len()).map(|k| i.fx.param(k)).collect();
+                (i.id, i.kind.id().to_string(), i.enabled(), params)
+            })
+            .collect()
+    }
+
+    /// Three engines fed the same audio and the same edits.
+    struct Rig {
+        /// Under test: the monitor option is used here.
+        a: (Session, Core),
+        /// The same edits, the option never touched: its main bus is the golden main bus.
+        plain: (Session, Core),
+        /// The same chain without its pitch effects, as a MAIN chain: its main bus is what the
+        /// monitor bus of `a` must carry.
+        reference: (Session, Core),
+        /// Input gain of the reference: a monitor chain switched on in the middle of a song
+        /// gets its input faded in over 10 ms, so the reference gets the same.
+        reference_in: live_dsp::Smoothed,
+        ledger: Ledger,
+        t: usize,
+        /// Blocks in which the monitor bus of `a` differed from its main bus.
+        untuned_blocks: usize,
+    }
+
+    impl Rig {
+        /// Blocks of 128 frames rendered and compared after every edit (171 ms).
+        const BLOCKS: usize = 64;
+
+        fn new() -> Self {
+            let pair = || {
+                let mut s = Session::new(48000.0, 128);
+                s.load_setlist(setlist());
+                (s, Core::new(48000.0, 128))
+            };
+            let a = pair();
+            let ledger = Ledger::for_core(&a.1);
+            Self {
+                a,
+                plain: pair(),
+                reference: pair(),
+                reference_in: live_dsp::Smoothed::with_ms(1.0, 10.0, 48000.0),
+                ledger,
+                t: 0,
+                untuned_blocks: 0,
+            }
+        }
+
+        fn send(pair: &mut (Session, Core), e: Edit) {
+            for c in edit(&mut pair.0, e) {
+                pair.1.apply(c, &mut |_g| {});
+            }
+        }
+
+        /// The reference starts again, empty, from the chain `a` has now (minus the pitch
+        /// effects): what a monitor chain switched on at this moment is.
+        fn restart_reference(&mut self) {
+            let mut preset = self.a.0.capture("reference");
+            preset.chain.retain(|i| !is_pitch(&i.fx));
+            let mut s = Session::new(48000.0, 128);
+            s.setlist = self.a.0.setlist.clone();
+            s.position = self.a.0.position.clone();
+            s.midi = self.a.0.midi.clone();
+            let mut c = Core::new(48000.0, 128);
+            c.apply(s.load(&preset).unwrap(), &mut |_g| {});
+            self.reference = (s, c);
+            self.reference_in.reset(0.0);
+            self.reference_in.set(1.0);
+        }
+
+        fn apply(&mut self, e: Edit) {
+            let before: Vec<String> = self.a.0.chain.iter().map(|i| i.fx.clone()).collect();
+            let moved = match e {
+                Edit::Move(fx, _) => first(&self.a.0, fx),
+                _ => None,
+            };
+            for c in edit(&mut self.a.0, e) {
+                self.ledger.apply(&mut self.a.1, c);
+            }
+            if matches!(e, Edit::Untuned(_) | Edit::OffOn) {
+                // Only `a` has the option. The reference restarts in `step`, at the block in
+                // which the new monitor chain starts.
+                return;
+            }
+            Self::send(&mut self.plain, e);
+            // Positions in the reference: the same place among the effects that are not pitch
+            // effects.
+            let kept = |fx: &[String]| fx.iter().filter(|f| !is_pitch(f)).count();
+            let for_reference = match e {
+                Edit::Add(fx, _) | Edit::Move(fx, _) if is_pitch(fx) => None,
+                Edit::Add(fx, at) => Some(Edit::Add(fx, kept(&before[..at.min(before.len())]))),
+                Edit::Move(fx, _) => {
+                    let now: Vec<String> = self.a.0.chain.iter().map(|i| i.fx.clone()).collect();
+                    let at = self.a.0.chain.iter().position(|i| Some(i.id) == moved);
+                    at.map(|at| Edit::Move(fx, kept(&now[..at])))
+                }
+                other => Some(other),
+            };
+            if let Some(e) = for_reference {
+                Self::send(&mut self.reference, e);
+            }
+            // Whatever was loaded: the reference never keeps a pitch effect.
+            let pitch: Vec<u32> = (self.reference.0.chain.iter())
+                .filter(|i| is_pitch(&i.fx))
+                .map(|i| i.id)
+                .collect();
+            for id in pitch {
+                let c = self.reference.0.remove_insert(id).unwrap();
+                self.reference.1.apply(c, &mut |_g| {});
+            }
+        }
+
+        /// Apply one edit, check the chains, render `settle + BLOCKS` blocks and compare the
+        /// last `BLOCKS`. Returns the largest difference between the monitor bus and what it
+        /// must carry: the reference's main bus while the option is on, its own main bus
+        /// while it is off.
+        fn step(&mut self, e: Edit, settle: usize) -> f32 {
+            self.apply(e);
+            let on = self.a.0.mix.monitor_untuned;
+            // The chains themselves: the main chain is the session's chain, the monitor chain
+            // is the same list without the pitch effects — ids, order, enabled, every value.
+            let all: Shape = (self.a.0.chain.iter())
+                .map(|i| {
+                    let params = i.params.iter().map(|p| p.1).collect();
+                    (i.id, i.fx.clone(), i.enabled, params)
+                })
+                .collect();
+            assert_eq!(shape(self.a.1.chain()), all, "{e:?}: main chain");
+            let want: Shape = all.into_iter().filter(|i| !is_pitch(&i.1)).collect();
+            assert_eq!(
+                self.a.1.monitor_chain().map(shape),
+                on.then_some(want),
+                "{e:?}: monitor chain"
+            );
+            let mut worst = 0.0f32;
+            for k in 0..settle + Self::BLOCKS {
+                if self.a.1.monitor_fresh() {
+                    self.restart_reference();
+                }
+                let input = signal(self.t, 128);
+                self.t += 128;
+                let ref_input: Vec<f32> =
+                    (input.iter().map(|x| x * self.reference_in.next())).collect();
+                let (main, mon) = render(&mut self.a.1, &input);
+                let (plain_main, plain_mon) = render(&mut self.plain.1, &input);
+                let (ref_main, _) = render(&mut self.reference.1, &ref_input);
+                self.ledger.collect(&mut self.a.1);
+                assert!(
+                    main == plain_main,
+                    "{e:?}: the main bus changed (block {k})"
+                );
+                assert!(plain_main == plain_mon, "{e:?}: plain twin");
+                if k < settle {
+                    continue;
+                }
+                self.untuned_blocks += usize::from(mon != main);
+                // On: the reference. Off: the main bus.
+                let want = if on { &ref_main } else { &main };
+                let diff = (mon.iter().zip(want)).map(|(x, y)| (x - y).abs());
+                worst = diff.fold(worst, f32::max);
+            }
+            self.ledger.assert_balanced(&self.a.1);
+            worst
+        }
+    }
+
+    /// Every way the chain can change — a parameter, on/off, add, remove, move, a preset, the
+    /// setlist with its song key and tempo, MIDI, the panic button, the option itself — keeps
+    /// the monitor chain equal to "the main chain without the pitch effects". After each edit:
+    /// the two chains are compared insert by insert, the monitor bus is compared with a
+    /// reference engine running that chain as its main chain (sample for sample: both run the
+    /// same code on the same input, so they must agree exactly), the main bus is compared with
+    /// an engine that never used the option, and every box sent to the audio thread is
+    /// accounted for.
+    #[test]
+    fn untuned_monitor_chain_follows_every_edit() {
+        use Edit::*;
+        // On in the middle of a song: the old chain fades out first if there is one (4 blocks),
+        // the new one runs unheard for 50 ms, then a 10 ms crossfade: 2881 samples, 23 blocks.
+        const SWITCH: usize = 4 + 23;
+        // Off: 10 ms crossfade back to the main bus (4 blocks).
+        const FADE: usize = 4;
+        let learn =
+            r#"{"type":"midi_learn","target":{"kind":"param","fx":"reverb","param":"mix"}}"#;
+        let steps: &[(Edit, usize)] = &[
+            (Untuned(true), SWITCH), // on before anything is loaded
+            (Load("Pop Polish"), 0), // eq deesser compressor AUTOTUNE doubler delay reverb limiter
+            (Param("reverb", "mix", 0.6), 0),
+            (Param("delay", "feedback", 0.6), 0),
+            (Param("autotune", "retune", 5.0), 0), // a pitch effect: main chain only
+            (Enable("compressor", false), 0),
+            (Enable("compressor", true), 0),
+            (Enable("autotune", false), 0),
+            (Enable("autotune", true), 0),
+            (Add("chorus", 0), 0),
+            (Add("saturator", 4), 0),  // right before the autotune
+            (Add("gate", 6), 0),       // right after it
+            (Add("harmonizer", 6), 0), // a second pitch effect next to the first
+            (Add("chorus", 6), 0),     // between the two pitch effects
+            (Add("limiter", 99), 0),   // past the end
+            (Remove("doubler"), 0),
+            (Remove("harmonizer"), 0),
+            (Move("reverb", 0), 0),     // across the autotune to the front
+            (Move("saturator", 99), 0), // across it to the end
+            (Move("gate", 2), 0),
+            (Move("autotune", 0), 0), // the pitch effect itself
+            (Move("compressor", 5), 0),
+            (Load("Harmony Stack"), 0), // scene change: both chains, both tails
+            (Goto(0, 1), 0),            // setlist: Pop Polish, song key (pitch effects), tempo
+            (Next, 0),                  // Hard Snap
+            (Prev, 0),
+            (Message(learn), 0),
+            (Midi(&[0xB0, 4, 10]), 0),  // the pedal is learned
+            (Midi(&[0xB0, 4, 100]), 0), // the pedal moves the reverb mix
+            (Midi(&[0xC0, 1]), 0),      // program change: Natural Vocal
+            (Panic, 0),                 // reset
+            (Next, 0),
+            (Next, 0), // Hard Snap: eq compressor AUTOTUNE delay reverb limiter
+            (Untuned(false), FADE),
+            (Param("delay", "mix", 0.4), 0), // edits while the option is off ...
+            (Add("saturator", 1), 0),
+            (Enable("compressor", false), 0),
+            (Add("chorus", 2), 0),
+            (Untuned(true), SWITCH), // ... are in the chain built when it goes on again
+            (Param("reverb", "mix", 0.3), 0),
+            (Add("gate", 3), 0),
+            (Move("delay", 0), 0),
+            (Remove("saturator"), 0),
+            // Off and on again inside the fade: the new chain takes over once the old one has
+            // faded out.
+            (OffOn, SWITCH),
+            (Param("delay", "mix", 0.1), 0),
+            (Move("chorus", 99), 0),
+            (Load("Ballad Hall"), 0),
+            (Load("Speech / MC"), 0),
+            (Untuned(false), FADE),
+        ];
+        let mut rig = Rig::new();
+        let mut report = Vec::new();
+        for (e, settle) in steps {
+            let worst = rig.step(*e, *settle);
+            report.push(format!("{worst:.1e}  {e:?}"));
+            assert!(worst == 0.0, "monitor bus vs reference: {report:#?}");
+        }
+        assert!(
+            rig.untuned_blocks > 1000,
+            "the monitor bus hardly ever differed from the main bus: {}",
+            rig.untuned_blocks
+        );
+        // With `-- --nocapture`: the largest difference after each edit.
+        println!("monitor bus vs reference, largest difference per edit:\n{report:#?}");
+    }
+
+    /// Option never touched: the session sends what it always sent.
+    #[test]
+    fn untuned_off_sends_the_commands_it_always_sent() {
+        let mut s = Session::new(48000.0, 128);
+        assert!(!s.mix.monitor_untuned);
+        assert!(matches!(
+            s.load_preset("Pop Polish").unwrap(),
+            Command::SwapChain { .. }
+        ));
+        assert!(matches!(
+            s.add_insert("chorus", 0).unwrap(),
+            Command::AddInsert { .. }
+        ));
+        let cmds = s.set_mix(|m| m.mute = true);
+        assert!(matches!(cmds.as_slice(), [Command::Mute(true)]));
+        // "Off" when it is off: nothing to send, nothing changed.
+        let r0 = s.revision;
+        assert!(s.set_mix(|m| m.monitor_untuned = false).is_empty());
+        assert_eq!(s.revision, r0);
+    }
+
+    /// Option on: a preset load is still ONE command (callers of `load_preset` send exactly
+    /// one), and it carries the monitor chain; a new insert comes with its monitor copy unless
+    /// it is a pitch effect.
+    #[test]
+    fn untuned_on_sends_the_monitor_chain_with_each_change() {
+        let ids = |c: &Chain| c.inserts.iter().map(|i| i.id).collect::<Vec<_>>();
+        let fx = |c: &Chain| c.inserts.iter().map(|i| i.kind.id()).collect::<Vec<_>>();
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Pop Polish").unwrap();
+        let r0 = s.revision;
+        let cmds = s.set_mix(|m| m.monitor_untuned = true);
+        assert!(s.revision > r0, "clients must hear about it");
+        match cmds.as_slice() {
+            [Command::SetMonitorChain { chain: Some(c) }] => {
+                // Pop Polish is ids 1..=8 with the autotune at 4.
+                assert_eq!(ids(c), [1, 2, 3, 5, 6, 7, 8]);
+                assert!(!fx(c).contains(&"autotune"));
+                // Room to add inserts on the audio thread without allocating.
+                assert!(c.inserts.capacity() >= live_dsp::chain::MAX_INSERTS);
+            }
+            _ => panic!("expected one SetMonitorChain"),
+        }
+        // On when it is on: nothing.
+        assert!(s.set_mix(|m| m.monitor_untuned = true).is_empty());
+        match s.load_preset("Harmony Stack").unwrap() {
+            Command::SwapChains { chain, monitor } => {
+                assert_eq!(
+                    fx(&chain),
+                    [
+                        "eq",
+                        "compressor",
+                        "autotune",
+                        "harmonizer",
+                        "reverb",
+                        "limiter"
+                    ]
+                );
+                assert_eq!(fx(&monitor), ["eq", "compressor", "reverb", "limiter"]);
+                assert_eq!(ids(&chain), [9, 10, 11, 12, 13, 14]);
+                assert_eq!(ids(&monitor), [9, 10, 13, 14]);
+                assert!(monitor.inserts.capacity() >= live_dsp::chain::MAX_INSERTS);
+            }
+            _ => panic!("expected SwapChains"),
+        }
+        match s.add_insert("delay", 1).unwrap() {
+            Command::AddInsertBoth {
+                at,
+                insert,
+                monitor,
+            } => assert_eq!((at, insert.id, monitor.id), (1, 15, 15)),
+            _ => panic!("expected AddInsertBoth"),
+        }
+        assert!(matches!(
+            s.add_insert("harmonizer", 0).unwrap(),
+            Command::AddInsert { .. }
+        ));
+        let cmds = s.set_mix(|m| m.monitor_untuned = false);
+        assert!(matches!(
+            cmds.as_slice(),
+            [Command::SetMonitorChain { chain: None }]
+        ));
+        assert!(matches!(
+            s.load_preset("Pop Polish").unwrap(),
+            Command::SwapChain { .. }
+        ));
+    }
+
+    /// `SessionState` carries `mix.monitor_untuned`; a state written before the field existed
+    /// still parses (off).
+    #[test]
+    fn untuned_is_in_the_session_state() {
+        let mut s = Session::new(48000.0, 128);
+        let v = serde_json::to_value(s.state()).unwrap();
+        assert_eq!(v["mix"]["monitor_untuned"], serde_json::json!(false));
+        s.set_mix(|m| m.monitor_untuned = true);
+        let mut v = serde_json::to_value(s.state()).unwrap();
+        assert_eq!(v["mix"]["monitor_untuned"], serde_json::json!(true));
+        let back: SessionState = serde_json::from_value(v.clone()).unwrap();
+        assert!(back.mix.monitor_untuned);
+        v["mix"].as_object_mut().unwrap().remove("monitor_untuned");
+        let old: SessionState = serde_json::from_value(v).unwrap();
+        assert!(!old.mix.monitor_untuned);
+        assert_eq!(MixState::default(), old_mix());
+    }
+
+    /// The mix as a client that predates the option writes it.
+    fn old_mix() -> MixState {
+        serde_json::from_str(
+            r#"{"input_db":0.0,"main_db":0.0,"monitor_db":0.0,"monitor_dry":0.0,"bypass":false,"mute":false}"#,
+        )
+        .unwrap()
     }
 }

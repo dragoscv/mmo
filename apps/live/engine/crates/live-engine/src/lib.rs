@@ -1,6 +1,7 @@
 //! MixAI Live engine: device I/O, the realtime core, presets/setlists and the control session.
 //! See ADR-0015 and `docs/live/architecture.md`.
 
+pub mod checkup;
 pub mod control;
 pub mod core;
 pub mod io;
@@ -10,6 +11,7 @@ pub mod preset;
 pub mod sample;
 pub mod session;
 pub mod store;
+pub mod voicemeeter;
 #[cfg(windows)]
 pub mod wasapi;
 

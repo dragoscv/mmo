@@ -19,6 +19,8 @@ Build features (forwarded to cpal): `asio` (Windows ASIO, needs the Steinberg SD
 | [`presets`](#presets) | List factory presets as JSON |
 | [`run`](#run) | Process live until Ctrl+C (or `--seconds`), printing meters every second |
 | [`latency`](#latency) | Measure the real round trip with a click train (needs a loopback) |
+| [`checkup`](#checkup) | Read-only: what outside the engine adds delay or breaks low buffers, as JSON |
+| [`voicemeeter`](#voicemeeter) | What the local Voicemeeter runs; `--save` / `--buffer` / `--load` change it |
 | [`render`](#render) | Process a WAV file offline through a preset |
 | [`serve`](#serve) | Run the engine with the control server (desktop UI, web remote, phones) |
 | `midi-ports` | List MIDI input port names as JSON (what `serve` will open; see [MIDI control](midi.md)) |
@@ -31,7 +33,7 @@ Shared by `run`, `latency` and `serve`:
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--host <name>` | system default | `WASAPI`, `WASAPI Exclusive`, `WASAPI Low Latency` ([Windows hosts](latency.md#windows)), `ASIO` (feature), `CoreAudio`, `ALSA`, `JACK` (feature)… case-insensitive |
+| `--host <name>` | system default | `WASAPI`, `WASAPI Exclusive`, `WASAPI Low Latency` ([Windows hosts](latency.md#windows)), `ASIO` (feature), `CoreAudio`, `ALSA`, `JACK` (feature)… case-insensitive; `Voicemeeter Insert` runs the engine inside Voicemeeter's own callback (see [voicemeeter](#voicemeeter)) |
 | `--input <id\|name>` | default input | device id or exact name from `devices` |
 | `--output <id\|name>` | default output | device id or exact name from `devices` |
 | `--rate <Hz>` | `48000` | sample rate for both streams |
@@ -113,7 +115,7 @@ mixai-live-engine latency [device options]
 Runs the click-train probe described in [latency.md](latency.md#measure-the-real-round-trip) and prints:
 
 ```json
-{ "round_trip_ms": 7.9, "nominal_ms": 4.0, "chain_latency_samples": 0, "in_peak_db": -3.1, "info": { "host": "ASIO", "...": "..." } }
+{ "round_trip_ms": 7.9, "nominal_ms": 4.0, "chain_latency_samples": 0, "monitor_chain_latency_samples": 0, "in_peak_db": -3.1, "info": { "host": "ASIO", "...": "..." } }
 ```
 
 The engine output is muted during the probe, so only the clicks are played (through a loopback the dry signal
@@ -122,6 +124,66 @@ would feed back). `in_peak_db` is the loudest input sample seen during the probe
 loopback, `latency probe timed out (loudest input: <x> dBFS)` after 10 s, or `audio stream stopped: <reason>`
 when a device stops delivering. The level tells the cases apart: a click needs to arrive above about
 −34 dBFS (0.02 of full scale) to count; `-180.0` means the input is digitally silent.
+
+## checkup
+
+```text
+mixai-live-engine checkup [device options]
+```
+
+Windows only, read-only: what outside the engine adds delay or breaks small buffers, as JSON. With `--input` /
+`--output` it looks at those devices, without them at the system default pair.
+
+```json
+{
+  "items": [
+    { "id": "endpoint_volume", "status": "ok", "device": "output", "value": "0.0",
+      "detail": "Windows volume of the output \"Audio Interface Out (2- HD-II)\" is 0.0 dB (slider at 100 %)." },
+    { "id": "exclusive_allowed", "status": "ok", "device": "output", "value": "allowed", "detail": "…" },
+    { "id": "voicemeeter_owns_device", "status": "warn", "device": "output", "value": "a1",
+      "detail": "Voicemeeter holds this device as its A1 output" }
+  ]
+}
+```
+
+`items` ids are stable: `exclusive_allowed`, `enhancements`, `sample_rate`, `endpoint_volume`, `output_kind`,
+`power_plan`, `voicemeeter_owns_device`. `status` is `ok`, `warn`, `fail` or `unknown` (could not be read on
+this system); `value` is the machine-readable reading per id and `detail` the sentence shown to a person.
+`voicemeeter_owns_device` is the one finding that is not a Windows setting: an interface held by Voicemeeter
+cannot be opened exclusively by the engine.
+
+## voicemeeter
+
+```text
+mixai-live-engine voicemeeter [--save <file.xml>] [--buffer <driver>=<frames>] [--load <file.xml>]
+```
+
+Windows only, read-only without flags: what the local Voicemeeter runs, as JSON.
+
+```json
+{
+  "installed": true, "running": true, "kind": "potato", "version": "3.1.2.2", "sample_rate": 48000,
+  "buffer_wdm": 256, "a1_device": "Audio Interface Out (2- HD-II)", "insert_channels": 34,
+  "strips": [
+    { "index": 4, "kind": "hardware", "label": "Q-28 (L mixer, R DJI)",
+      "device": "Audio Interface IN (2- HD-II)", "channels": [8, 9], "a1": true, "b1": false }
+  ]
+}
+```
+
+`channels` are the insert-buffer channels of that strip (what `--in-ch` and `--main` take on the
+`Voicemeeter Insert` host). The options change Voicemeeter, so `--save` is worth doing first:
+
+- `--save <file.xml>`: Voicemeeter writes its whole configuration there (verified: the file is there, big
+  enough, newer than before the request).
+- `--buffer wdm=160`: set a buffer size (`mme` / `wdm` / `ks` / `asio`, 64…2048 frames) and restart
+  Voicemeeter's audio; needs `--save` in the same call, and reads the value back before returning.
+- `--load <file.xml>`: load a configuration saved with `--save`; Voicemeeter restarts its audio (a short
+  dropout for everything that plays through it).
+
+When using `--host "Voicemeeter Insert"` with `run`, `latency`, or `serve`, the engine runs inside Voicemeeter's
+own audio callback (via the Voicemeeter Remote / Insert API). Hardware `--input` and `--output` options are omitted;
+`--in-ch` routes from Voicemeeter insert channels, and `--main` / `--monitor` route back to insert return channels.
 
 ## render
 
