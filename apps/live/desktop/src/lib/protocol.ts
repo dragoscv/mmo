@@ -163,6 +163,12 @@ export interface RunningInfo {
     input_channels: number;
     output_channels: number;
     nominal_latency_ms: number;
+    /** The three buffer terms behind `nominal_latency_ms`, in frames: one input period, the frames
+     *  kept queued between input and output, one output period. The engine sends them since the
+     *  latency slice; an older engine leaves them at 0. */
+    input_period_frames?: number;
+    cushion_frames?: number;
+    output_period_frames?: number;
     notes: string[];
 }
 

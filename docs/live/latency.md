@@ -22,6 +22,12 @@ The engine reports `nominal_latency_ms` = 3 × buffer ÷ rate (the three buffer 
 trip is always larger; measure it with the probe below — the engine never reports driver figures as the
 latency. The ADR-0015 target is ≤ 6 ms round trip at 64 frames on a good driver.
 
+The desktop setup step shows both side by side as a **latency budget**: each stage the engine controls (input
+period, the frames queued between input and output, output period, the effect chain — separately for the
+audience's path and the ears') next to the measured round trip, with the difference labelled *driver, OS and
+routing*. The declared side is a sum of what the engine sets; the measured side is what came back. Read them
+that way: a small declared figure with a large measured one means the delay is outside the engine.
+
 The native WASAPI hosts report the periods the driver really runs: nominal = (input period + ring target +
 output period) ÷ rate, where the ring target is the larger of the two periods. With one interface for input
 and output the periods are equal and this is again 3 periods. With unequal periods (two devices) the ring

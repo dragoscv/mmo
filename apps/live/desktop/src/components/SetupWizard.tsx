@@ -2,7 +2,7 @@
  * First-run / audio setup: host, input + channels, output + main pair + optional in-ear pair, buffer
  * with live nominal latency, Voicemeeter badge + recommended routing, real latency measurement, Start.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Activity, Loader2, Play, RefreshCw, Sparkles } from "lucide-react";
 import {
@@ -37,6 +37,8 @@ import {
     type DevicesResponse,
 } from "../lib/routing";
 import { api, isTauri, type EngineConfig, type LatencyResult } from "../lib/tauri";
+import { latencyBudget } from "../lib/latency-budget";
+import { useMeterSample } from "../lib/meter-bus";
 import { useStore } from "../store";
 
 const AUTO = "__auto__";
@@ -124,6 +126,8 @@ export function SetupWizard() {
     const openPanel = useStore((s) => s.openPanel);
     const settings = useStore((s) => s.settings);
     const status = useStore((s) => s.status);
+    const engine = useStore((s) => s.start);
+    const meters = useMeterSample(4);
     const startEngine = useStore((s) => s.startEngine);
     const currentPreset = useStore((s) => s.proto.state?.preset);
     const canClose = !!settings.device;
@@ -184,6 +188,27 @@ export function SetupWizard() {
     const rec = useMemo(() => recommendRouting(devices), [devices]);
     const hint = routingHint(inDev, outDev);
     const nominal = nominalLatencyMs(draft.buffer, draft.rate);
+    // What the engine declares per stage, against what the probe measured: the budget block below.
+    // Without a running engine the declared side is the settings being chosen (equal periods, the
+    // cushion the fixed mode keeps), so the block is useful before anything is started.
+    const budget = latencyBudget(
+        engine?.info ?? {
+            host: draft.host,
+            input: inDev?.name ?? "",
+            output: outDev?.name ?? "",
+            sample_rate: draft.rate,
+            buffer_frames: draft.buffer,
+            input_channels: inDev?.input_channels ?? 0,
+            output_channels: outDev?.output_channels ?? 0,
+            nominal_latency_ms: nominal,
+            input_period_frames: draft.buffer,
+            cushion_frames: draft.buffer,
+            output_period_frames: draft.buffer,
+            notes: [],
+        },
+        meters,
+        latency?.round_trip_ms ?? null,
+    );
 
     const config = (): EngineConfig | null => {
         if (!inDev || !outDev) return null;
@@ -361,6 +386,33 @@ export function SetupWizard() {
                                     {t("setup.measured", { ms: latency.round_trip_ms.toFixed(1), nominal: latency.nominal_ms.toFixed(1) })}
                                 </p>
                             ) : null}
+                            <div className="mt-1 border-t pt-2 text-xs text-muted-foreground" role="group" aria-label={t("setup.budgetTitle")}>
+                                <p className="mb-1 font-medium text-foreground">{t("setup.budgetTitle")}</p>
+                                <dl className="grid grid-cols-2 gap-x-3 tabular-nums">
+                                    {budget.rows.map((r) => (
+                                        <Fragment key={r.id}>
+                                            <dt>{t(`setup.budget${r.id}`)}</dt>
+                                            <dd className="text-end">{r.ms.toFixed(2)} ms</dd>
+                                        </Fragment>
+                                    ))}
+                                    <dt className="font-medium text-foreground">{t("setup.budgetDeclared")}</dt>
+                                    <dd className="text-end font-medium text-foreground">{budget.declaredMs.toFixed(2)} ms</dd>
+                                    {budget.declaredEarsMs !== budget.declaredMs ? (
+                                        <>
+                                            <dt>{t("setup.budgetDeclaredEars")}</dt>
+                                            <dd className="text-end">{budget.declaredEarsMs.toFixed(2)} ms</dd>
+                                        </>
+                                    ) : null}
+                                    {budget.measuredMs != null ? (
+                                        <>
+                                            <dt>{t("setup.budgetMeasured")}</dt>
+                                            <dd className="text-end">{budget.measuredMs.toFixed(2)} ms</dd>
+                                            <dt>{t("setup.budgetRest")}</dt>
+                                            <dd className="text-end">{(budget.restMs ?? 0).toFixed(2)} ms</dd>
+                                        </>
+                                    ) : null}
+                                </dl>
+                            </div>
                         </div>
                     </div>
                 </div>

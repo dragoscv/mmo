@@ -10,6 +10,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — the latency budget, declared against measured (2026-11-13)
+
+The setup step now shows a **latency budget**: every stage the engine can account for — the input period, the
+frames kept queued between input and output, the output period, and the effect chain for the audience and for
+the ears — beside the round trip the probe actually measured, plus the difference as *driver, OS and routing*.
+The two numbers are never presented as one: the declared figure is a sum of what the engine controls, and the
+measured one is what came back through the loopback. It works before an engine is started (the declared side is
+the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
+`src/lib/latency-budget.ts` with five tests.
+
 ## MixAI Live — a pedal and the phone remote can use the monitor option (2026-11-13)
 
 The "tuned only for the audience" option is now reachable from every control surface, not just the protocol:
