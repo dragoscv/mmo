@@ -311,6 +311,7 @@
         "diatonic": "Diatonic",
         "chromatic": "Chromatic",
         "midi": "MIDI note",
+        "auto": "Auto",
         "on": "On"
     },
     "scale": {

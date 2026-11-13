@@ -20,13 +20,20 @@ the main chain latency in samples under it — the first line of the latency bud
 
 ## MixAI Live — fast pitch mode wired into the corrector (WP21-26, 2026-11-13)
 
-`autotune` has a **`fast`** switch (off by default): the period-synchronous shifter of
+`autotune` has a **`fast`** choice, **`auto` by default**: the period-synchronous shifter of
 `live-dsp/src/psola.rs` replaces the grain shifter, so the wet path sits 1 sample behind the voice
-instead of 256 (5.3 ms). Measured on a 110 Hz tone asked to move +25 cents: the fast mode lands
-**0.01 cents** off, the classic shifter leaves the note where it was (**−25.16 cents**) — the defect
-its ignored test `shifter_applies_small_corrections_at_110_hz` pinned. The switch crossfades both
-paths over 10 ms (the dry tap follows the same fade), so flipping it while singing does not click;
-while the mode is off the fast shifter is not ticked at all.
+instead of 256 (5.3 ms). Measured on a 110 Hz tone asked to move +25 cents: the fast shifter lands
+**0.01 cents** off, the classic one leaves the note where it was (**−25.16 cents**) — the defect its
+ignored test `shifter_applies_small_corrections_at_110_hz` pinned. Switching between the two
+crossfades both paths over 10 ms (the dry tap follows the same fade), so a change while singing does
+not click; while the fast shifter is not in use it is not ticked at all.
+
+`auto` picks per note, from the period the detector reports: the fast shifter for notes whose period
+is at most the classic shifter's own 256 samples (187.5 Hz and up at 48 kHz), the classic one below,
+with a 10 % band so a vibrato around the boundary does not crossfade back and forth. `off` and `on`
+force either one. The reason for the band, measured: during a correction the fast shifter's delay runs
+through one whole period, so on low notes it is LATER than the classic one on average (82 Hz: up to
+12.2 ms, 6.1 ms mean against a fixed 5.3 ms), and its level falls below 1 dB under ratio 0.75.
 
 Honest caveat, measured by its author: the fast shifter's delay during a *correction* runs through
 one whole period, so on low notes it can be longer than the classic one (82 Hz: up to 12.2 ms,

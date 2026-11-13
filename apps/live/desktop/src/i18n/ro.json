@@ -311,6 +311,7 @@
         "diatonic": "Diatonic",
         "chromatic": "Cromatic",
         "midi": "Notă MIDI",
+        "auto": "Automat",
         "on": "Pornit"
     },
     "scale": {

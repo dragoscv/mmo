@@ -16,7 +16,7 @@ mic → ADC → driver input buffer → input ring (1 block) → output callback
 | Input period | `--buffer` frames | you |
 | Input ring target | one more `--buffer` block (absorbs callback jitter) | engine |
 | Output period | `--buffer` frames | you |
-| Chain latency | 0 for most effects; 256 samples per `autotune`/`harmonizer` | preset ([effects](effects.md)) |
+| Chain latency | 0 for most effects; 256 samples per `autotune`/`harmonizer`, and the `autotune` `fast` choice takes it to 1 sample for notes from 187.5 Hz up (`auto`, the default) | preset ([effects](effects.md)) |
 
 The engine reports `nominal_latency_ms` = 3 × buffer ÷ rate (the three buffer terms above). The **real** round
 trip is always larger; measure it with the probe below — the engine never reports driver figures as the

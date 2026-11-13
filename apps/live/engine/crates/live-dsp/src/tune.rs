@@ -27,11 +27,20 @@ const TUNE_SPECS: &[ParamSpec] = &[
     ParamSpec::new("transpose", -12.0, 12.0, 0.0, Unit::Semitones),
     ParamSpec::new("sticky", 0.0, 100.0, 60.0, Unit::Cents),
     // "Fast pitch": the period-synchronous shifter (`psola`) instead of the grain shifter. 1 sample
-    // of delay at rest instead of 256 (5.3 ms), but during a correction on a LOW note its delay
-    // runs up to one period (82 Hz: 12.2 ms), more than the classic shifter's fixed 5.3 ms. Off by
-    // default: the classic shifter is the one measured on the owner's rig so far.
-    ParamSpec::toggle("fast", false),
+    // of delay at rest instead of 256 (5.3 ms), but during a correction on a LOW note its delay runs
+    // up to one period (82 Hz: 12.2 ms), more than the classic shifter's fixed 5.3 ms. `auto`
+    // (default) picks the fast one where it cannot be later: notes whose period is at most the
+    // classic delay (`FAST_PERIOD` = 256 samples, 187.5 Hz at 48 kHz).
+    ParamSpec::choice("fast", FAST_NAMES, 1),
 ];
+
+const FAST_NAMES: &[&str] = &["off", "auto", "on"];
+/// Period at or below which `auto` uses the fast shifter: the classic shifter's own fixed delay, so
+/// above it the fast one is never later on average (mean delay = half a period).
+const FAST_PERIOD: f32 = Shifter::latency() as f32;
+/// Leave the fast shifter only above this period (10 % up), so a vibrato around the boundary does
+/// not crossfade back and forth.
+const SLOW_PERIOD: f32 = FAST_PERIOD * 1.1;
 
 /// Snapshot of what the corrector is doing (telemetry for the tuner UI).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -53,6 +62,10 @@ pub struct Autotune {
     /// Weight of the fast shifter on the wet path, 0 = classic. Ramped over 10 ms so the switch
     /// between two paths with a very different delay does not click.
     mode: Smoothed,
+    /// What the last control step decided (in `auto`, from the detected period).
+    want_fast: bool,
+    /// `auto` only: the state the hysteresis band keeps (see [`FAST_PERIOD`], [`SLOW_PERIOD`]).
+    auto_fast: bool,
     scale: Scale,
     stable: Option<i32>,
     semis: f32,
@@ -73,7 +86,13 @@ impl Autotune {
             yin: Yin::new(sample_rate),
             shifter: Shifter::new(v[5] > 0.5),
             psola: PsolaShifter::new(sample_rate),
-            mode: Smoothed::with_ms(if v[9] > 0.5 { 1.0 } else { 0.0 }, 10.0, sample_rate),
+            mode: Smoothed::with_ms(
+                if v[9] as usize == 2 { 1.0 } else { 0.0 },
+                10.0,
+                sample_rate,
+            ),
+            want_fast: v[9] as usize == 2,
+            auto_fast: false,
             scale: Scale::new(v[0] as usize, v[1] as usize),
             stable: None,
             semis: 0.0,
@@ -96,7 +115,7 @@ impl Autotune {
 
     /// The fast (period-synchronous) shifter is selected.
     fn fast(&self) -> bool {
-        self.v[9] > 0.5
+        self.want_fast
     }
 
     /// Times the formant guard fell back since the last reset (0 when formant is off).
@@ -157,12 +176,31 @@ impl Autotune {
         self.psola.set_ratio(ratio);
         // The fast shifter wants the period in samples; unvoiced (0) lets it fall back to its
         // one-sample delay instead of holding a stale period.
-        self.psola
-            .set_period(if info.voiced() && info.frequency > 0.0 {
-                self.sr / info.frequency
-            } else {
-                0.0
-            });
+        let period = if info.voiced() && info.frequency > 0.0 {
+            self.sr / info.frequency
+        } else {
+            0.0
+        };
+        self.psola.set_period(period);
+        // Which shifter feeds the wet path. `auto` keeps the classic one on low notes, where the
+        // fast one's delay during a correction can exceed the classic shifter's fixed 256 samples.
+        self.want_fast = match self.v[9] as usize {
+            0 => false,
+            2 => true,
+            _ => {
+                if period > 0.0 {
+                    // Hysteresis: enter at or below the classic delay, leave only 10 % above it.
+                    self.auto_fast = if self.auto_fast {
+                        period <= SLOW_PERIOD
+                    } else {
+                        period <= FAST_PERIOD
+                    };
+                }
+                // Unvoiced (a pause) keeps whatever the last note chose: no flapping in silence.
+                self.auto_fast
+            }
+        };
+        self.mode.set(if self.want_fast { 1.0 } else { 0.0 });
     }
 }
 
@@ -176,9 +214,8 @@ impl Processor for Autotune {
                 0 | 1 => self.scale = Scale::new(self.v[0] as usize, self.v[1] as usize),
                 5 => self.shifter.set_formant(v > 0.5),
                 6 => self.mix.set(v),
-                // Not on the audio thread: `Command::SetParam` is applied in `Core::apply`, inside
-                // the callback, and `Smoothed` only writes fields.
-                9 => self.mode.set(if v > 0.5 { 1.0 } else { 0.0 }),
+                // 9 (`fast`) needs nothing here: `control` reads it at the next quantum (2.7 ms
+                // at 48 kHz) and ramps `mode` itself.
                 _ => {}
             }
         }
@@ -525,8 +562,54 @@ mod tests {
         let t = Autotune::new(48000.0);
         assert_eq!(t.param(1), 0.0, "scale must default to chromatic");
         assert_eq!(t.param(5), 0.0, "formant must default to off");
-        assert_eq!(t.param(9), 0.0, "the fast shifter must default to off");
+        assert_eq!(t.param(9), 1.0, "the fast shifter must default to auto");
+        assert_eq!(FAST_NAMES[t.param(9) as usize], "auto");
         assert_eq!(t.latency(), 256, "the classic shifter is the default");
+    }
+
+    /// `auto`: the fast shifter for notes whose period is at most the classic delay (187.5 Hz at
+    /// 48 kHz), the classic one below - with a 10 % band, so a vibrato does not flap.
+    #[test]
+    fn fast_mode_is_automatic_around_the_classic_delay() {
+        let latency_after = |f: f32| {
+            let mut t = Autotune::new(48000.0);
+            // 40 ms of the tone is enough for the detector and the crossfade.
+            let mut l = sine(f, 48000.0, 1920, 0.4);
+            let mut r = l.clone();
+            t.process(&mut l, &mut r);
+            t.latency()
+        };
+        // Period 109 samples at 440 Hz, 218 at 220 Hz: both at or below 256 -> fast.
+        assert_eq!(
+            latency_after(440.0),
+            1,
+            "440 Hz should take the fast shifter"
+        );
+        assert_eq!(
+            latency_after(220.0),
+            1,
+            "220 Hz should take the fast shifter"
+        );
+        // Period 436 samples at 110 Hz, 585 at 82 Hz: above 256 -> classic.
+        assert_eq!(
+            latency_after(110.0),
+            256,
+            "110 Hz should keep the classic shifter"
+        );
+        assert_eq!(
+            latency_after(82.0),
+            256,
+            "82 Hz should keep the classic shifter"
+        );
+        // Forced modes ignore the pitch.
+        for (mode, want) in [(0.0, 256usize), (2.0, 1)] {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(9, mode);
+            let mut l = sine(110.0, 48000.0, 1920, 0.4);
+            let mut r = l.clone();
+            t.process(&mut l, &mut r);
+            assert_eq!(t.latency(), want, "mode {mode} at 110 Hz");
+        }
     }
 
     /// The fast mode must actually be fast: an impulse comes out 1 sample later instead of 256.
@@ -534,7 +617,7 @@ mod tests {
     fn fast_mode_moves_the_voice_a_hundred_times_closer() {
         let delay = |fast: bool| {
             let mut t = Autotune::new(48000.0);
-            t.set_param(9, if fast { 1.0 } else { 0.0 });
+            t.set_param(9, if fast { 2.0 } else { 0.0 });
             // Warm up so the 10 ms crossfade between the two paths has settled, then one impulse.
             let (mut l, mut r) = (vec![0.0f32; 2048], vec![0.0f32; 2048]);
             t.process(&mut l, &mut r);
@@ -572,7 +655,9 @@ mod tests {
             t.set_param(2, 0.0); // amount: no scale correction, only the transpose below
             t.set_param(3, 0.5); // retune 40 ms
             t.set_param(7, 0.25); // +25 cents
-            t.set_param(9, if fast { 1.0 } else { 0.0 });
+            // Forced, not auto: at 110 Hz auto deliberately keeps the classic shifter, and this is
+            // the test of what the fast one does there when it is asked for.
+            t.set_param(9, if fast { 2.0 } else { 0.0 });
             let mut l = sine(110.0, 48000.0, 96000, 0.4);
             let mut r = l.clone();
             t.process(&mut l, &mut r);
@@ -603,7 +688,7 @@ mod tests {
             let mut r = l.clone();
             // Off for 10 blocks, then on while the sine is running.
             if k == 10 {
-                t.set_param(9, 1.0);
+                t.set_param(9, 2.0);
             }
             t.process(&mut l, &mut r);
             out.extend_from_slice(&l);

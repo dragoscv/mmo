@@ -1921,10 +1921,18 @@ mod tests {
             render_all(&mut core, &voice(4800), 128);
             core.meters_due().unwrap()
         };
-        // The ears are back on the main chain, pitch correction and its delay included.
+        // The ears are back on the main chain: whatever the pitch effect costs right now, the
+        // monitor reports the same figure. With `fast = auto` that is not a fixed 256 any more -
+        // the fast shifter is 1 sample and `auto` takes it for notes at or above 187.5 Hz, so the
+        // assertion is equality plus "it is the pitch effect's figure", not one specific number.
         assert_eq!(
-            (m.chain_latency_samples, m.monitor_chain_latency_samples),
-            (256, 256)
+            m.chain_latency_samples, m.monitor_chain_latency_samples,
+            "the ears must hear the main chain again"
+        );
+        assert!(
+            matches!(m.chain_latency_samples, 1 | 256),
+            "the main chain still carries the pitch effect's latency, got {}",
+            m.chain_latency_samples
         );
     }
 
