@@ -104,6 +104,21 @@ while it is on. Every later edit of the main chain — parameter, enable, add, r
 setlist navigation, MIDI, `reset` — reaches the monitor chain too; inserts are linked by id, so an operation on a
 pitch insert simply does not apply there.
 
+**Verifying it without any hardware** (run on 2026-11-13 against the release binary, result below): the `Null`
+host is a simulated device, so nothing is played and no interface is opened.
+
+```powershell
+# 1. start the engine on the simulated device; it prints its token in the ready line (?t=…)
+.apps\live\engine\target\release\mixai-live-engine.exe serve --host Null --port 17991 --seconds 40 --preset "Pop Polish"
+# 2. connect to ws://127.0.0.1:17991/ws?t=<token>&c=<any name>, send
+#    {"type":"subscribe","meters":true}, then {"type":"set_mix","monitor_untuned":true}
+```
+
+Measured with `Pop Polish` (which carries `autotune`): off → `chain_latency_samples` 256,
+`monitor_chain_latency_samples` 256; on → 256 and **0**, so the ears lose 256 samples (5.33 ms at 48 kHz) while
+the main chain is unchanged; the option survives a `load_preset` and putting it back off returns the monitor to
+the main chain's figure. A preset without a pitch effect shows the two equal, which is correct.
+
 The option is not persisted: the engine starts with it off, so a client that wants it must send `set_mix` again
 after every restart. Switching it on or off while singing crossfades the monitor bus over 10 ms, and a scene
 change lets the old monitor chain ring out on the monitor bus just as the old main chain does on the main bus.
