@@ -197,7 +197,7 @@ pub struct GigCtl(Mutex<Inner<sys::WakeLock>>);
 
 impl Default for GigCtl {
     fn default() -> Self {
-        Self(Mutex::new(Inner::new(sys::WakeLock::default())))
+        Self(Mutex::new(Inner::new(sys::WakeLock::new())))
     }
 }
 
@@ -624,6 +624,13 @@ mod sys {
     pub struct WakeLock(Option<isize>);
 
     #[cfg(windows)]
+    impl WakeLock {
+        pub fn new() -> Self {
+            Self(None)
+        }
+    }
+
+    #[cfg(windows)]
     impl Wake for WakeLock {
         fn supported(&self) -> bool {
             true
@@ -712,8 +719,16 @@ mod sys {
     // ---- everything else: no keep-awake ----
 
     #[cfg(not(windows))]
-    #[derive(Default)]
     pub struct WakeLock;
+
+    #[cfg(not(windows))]
+    impl WakeLock {
+        /// `WakeLock::default()` on a unit struct is clippy's `default_constructed_unit_structs`
+        /// (it fired on the Linux CI job): construct it directly instead.
+        pub fn new() -> Self {
+            Self
+        }
+    }
 
     #[cfg(not(windows))]
     impl Wake for WakeLock {
@@ -909,7 +924,12 @@ mod sys {
                 "//./pipe/x",
             ] {
                 assert_eq!(check_path_for(device, true), Err(err::DEVICE), "{device:?}");
+                // `disk_status` asks the real system: the device namespace is a Windows rule, so on
+                // macOS and Linux the same path is merely relative (the CI macOS job caught this).
+                #[cfg(windows)]
                 assert_eq!(disk_status(device).error.as_deref(), Some(err::DEVICE));
+                #[cfg(not(windows))]
+                let _ = device;
             }
             // Unix rules: a leading slash, and `//server/share` is an ordinary local path.
             assert_eq!(check_path_for("/home/dj/sets", false), Ok(PathKind::Local));

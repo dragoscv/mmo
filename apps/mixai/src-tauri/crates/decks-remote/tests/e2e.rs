@@ -666,12 +666,37 @@ fn a_new_overlay_code_disconnects_the_overlay_and_only_it() {
 fn overlays_count_against_the_device_limit() {
     let s = server();
     let token = s.overlay_token();
-    // Every client answers the server's pings by itself (see `Ws`), so none of the 48 is
-    // dropped as silent however long the test takes.
-    let mut overlays: Vec<_> = (0..MAX_CLIENTS)
-        .map(|i| connect(s.port(), &token, &format!("obs-{i}")).unwrap())
-        .collect();
-    assert_eq!(s.clients().len(), MAX_CLIENTS);
+    // Every client answers the server's pings by itself (see `Ws`), but the handshakes must not take
+    // longer than the server's patience with a SILENT socket (`DEAD_AFTER`): on a loaded CI runner
+    // opening 48 sockets in one go took over five seconds, so the first one was dropped as silent
+    // and the count came out 47 (seen on windows-latest 2026-11-13). Fill the server one client at a
+    // time, waiting for each to be counted, and open a new one if the server dropped one meanwhile
+    // (that is the environment, not the cap: what is under test is that the 49th is refused).
+    let mut overlays: Vec<Ws> = Vec::new();
+    let deadline = Instant::now() + LIMIT;
+    let mut n = 0;
+    while s.clients().len() < MAX_CLIENTS && Instant::now() < deadline {
+        n += 1;
+        let Ok(ws) = connect(s.port(), &token, &format!("obs-{n}")) else {
+            break; // refused: the cap is doing its job
+        };
+        overlays.push(ws);
+        // Give the server a moment to count it.
+        let until = Instant::now() + Duration::from_millis(500);
+        while s.clients().len() < overlays.len() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if s.clients().len() < overlays.len() {
+            // One of ours was dropped by the server's own silence rule (a slow machine, not the cap):
+            // forget the oldest socket and fill that slot again.
+            overlays.remove(0);
+        }
+    }
+    assert_eq!(
+        s.clients().len(),
+        MAX_CLIENTS,
+        "the server holds {MAX_CLIENTS} devices"
+    );
     // Full: a phone with the right code is turned away (and an overlay too).
     assert!(connect(s.port(), &s.token(Role::Controller), "phone").is_err());
     assert!(connect(s.port(), &token, "one-more").is_err());
