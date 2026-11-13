@@ -149,7 +149,8 @@
             "tap_tempo": "Tap tempo",
             "panic": "Panic",
             "toggle_bypass": "Bypass on/off",
-            "toggle_mute": "Mute on/off"
+            "toggle_mute": "Mute on/off",
+            "toggle_monitor_untuned": "Ears untuned on/off"
         }
     },
     "setlist": {

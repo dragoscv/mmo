@@ -12,7 +12,15 @@ import { useStore } from "../store";
 import { MidiLearnButton } from "./MidiLearn";
 import { fxLabel, paramLabel } from "./fx-labels";
 
-const ACTIONS: MidiAction[] = ["next", "prev", "tap_tempo", "panic", "toggle_bypass", "toggle_mute"];
+const ACTIONS: MidiAction[] = [
+    "next",
+    "prev",
+    "tap_tempo",
+    "panic",
+    "toggle_bypass",
+    "toggle_mute",
+    "toggle_monitor_untuned",
+];
 const MIX_FIELDS: MixField[] = ["input_db", "main_db", "monitor_db", "monitor_dry"];
 const MIX_LABEL: Record<MixField, string> = { input_db: "mix.input", main_db: "mix.main", monitor_db: "mix.monitor", monitor_dry: "mix.monitorDry" };
 

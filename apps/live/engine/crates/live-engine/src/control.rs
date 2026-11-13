@@ -371,6 +371,10 @@ impl Session {
                     let v = !self.mix.mute;
                     self.set_mix(|m| m.mute = v)
                 }
+                MidiAction::ToggleMonitorUntuned => {
+                    let v = !self.mix.monitor_untuned;
+                    self.set_mix(|m| m.monitor_untuned = v)
+                }
             },
             MidiEvent::Program(n) => match self.find_program(n) {
                 Some((s, p)) => self.goto(s, p)?,
@@ -485,6 +489,42 @@ mod tests {
         assert!(
             serde_json::from_str::<Control>(r#"{"type":"set_mix","monitor_untuned":1}"#).is_err()
         );
+    }
+
+    /// The ears-untuned option on a pedal: the action toggles it exactly like `bypass` and `mute`,
+    /// and it round-trips through the MIDI map file.
+    #[test]
+    fn a_pedal_toggles_the_ears_untuned_option() {
+        // The binding survives a save/load of the map (the enum is `snake_case` on the wire).
+        let target = MidiTarget::Action {
+            action: MidiAction::ToggleMonitorUntuned,
+        };
+        let json = serde_json::to_string(&target).unwrap();
+        assert!(json.contains("toggle_monitor_untuned"), "{json}");
+        assert_eq!(serde_json::from_str::<MidiTarget>(&json).unwrap(), target);
+
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Pop Polish").unwrap();
+        let t0 = Instant::now();
+        assert!(!s.mix.monitor_untuned);
+        // On: the second chain is built and sent.
+        let cmds = s
+            .apply_midi_event(MidiEvent::Action(MidiAction::ToggleMonitorUntuned), t0)
+            .unwrap();
+        assert!(s.mix.monitor_untuned, "the action must switch it on");
+        assert!(matches!(
+            cmds.as_slice(),
+            [Command::SetMonitorChain { chain: Some(_) }]
+        ));
+        // Off again: the ears go back to the main chain.
+        let cmds = s
+            .apply_midi_event(MidiEvent::Action(MidiAction::ToggleMonitorUntuned), t0)
+            .unwrap();
+        assert!(!s.mix.monitor_untuned);
+        assert!(matches!(
+            cmds.as_slice(),
+            [Command::SetMonitorChain { chain: None }]
+        ));
     }
 
     #[test]

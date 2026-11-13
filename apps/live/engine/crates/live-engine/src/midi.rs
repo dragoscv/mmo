@@ -108,6 +108,9 @@ pub enum MidiAction {
     Panic,
     ToggleBypass,
     ToggleMute,
+    /// The monitor option "tuned only for the audience": the ears get the chain without the pitch
+    /// effects (no shifter delay), the main output keeps everything.
+    ToggleMonitorUntuned,
 }
 
 /// What a binding controls. Parameters address the first insert of an effect kind, so a binding

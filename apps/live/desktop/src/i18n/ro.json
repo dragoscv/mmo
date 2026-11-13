@@ -149,7 +149,8 @@
             "tap_tempo": "Bate tempoul",
             "panic": "Panică",
             "toggle_bypass": "Ocolire pornit/oprit",
-            "toggle_mute": "Mut pornit/oprit"
+            "toggle_mute": "Mut pornit/oprit",
+            "toggle_monitor_untuned": "Urechi netunate pornit/oprit"
         }
     },
     "setlist": {

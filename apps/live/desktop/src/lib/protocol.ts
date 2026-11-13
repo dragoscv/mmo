@@ -70,7 +70,14 @@ export interface MidiSource {
 export type MixField = "input_db" | "main_db" | "monitor_db" | "monitor_dry";
 
 /** One-shot actions (note on / CC crossing 64 upwards). */
-export type MidiAction = "next" | "prev" | "tap_tempo" | "panic" | "toggle_bypass" | "toggle_mute";
+export type MidiAction =
+    | "next"
+    | "prev"
+    | "tap_tempo"
+    | "panic"
+    | "toggle_bypass"
+    | "toggle_mute"
+    | "toggle_monitor_untuned";
 
 /** What a binding controls (`kind`-tagged enum; params address the first insert of an effect kind). */
 export type MidiTarget =

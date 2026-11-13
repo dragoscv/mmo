@@ -48,7 +48,7 @@ FFI and tests share it. Open ports, the learn target and the last message seen a
 | `param` | `fx, param` | sets the parameter of the **first insert of that effect kind** (normalised 0–1 → its range, see [effects](effects.md)). Addressing by kind keeps the binding working when a song part loads another preset; in a chain without that effect it does nothing |
 | `enable` | `fx` | CC: on/off at 64; note: toggles |
 | `mix` | `field`: `input_db` \| `main_db` \| `monitor_db` \| `monitor_dry` | faders map 0–127 to −60…+12 dB (unity ≈ CC 106); `monitor_dry` maps to 0–1 |
-| `action` | `action`: `next` \| `prev` \| `tap_tempo` \| `panic` \| `toggle_bypass` \| `toggle_mute` | one shot |
+| `action` | `action`: `next` \| `prev` \| `tap_tempo` \| `panic` \| `toggle_bypass` \| `toggle_mute` \| `toggle_monitor_untuned` | one shot |
 
 ## MIDI learn
 

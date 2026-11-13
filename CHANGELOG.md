@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — a pedal and the phone remote can use the monitor option (2026-11-13)
+
+The "tuned only for the audience" option is now reachable from every control surface, not just the protocol:
+a foot switch can toggle it (`MidiTarget` action `toggle_monitor_untuned`, in the MIDI panel's action list and
+on the LAN remote page), the phone remote page has an **Ears untuned** button next to Mute and Bypass (with a
+tooltip saying what it does), and the desktop mix strip keeps its switch and both chain latencies. 192
+workspace tests and 31 desktop tests green.
+
 ## MixAI Live — the ASIO tier builds locally, and what the machine has on it (WP21-27, 2026-11-13)
 
 The Steinberg ASIO SDK was downloaded at the owner's request and installed **outside** the repository

@@ -122,6 +122,9 @@ the main chain's figure. A preset without a pitch effect shows the two equal, wh
 The option is not persisted: the engine starts with it off, so a client that wants it must send `set_mix` again
 after every restart. Switching it on or off while singing crossfades the monitor bus over 10 ms, and a scene
 change lets the old monitor chain ring out on the monitor bus just as the old main chain does on the main bus.
+The desktop mix strip carries a switch for it (with both chain latencies beside it), the LAN remote page a
+**Ears untuned** button next to Mute and Bypass, and a foot switch can toggle it (`MidiTarget` action
+`toggle_monitor_untuned`, see [MIDI control](midi.md)).
 
 ## OSC address space
 

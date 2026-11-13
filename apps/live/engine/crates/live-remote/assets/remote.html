@@ -109,6 +109,7 @@
       <button class="panic" id="panic" data-i18n="panic">PANIC</button>
       <button id="mute" aria-pressed="false" data-i18n="mute">Mute</button>
       <button id="bypass" aria-pressed="false" data-i18n="bypass">Bypass</button>
+      <button id="untuned" aria-pressed="false" data-i18n="untuned" title="">Ears untuned</button>
     </div>
     <div class="row">
       <button id="prev" data-i18n="prev">Prev</button>
@@ -166,7 +167,9 @@
     midi: "MIDI", midiChannel: "Canal", omni: "Toate canalele", programChange: "Schimbare de program", actions: "Acțiuni", bindings: "Asocieri",
     learn: "Învață", learnWaiting: "Mișcă pedala sau apasă o tastă pentru", cancel: "Renunță", unbind: "Șterge", noBindings: "Nicio asociere.",
     ports: "Porturi", noPorts: "Niciun port MIDI deschis.", lastMsg: "Ultimul mesaj", deletePreset: "Șterge presetarea",
-    revertPreset: "Revino la varianta din fabrică", confirmAgain: "Atinge din nou", tapTempo: "Tempo", toggleBypass: "Ocolire", toggleMute: "Mut"
+    revertPreset: "Revino la varianta din fabrică", confirmAgain: "Atinge din nou", tapTempo: "Tempo", toggleBypass: "Ocolire", toggleMute: "Mut",
+    untuned: "Urechi netunate", toggleUntuned: "Urechi netunate",
+    untunedHint: "Doar pentru public: urechile primesc același lanț fără efectele de pitch (fără cei 5,3 ms ai corectorului), ieșirea principală le păstrează."
   } : {
     title: "MixAI Live Remote", meters: "Meters", input: "Input", outL: "Out L", outR: "Out R", clip: "CLIP",
     tuner: "Tuner", perform: "Performance", panic: "PANIC", panicConfirm: "Tap again", mute: "Mute", bypass: "Bypass",
@@ -180,6 +183,8 @@
     midi: "MIDI", midiChannel: "Channel", omni: "All channels", programChange: "Program change", actions: "Actions", bindings: "Bindings",
     learn: "Learn", learnWaiting: "Move the pedal or press a key for", cancel: "Cancel", unbind: "Remove", noBindings: "No bindings yet.",
     ports: "Ports", noPorts: "No MIDI port open.", lastMsg: "Last message", deletePreset: "Delete preset",
+    untuned: "Ears untuned", toggleUntuned: "Ears untuned",
+    untunedHint: "Tuned only for the audience: the ears get the same chain without the pitch effects (no 5.3 ms of corrector), the main output keeps them.",
     revertPreset: "Revert to the factory version", confirmAgain: "Tap again", tapTempo: "Tap tempo", toggleBypass: "Bypass", toggleMute: "Mute"
   };
   document.documentElement.lang = ro ? "ro" : "en";
@@ -230,6 +235,8 @@
   });
   $("mute").addEventListener("click", () => send({ type: "set_mix", mute: $("mute").getAttribute("aria-pressed") !== "true" }));
   $("bypass").addEventListener("click", () => send({ type: "set_mix", bypass: $("bypass").getAttribute("aria-pressed") !== "true" }));
+  $("untuned").title = T.untunedHint;
+  $("untuned").addEventListener("click", () => send({ type: "set_mix", monitor_untuned: $("untuned").getAttribute("aria-pressed") !== "true" }));
   $("prev").addEventListener("click", () => send({ type: "prev" }));
   $("next").addEventListener("click", () => send({ type: "next" }));
   $("tap").addEventListener("click", () => send({ type: "tap_tempo" }));
@@ -241,8 +248,8 @@
   const paramLabel = p => p.replace(/_/g, " ");
 
   // MIDI ------------------------------------------------------------------
-  const MIDI_ACTIONS = ["next", "prev", "tap_tempo", "panic", "toggle_bypass", "toggle_mute"];
-  const ACT_T = { next: "next", prev: "prev", tap_tempo: "tapTempo", panic: "panic", toggle_bypass: "toggleBypass", toggle_mute: "toggleMute" };
+  const MIDI_ACTIONS = ["next", "prev", "tap_tempo", "panic", "toggle_bypass", "toggle_mute", "toggle_monitor_untuned"];
+  const ACT_T = { next: "next", prev: "prev", tap_tempo: "tapTempo", panic: "panic", toggle_bypass: "toggleBypass", toggle_mute: "toggleMute", toggle_monitor_untuned: "toggleUntuned" };
   const MIX_T = { input_db: "inputDb", main_db: "mainDb", monitor_db: "monitorDb", monitor_dry: "monitorDry" };
   const actLabel = a => T[ACT_T[a]] || a;
   function targetLabel(t) {
@@ -405,6 +412,7 @@
     for (const k in mix) if (typeof m[k] === "number") mix[k].set(m[k]);
     $("mute").setAttribute("aria-pressed", String(!!m.mute));
     $("bypass").setAttribute("aria-pressed", String(!!m.bypass));
+    $("untuned").setAttribute("aria-pressed", String(!!m.monitor_untuned));
     $("bpm").textContent = st.bpm ? Math.round(st.bpm) + " BPM" : "";
     renderPresets(st); renderSetlist(st);
     if (role === "controller") { renderChain(st.chain || []); learnWanted = null; renderMidi(st); }
