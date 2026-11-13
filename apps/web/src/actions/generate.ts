@@ -1034,7 +1034,8 @@ export async function startAceStepLoraTraining(input: {
 
     // Resolve workspace root (cwd is e:\gh\mmo\app). Training script
     // lives at e:\gh\mmo\scripts\train-acestep-lora.ps1.
-    const workspaceRoot = path.resolve(process.cwd(), "..");
+    // turbopackIgnore: without it the build traces every file under the parent folder (the Rust target folders too).
+    const workspaceRoot = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "..");
     const scriptPath = path.join(workspaceRoot, "scripts", "train-acestep-lora.ps1");
     try {
         await fsp.access(scriptPath);
@@ -1592,7 +1593,8 @@ export async function submitAceStepLoraTrainingVertex(input: {
     if (!input.datasetUri.startsWith("gs://")) return { ok: false, error: "datasetUri-must-be-gs-uri" };
     if (!input.outputUri.startsWith("gs://")) return { ok: false, error: "outputUri-must-be-gs-uri" };
 
-    const workspaceRoot = path.resolve(process.cwd(), "..");
+    // turbopackIgnore: see startAceStepLoraTraining.
+    const workspaceRoot = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "..");
     const scriptPath = path.join(workspaceRoot, "infra", "vertex", "submit-training.py");
     try {
         await fsp.access(scriptPath);
@@ -1687,7 +1689,8 @@ export async function submitConductorTrainingVertex(input: {
     if (!input.datasetUri.startsWith("gs://")) return { ok: false, error: "datasetUri-must-be-gs-uri" };
     if (!input.outputUri.startsWith("gs://")) return { ok: false, error: "outputUri-must-be-gs-uri" };
 
-    const workspaceRoot = path.resolve(process.cwd(), "..");
+    // turbopackIgnore: see startAceStepLoraTraining.
+    const workspaceRoot = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "..");
     const scriptPath = path.join(workspaceRoot, "infra", "vertex", "submit-training.py");
     try {
         await fsp.access(scriptPath);

@@ -108,3 +108,49 @@ terminalul pwsh implicit e partajat cu alți agenți.
 Zgomot de așteptat pe această mașină: ±3 s pe orice țintă sub 20 s (alți agenți
 rulează build-uri/teste în paralel). Repetă de două ori înainte de a declara o
 regresie.
+
+## 6. Memoria build-ului web (2026-11-12)
+
+**Simptom:** în pasul „Creating an optimized production build” procesul
+`next build` creștea la ~100 GB memorie privată și lăsa mașina (192 GB) cu
+8 GB liberi; uneori build-ul ieșea cu `exit 1` fără niciun mesaj.
+
+**Cauză:** cinci apeluri `path.resolve(process.cwd(), "..")` în
+`apps/web/src/actions/{generate,training,lora-validate}.ts`. Turbopack nu poate
+restrânge o cale care urcă din directorul aplicației, așa că urmărește **tot ce
+se află sub `apps/`**. Pe o mașină de dezvoltare acolo stau și artefactele
+celorlalte aplicații (`apps/mixai/src-tauri/target` 71 GB,
+`apps/live/engine/target` 7 GB, directoarele `build` Android): avertismentul din
+log era `The file pattern '/ROOT/apps' matches 73808 files`, iar fișierele
+`.nft.json` a 7 rute listau câte 70 354 de fișiere. Numărul a crescut odată cu
+artefactele: 11 113 fișiere pe 5 nov., 99 551 pe 9 nov.
+
+**Remediu:** marcajul `/*turbopackIgnore: true*/` pe cele cinci apeluri
+(scripturile sunt pornite la rulare, nu trebuie incluse în build).
+
+Măsurat pe aceeași mașină, proces `next build`, memorie privată (prag de oprire
+automată în scriptul de măsurare):
+
+| Rulare | Vârf memorie | Citit de pe disc | Rezultat |
+|---|---:|---:|---|
+| înainte, 17:22 și 17:58 | ~100 GB | — | 8 GB RAM liber la vârf |
+| cu marcaje, cache cald | 2,8 GB | 1,5 GB | exit 0 |
+| cu marcaje, cache rece | 5,2 GB | 1,5 GB | exit 0, compilare 2,6 min |
+| mutant: marcajele scoase, cache rece | oprit la 21,4 GB, în creștere | 17,4 GB | dovada cauzei |
+
+Între 17:22 și 18:02 au fost și două build-uri cu marcajele puse care au urcat
+totuși la ~100 GB: porneau de la cache-ul Turbopack de pe disc scris înainte de
+remediu. Următorul build (18:10) și toate cele de după au rămas sub 10 GB. De
+ce a mai durat două rulări până s-a așezat cache-ul nu a fost investigat.
+
+**Poartă:** `node apps/web/scripts/trace-scope.mjs` (după build) eșuează dacă un
+`.nft.json` listează fișiere din afara `apps/web`, `packages/*` și
+`node_modules`; rulează în `web-ci` după pasul Build. Testată pe arbori de
+probă: curat → exit 0; un fișier din altă aplicație, din `.copilot-tmp` sau din
+rădăcina repo-ului → exit 1 cu zona și un exemplu.
+
+Au rămas 7 avertismente „Dynamic filesystem access causes tracing of the whole
+project” (`actions/recordings.ts`, `api/audio/[id]/route.ts`,
+`lib/rekordbox-import.ts`): acelea urmăresc doar `apps/web` (~16 000 de fișiere,
+cu `.pnpm-cache` și `learn-content`), nu ies din aplicație și nu au efect
+măsurabil asupra memoriei.

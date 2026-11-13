@@ -10,6 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## The web build no longer eats the machine's memory (web 3.6.1, 2026-11-12)
+
+`next build` grew to ~100 GB of memory and left the machine with 8 GB free (and sometimes
+exited 1 with no message). Five server actions resolved the parent of the working directory
+with `path.resolve(process.cwd(), "..")`; Turbopack cannot narrow such a path, so it traced
+every file under `apps/` — 73 808 of them, including the other apps' Rust target folders
+(71 GB) and Android build output. The traces of seven routes each listed 70 354 files.
+
+The five calls are marked `/*turbopackIgnore: true*/`; the scripts are executed at runtime and
+never belong in the build. Measured on the same machine, `next build` private memory: ~100 GB
+before, 2.8 GB with a warm cache, 5.2 GB cold; with the marks removed and a cold cache it
+climbed past 21 GB again. New gate `apps/web/scripts/trace-scope.mjs` (in `web-ci` after the
+build) fails when a file trace leaves `apps/web`. See `docs/arhitectura/build-performance.md`
+§6.
+
 ## MixAI brand pack 1.0: new mark, product icons, logo motion (WP22-03..10, 2026-11-12)
 
 Web 3.6.0, MixAI Server 3.16.0, MixAI Connector 3.1.0, MixAI TV for Android TV 2.4.0, Tizen 2.5.0, `@mmo/ui` 1.1.0,

@@ -16,7 +16,8 @@ import path from "node:path";
 
 import { auth } from "@/auth";
 
-const WORKSPACE_ROOT = path.resolve(process.cwd(), "..");
+// turbopackIgnore: without it the build traces every file under the parent folder (Rust target dirs included).
+const WORKSPACE_ROOT = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "..");
 const CLI_PATH = path.join(WORKSPACE_ROOT, "app", "scripts", "validate-lora-corpus.mjs");
 
 export interface ValidateClipResult {

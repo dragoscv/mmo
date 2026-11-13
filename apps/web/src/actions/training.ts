@@ -844,7 +844,8 @@ async function cancelVertexJob(jobName: string): Promise<void> {
     const { spawn } = await import("node:child_process");
     const path = await import("node:path");
     const fsp = await import("node:fs/promises");
-    const workspaceRoot = path.resolve(process.cwd(), "..");
+    // turbopackIgnore: without it the build traces every file under the parent folder (Rust target dirs included).
+    const workspaceRoot = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "..");
     const script = path.join(workspaceRoot, "infra", "vertex", "cancel-job.py");
     try {
         await fsp.access(script);

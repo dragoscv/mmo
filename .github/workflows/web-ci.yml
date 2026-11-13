@@ -113,6 +113,10 @@ jobs:
             - run: pnpm test
             - name: Build
               run: pnpm build
+            # A server file that resolves the parent of cwd makes Turbopack trace every file under apps/
+            # (100 GB of memory on a developer machine, docs/arhitectura/build-performance.md §6).
+            - name: File traces stay inside the app
+              run: node scripts/trace-scope.mjs
             # .bundle-baseline.json method is `next-dir` → measure the Turbopack .next directly.
             # (A `--webpack` log baseline would need `pnpm build:webpack > log` + `--check log`.)
             - name: Bundle budget
