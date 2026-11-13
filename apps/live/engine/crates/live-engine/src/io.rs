@@ -1127,7 +1127,25 @@ pub fn start(cfg: &IoConfig) -> Result<Running, IoError> {
         .map_err(|e| IoError::Config(format!("output: {e}")))?;
     let mut notes = Vec::new();
     if !has_f32(&indev, true) || !has_f32(&outdev, false) {
-        return Err(IoError::Config("device offers no f32 stream format".into()));
+        // A host whose device list is empty is a missing driver, not a format problem: ASIO on a
+        // machine that only has the Windows class driver, for instance. Say which it is.
+        let listed = host
+            .devices()
+            .map(|d| d.filter(|x| has_f32(x, true) || has_f32(x, false)).count())
+            .unwrap_or(0);
+        return Err(IoError::Config(if listed == 0 {
+            format!(
+                "the {} host has no usable device: is a driver installed for it?",
+                host.id().name()
+            )
+        } else {
+            format!(
+                "{} offers no f32 stream format ({} device(s) on the {} host do)",
+                dev_name(&indev),
+                listed,
+                host.id().name()
+            )
+        }));
     }
     let in_ch = in_def.channels();
     let out_ch = out_def.channels();

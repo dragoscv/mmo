@@ -10,6 +10,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — the ASIO tier builds locally, and what the machine has on it (WP21-27, 2026-11-13)
+
+The Steinberg ASIO SDK was downloaded at the owner's request and installed **outside** the repository
+(`E:\asio\ASIOSDK` — the folder that directly holds `common\` and `host\`), and
+`cargo build --release -p live-cli --features asio` now succeeds locally in 1 m 41 s. The binary lists the
+ASIO host, and this machine turns out to have **seven** ASIO devices: `Voicemeeter Potato Insert Virtual
+ASIO` (34 channels — the ASIO face of the very insert point the Remote-API host uses), `Voicemeeter Insert
+Virtual ASIO` (22), the three Voicemeeter virtual buses (8), plus `ASIO4ALL v2` and `FL Studio ASIO` (2).
+
+The host's *default* device is ASIO4ALL v2, which offers no f32 format: the engine used to answer the
+misleading "device offers no f32 stream format" and now says which host has no usable device, or names the
+device and how many on that host do. Nothing may be distributed — a beta included — before the Steinberg
+agreement is signed by both sides; the repository holds no SDK file, so CI cannot build this tier.
+
 ## MixAI Live — the desktop app can use the monitor option (2026-11-13)
 
 The mix strip carries an **Ears untuned** switch (`set_mix {monitor_untuned:true}`), with the ears' and

@@ -93,8 +93,8 @@ driver really runs.
   for bindgen). **Licence**: the ASIO SDK is dual GPLv3 / proprietary Steinberg licence, which is why it is an
   opt-in feature (ADR-0015 §8). A binary built with it may only be redistributed under the Steinberg licence
   agreement or GPLv3 terms; the default build contains no ASIO code.
-  - **Building it on this PC** (checked against `cpal 0.18.2` / `asio-sys 0.4.0` in the local cargo registry on
-   2026-11-13; the SDK is not in the repository and cannot be):
+  - **Built and verified on this PC on 2026-11-13** (checked against `cpal 0.18.2` / `asio-sys 0.4.0` in the
+    local cargo registry; the SDK is not in the repository and cannot be — it lives at `E:\asio\ASIOSDK`):
    1. Download the SDK from <https://www.steinberg.net/asiosdk> and accept its licence there. That download is
      the acceptance; `asio-sys` would otherwise do it by itself into the temp folder when `CPAL_ASIO_DIR` is
      unset, which is a decision to take deliberately, not by accident.
@@ -105,13 +105,26 @@ driver really runs.
      `libclang` for bindgen — LLVM is installed here (`C:\Program Files\LLVM\bin\libclang.dll`) and `clang`
      is on PATH; if bindgen cannot find it, set `LIBCLANG_PATH` to that `bin` folder.
    4. ```powershell
-     $env:CPAL_ASIO_DIR = 'E:\asio\ASIOSDK2'
+     $env:CPAL_ASIO_DIR = 'E:\asio\ASIOSDK'
      pwsh -NoProfile -File "$env:USERPROFILE\.copilot\hooks\run-build.ps1" -Command 'cargo build --release -p live-cli --features asio --manifest-path apps/live/engine/Cargo.toml'
      ```
-   5. Run it with the interface's own driver on both sides:
-     `mixai-live-engine periods --device "<ASIO device>"` then
+     (took 1 m 41 s on this machine, incremental 50 s.)
+   5. Name the device: `mixai-live-engine devices --host ASIO`. **What this machine has** (2026-11-13): seven
+     ASIO devices, and the host's *default* one is `ASIO4ALL v2`, which answers no f32 format — the engine now
+     says so instead of "device offers no f32 stream format":
+
+     | ASIO device | in / out | note |
+     |---|---:|---|
+     | `Voicemeeter Potato Insert Virtual ASIO` | 34 / 34 | Voicemeeter's own ASIO face of the insert point the Remote-API host uses |
+     | `Voicemeeter Insert Virtual ASIO` | 22 / 22 | same, standard/Banana layout |
+     | `Voicemeeter Virtual ASIO` / `AUX` / `VAIO3` | 8 / 8 | the virtual buses |
+     | `ASIO4ALL v2`, `FL Studio ASIO` | 2 / 2 | wrappers over WASAPI, not the interface's own driver |
+
+   6. Run it with the interface's own driver on both sides (same device for input and output, no drift):
      `mixai-live-engine latency --host ASIO --input "<device>" --output "<device>" --buffer 64`.
-   6. Do not ship the binary (or a beta) before both signatures are on the agreement; the repository stores no
+     A direct test on this rig is worth it: `Voicemeeter Potato Insert Virtual ASIO` is the ASIO route to the
+     same insert point the Remote-API host uses, so the two can be measured against each other.
+   7. Do not ship the binary (or a beta) before both signatures are on the agreement; the repository stores no
      SDK file, so CI cannot build this tier at all.
   - **Before any ASIO build leaves this PC** (decided 2026-11-12, tracker WP21-27; terms as read on Steinberg's
     pinned "ASIO SDK Proprietary Licensing FAQ" of 2026-10-21 — the agreement PDF and the ASIO Usage Guidelines
