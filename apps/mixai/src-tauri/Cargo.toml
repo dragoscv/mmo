@@ -1,6 +1,6 @@
 [package]
 name = "mixai"
-version = "1.6.0"
+version = "1.7.0"
 description = "MixAI Decks — native DJ software"
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 license = "AGPL-3.0-or-later"
