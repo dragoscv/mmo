@@ -28,14 +28,14 @@
     <string name="signin_err_status">%1$s answered with error %2$d.</string>
     <string name="signin_err_invalid">%1$s sent an unexpected answer.</string>
     <string name="discover_title">Choose a server</string>
-    <string name="discover_subtitle">MMO Servers found on this Wi-Fi network.</string>
+    <string name="discover_subtitle">MixAI Servers found on this Wi-Fi network.</string>
     <string name="discover_searching">Searching the network…</string>
     <string name="discover_manual">Enter the address manually</string>
     <string name="discover_manual_hint">For example http://192.168.1.10:17899</string>
     <string name="pair_title">Pair with %1$s</string>
     <string name="pair_requesting">Asking the server for a pairing code…</string>
     <string name="pair_your_code">Pairing code</string>
-    <string name="pair_instructions">Approve this code in MixAI (Settings, Devices) or in the MMO Server app on your computer.</string>
+    <string name="pair_instructions">Approve this code in MixAI (Settings, Devices) or in MixAI Server app on your computer.</string>
     <string name="pair_approve_here">Approve on this phone</string>
     <string name="pair_waiting">Waiting for approval…</string>
     <string name="pair_expired">The pairing code expired.</string>

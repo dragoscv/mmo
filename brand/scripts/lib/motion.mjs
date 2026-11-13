@@ -1,0 +1,273 @@
+// Logo motion generators: one definition (brand/src/motion.mjs) -> CSS keyframes, animated SVG (SMIL),
+// Android AnimatedVectorDrawable pieces and Swift tables. Pure functions, no file output.
+import { EASE, LOGO_MOTION } from '../../src/motion.mjs';
+import { geometry } from '../../src/marks.mjs';
+import { esc, n, nameOf, scheme } from './draw.mjs';
+
+/** Normalise a track to keys `{ t, v, ease }` that start at 0 and end at 1. */
+export function keys(track) {
+  const out = track.map(([t, v, ease]) => ({ t, v, ease: ease ?? 'linear' }));
+  if (out[0].t !== 0) out.unshift({ t: 0, v: out[0].v, ease: 'linear' });
+  if (out[out.length - 1].t !== 1) out.push({ t: 1, v: out[out.length - 1].v, ease: 'linear' });
+  for (let i = 1; i < out.length; i++) if (out[i].t <= out[i - 1].t) throw new Error('track times must increase');
+  for (const k of out) {
+    const e = EASE[k.ease];
+    if (!e) throw new Error(`unknown easing "${k.ease}" (see EASE in brand/src/motion.mjs)`);
+    if (e.some((v) => v < 0 || v > 1)) throw new Error(`easing "${k.ease}" leaves 0..1: animated SVG cannot play it, use a keyframe for the overshoot`);
+  }
+  return out;
+}
+
+const bez = (name) => `cubic-bezier(${EASE[name].map((v) => n(v)).join(', ')})`;
+const pct = (t) => `${n(t * 100, 2)}%`;
+
+/** Position of line `index` among `count` lines, 0..1 (0 for a single line). Its delay = position x lineSpread x duration. */
+export const linePosition = (index, count) => (count > 1 ? index / (count - 1) : 0);
+
+/** cubic-bezier(x1, y1, x2, y2) evaluated at `x` (0..1). */
+function easeAt(x, [x1, y1, x2, y2]) {
+  if (x1 === y1 && x2 === y2) return x;
+  const curve = (t, p1, p2) => 3 * (1 - t) * (1 - t) * t * p1 + 3 * (1 - t) * t * t * p2 + t * t * t;
+  let lo = 0;
+  let hi = 1;
+  let t = x;
+  for (let i = 0; i < 40; i++) {
+    const at = curve(t, x1, x2);
+    if (Math.abs(at - x) < 1e-6) break;
+    if (at < x) lo = t;
+    else hi = t;
+    t = (lo + hi) / 2;
+  }
+  return curve(t, y1, y2);
+}
+
+/** Value of a track at time `t` (0..1). */
+export function valueAt(track, t) {
+  const ks = keys(track);
+  if (t <= 0) return ks[0].v;
+  if (t >= 1) return ks[ks.length - 1].v;
+  for (let i = 1; i < ks.length; i++) {
+    if (t > ks[i].t) continue;
+    const a = ks[i - 1];
+    const b = ks[i];
+    return a.v + (b.v - a.v) * easeAt((t - a.t) / (b.t - a.t), EASE[b.ease]);
+  }
+  return ks[ks.length - 1].v;
+}
+
+/** `[time, value]` samples that reproduce a track with LINEAR interpolation (easing baked in). */
+export function sampled(track, step = 1 / 36) {
+  const ks = keys(track);
+  const times = new Set(ks.map((k) => k.t));
+  for (let i = 1; i < ks.length; i++) {
+    const a = ks[i - 1];
+    const b = ks[i];
+    const straight = a.v === b.v || (EASE[b.ease][0] === EASE[b.ease][1] && EASE[b.ease][2] === EASE[b.ease][3]);
+    if (straight) continue;
+    for (let t = Math.ceil(a.t / step) * step; t < b.t; t += step) if (t > a.t) times.add(Number(t.toFixed(4)));
+  }
+  return [...times].sort((x, y) => x - y).map((t) => [t, valueAt(track, t)]);
+}
+
+/** `@keyframes` from a track; `decl(value)` returns the declarations for one key. */
+function keyframes(name, track, decl) {
+  const ks = keys(track);
+  const rows = ks.map((k, i) => {
+    const next = ks[i + 1];
+    const timing = next ? ` animation-timing-function: ${bez(next.ease)};` : '';
+    return `  ${pct(k.t)} { ${decl(k.v)}${timing} }`;
+  });
+  return `@keyframes ${name} {\n${rows.join('\n')}\n}`;
+}
+
+/** Trim track with an opacity guard: a fully retracted line with round caps would still paint a dot. */
+function trimKeyframes(name, track) {
+  const ks = keys(track);
+  const rows = [];
+  ks.forEach((k, i) => {
+    const next = ks[i + 1];
+    const gone = k.v >= 0.999;
+    const timing = next ? ` animation-timing-function: ${bez(next.ease)};` : '';
+    if (gone && i > 0 && ks[i - 1].v < 0.999) rows.push(`  ${pct(k.t - 0.0001)} { stroke-dashoffset: ${n(-k.v)}; opacity: 1; }`);
+    rows.push(`  ${pct(k.t)} { stroke-dashoffset: ${n(-k.v)}; opacity: ${gone ? 0 : 1};${timing} }`);
+    if (gone && next && next.v < 0.999) rows.push(`  ${pct(k.t + 0.0001)} { stroke-dashoffset: ${n(-k.v)}; opacity: 1;${timing} }`);
+  });
+  return `@keyframes ${name} {\n${rows.join('\n')}\n}`;
+}
+
+/**
+ * CSS for every surface that renders the mark as inline SVG (structure: see `animatedMarkup`).
+ * Usage: `<svg class="mixai-logo" data-anim="intro|loading|success|error|morph">`; press = `.mixai-logo-press`.
+ */
+export function logoCss() {
+  const M = LOGO_MOTION;
+  const part = (anim, what, extra = '') =>
+    `.mixai-logo[data-anim="${anim}"] ${what} { animation: mixai-logo-${anim}-${extra || 'x'} ${M[anim].duration}ms linear ${M[anim].loop ? 'infinite' : '1'} both; }`;
+  const stagger = (anim) => `.mixai-logo[data-anim="${anim}"] .mixai-logo-line { animation-delay: calc(var(--i, 0) * ${n(M[anim].lineSpread * M[anim].duration, 1)}ms); }`;
+  return [
+    `/* GENERATED by brand/scripts/build.mjs from brand/src/motion.mjs. Do not edit. */`,
+    `.mixai-logo { overflow: visible; }`,
+    `.mixai-logo-line { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 1; stroke-dashoffset: 0; }`,
+    `.mixai-logo-dot, .mixai-logo-body { transform-origin: 0 0; }`,
+    ``,
+    trimKeyframes('mixai-logo-intro-line', M.intro.trimStart),
+    keyframes('mixai-logo-intro-dot', M.intro.dotScale, (v) => `transform: scale(${n(v)});`),
+    part('intro', '.mixai-logo-line', 'line'),
+    stagger('intro'),
+    part('intro', '.mixai-logo-dot', 'dot'),
+    ``,
+    keyframes('mixai-logo-loading-line', M.loading.lineOpacity, (v) => `opacity: ${n(v)};`),
+    keyframes('mixai-logo-loading-dot', M.loading.dotScale, (v) => `transform: scale(${n(v)});`),
+    part('loading', '.mixai-logo-line', 'line'),
+    stagger('loading'),
+    part('loading', '.mixai-logo-dot', 'dot'),
+    ``,
+    keyframes('mixai-logo-success-dot', M.success.dotScale, (v) => `transform: scale(${n(v)});`),
+    part('success', '.mixai-logo-dot', 'dot'),
+    ``,
+    keyframes('mixai-logo-error-body', M.error.shakeX, (v) => `transform: translateX(${n(v)}px);`),
+    part('error', '.mixai-logo-body', 'body'),
+    ``,
+    keyframes('mixai-logo-morph-line', M.morph.lineOpacity, (v) => `opacity: ${n(v)};`),
+    keyframes('mixai-logo-morph-dot', M.morph.dotGrow, (v) => `transform: scale(calc(1 + ${n(v)} * (var(--mixai-logo-morph-scale, 60) - 1)));`),
+    part('morph', '.mixai-logo-line', 'line'),
+    part('morph', '.mixai-logo-dot', 'dot'),
+    ``,
+    `.mixai-logo-press { transition: transform ${M.press.duration}ms ${bez(M.press.ease)}; }`,
+    `.mixai-logo-press:active { transform: scale(${M.press.scale}); }`,
+    ``,
+    `/* Reduced motion: the static mark. Loading states must show a text status next to it. */`,
+    `@media (prefers-reduced-motion: reduce) {`,
+    `  .mixai-logo[data-anim] .mixai-logo-line, .mixai-logo[data-anim] .mixai-logo-dot, .mixai-logo[data-anim] .mixai-logo-body { animation: none; }`,
+    `  .mixai-logo[data-anim="morph"] { transition: opacity 150ms linear; }`,
+    `  .mixai-logo-press { transition: opacity ${M.press.duration}ms linear; }`,
+    `  .mixai-logo-press:active { transform: none; opacity: 0.8; }`,
+    `}`,
+    `:root[data-motion="reduced"] .mixai-logo[data-anim] .mixai-logo-line, :root[data-motion="reduced"] .mixai-logo[data-anim] .mixai-logo-dot, :root[data-motion="reduced"] .mixai-logo[data-anim] .mixai-logo-body { animation: none; }`,
+    `:root[data-motion="reduced"] .mixai-logo[data-anim="morph"] { transition: opacity 150ms linear; }`,
+    `:root[data-motion="reduced"] .mixai-logo-press { transition: opacity ${M.press.duration}ms linear; }`,
+    `:root[data-motion="reduced"] .mixai-logo-press:active { transform: none; opacity: 0.8; }`,
+    ``,
+  ].join('\n');
+}
+
+/**
+ * Inline SVG body the CSS animates: lines carry `pathLength="1"` and `--i` (line position 0..1), the dot sits
+ * in a group translated to its centre so scaling needs no transform-box. `color(role)` returns a paint for a|b|dot.
+ * With `color = null` the markup carries no paint and no style attribute (static HTML: old TV engines, strict
+ * CSP); pair it with `markPaintCss`, which sets colours and line positions from a stylesheet.
+ */
+export function animatedMarkup(id, color) {
+  const geo = geometry(id).master;
+  const lines = geo.lines
+    .map((l, i) => {
+      const role = l.role === 'b' ? 'b' : 'a';
+      const paint = color ? ` style="--i:${n(linePosition(i, geo.lines.length))}" stroke="${color(role)}"` : '';
+      return `<path class="mixai-logo-line${!color && role === 'b' ? ' mixai-logo-b' : ''}"${paint} pathLength="1" d="${l.d}" stroke-width="${geo.w}"/>`;
+    })
+    .join('');
+  const [cx, cy, r] = geo.dot;
+  return `<g class="mixai-logo-body">${lines}<g transform="translate(${cx} ${cy})"><circle class="mixai-logo-dot" r="${r}"${color ? ` fill="${color('dot')}"` : ''}/></g></g>`;
+}
+
+/**
+ * CSS for the paint-less markup of `<svg class="mixai-logo" data-product="id">` and its outlined name
+ * (`<svg class="mixai-wordmark" data-product="id">`): colours through the design-token variables, line positions.
+ */
+export function markPaintCss(id) {
+  const count = geometry(id).master.lines.length;
+  const a = id === 'mark' ? 'var(--mark-a)' : `var(--product-${id})`;
+  const b = id === 'mark' ? 'var(--mark-b)' : a;
+  const sel = `.mixai-logo[data-product="${id}"]`;
+  return [
+    `${sel} .mixai-logo-line { stroke: ${a}; }`,
+    ...(id === 'mark' ? [`${sel} .mixai-logo-b { stroke: ${b}; }`] : []),
+    `${sel} .mixai-logo-dot, .mixai-wordmark[data-product="${id}"] .mixai-ink { fill: var(--mark-signal); }`,
+    `.mixai-wordmark[data-product="${id}"] .mixai-accent { fill: ${b}; }`,
+    ...Array.from({ length: count }, (_, i) => i)
+      .filter((i) => i > 0)
+      .map((i) => `${sel} .mixai-logo-line:nth-child(${i + 1}) { --i: ${n(linePosition(i, count))}; }`),
+  ].join('\n');
+}
+
+// ── animated SVG (SMIL): self-contained files for docs, README and places without the CSS ───
+
+function smil(attr, track, dur, { begin = 0, loop = false, map = (v) => n(v), type } = {}) {
+  const ks = keys(track);
+  const values = ks.map((k) => map(k.v)).join(';');
+  const keyTimes = ks.map((k) => n(k.t, 4)).join(';');
+  const splines = ks.slice(1).map((k) => EASE[k.ease].map((v) => n(v)).join(' ')).join(';');
+  const common = `values="${values}" keyTimes="${keyTimes}" calcMode="spline" keySplines="${splines}" dur="${dur}ms" begin="${n(begin, 1)}ms" ${loop ? 'repeatCount="indefinite"' : 'fill="freeze"'}`;
+  return type ? `<animateTransform attributeName="transform" type="${type}" ${common}/>` : `<animate attributeName="${attr}" ${common}/>`;
+}
+
+/** Opacity guard track for a trim track (0 while the line is fully retracted). */
+function trimOpacityTrack(track) {
+  const ks = keys(track);
+  const out = [];
+  ks.forEach((k, i) => {
+    const gone = k.v >= 0.999;
+    const prevGone = i > 0 && ks[i - 1].v >= 0.999;
+    if (gone && !prevGone && i > 0) out.push([k.t - 0.0001, 1]);
+    out.push([k.t, gone ? 0 : 1]);
+    if (gone && ks[i + 1] && ks[i + 1].v < 0.999) out.push([k.t + 0.0001, 1]);
+  });
+  return out;
+}
+
+/** A self-contained animated SVG of one animation of one mark. */
+export function animatedSvg(id, anim, px, { mode = 'dark' } = {}) {
+  const M = LOGO_MOTION[anim];
+  const geo = geometry(id).master;
+  const sch = scheme(id, mode);
+  const dur = M.duration;
+  const lines = geo.lines
+    .map((l, i) => {
+      const begin = (M.lineSpread ?? 0) * dur * linePosition(i, geo.lines.length);
+      const anims = [];
+      if (M.trimStart) {
+        anims.push(smil('stroke-dashoffset', M.trimStart, dur, { begin, map: (v) => n(-v) }));
+        anims.push(smil('opacity', trimOpacityTrack(M.trimStart), dur, { begin }));
+      }
+      if (M.lineOpacity) anims.push(smil('opacity', M.lineOpacity, dur, { begin, loop: M.loop }));
+      return `<path pathLength="1" d="${l.d}" fill="none" stroke="${l.role === 'b' ? sch.b : sch.a}" stroke-width="${geo.w}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 1">${anims.join('')}</path>`;
+    })
+    .join('');
+  const [cx, cy, r] = geo.dot;
+  const dotAnim = M.dotScale ? smil('', M.dotScale, dur, { loop: M.loop, type: 'scale' }) : '';
+  const bodyAnim = M.shakeX ? smil('', M.shakeX, dur, { type: 'translate', map: (v) => `${n(v)} 0` }) : '';
+  const body = `<g>${bodyAnim}${lines}<g transform="translate(${cx} ${cy})"><g>${dotAnim}<circle r="${r}" fill="${sch.dot}"/></g></g></g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${geo.grid} ${geo.grid}" role="img" aria-label="${esc(nameOf(id))}">${body}</svg>\n`;
+}
+
+// ── Android AnimatedVectorDrawable pieces ──────────────────────────────────────────────────
+
+/**
+ * One `<objectAnimator>` that plays `tracks` (property name -> track) over `dur` ms after `begin` ms.
+ * Easing is baked into linear keyframes, so loops repeat the whole track and no inline interpolator is needed.
+ */
+export function avdAnimator(tracks, dur, { begin = 0, loop = false, map = (v) => v, indent = '' } = {}) {
+  const f = (v) => {
+    const s = n(v, 4);
+    return s.includes('.') ? s : `${s}.0`;
+  };
+  const holders = Object.entries(tracks).map(
+    ([property, track]) =>
+      `${indent}    <propertyValuesHolder android:propertyName="${property}" android:valueType="floatType">\n` +
+      sampled(track).map(([t, v]) => `${indent}        <keyframe android:fraction="${f(t)}" android:value="${f(map(v))}" />`).join('\n') +
+      `\n${indent}    </propertyValuesHolder>`,
+  );
+  return (
+    `${indent}<objectAnimator android:duration="${Math.round(dur)}" android:startOffset="${Math.round(begin)}" android:interpolator="@android:interpolator/linear"` +
+    `${loop ? ' android:repeatCount="infinite"' : ''}>\n${holders.join('\n')}\n${indent}</objectAnimator>`
+  );
+}
+
+// ── Swift tables ───────────────────────────────────────────────────────────────────────────
+
+/** Swift literal `[BrandKey]` for a track. */
+export function swiftTrack(track) {
+  return `[${keys(track)
+    .map((k) => `BrandKey(${n(k.t, 4)}, ${n(k.v, 4)}, ${EASE[k.ease].map((v) => n(v)).join(', ')})`)
+    .join(', ')}]`;
+}

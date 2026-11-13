@@ -8,10 +8,12 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
-    <!-- SplashScreen API (core-splashscreen); installSplashScreen() swaps to Theme.MixaiMusic. -->
+    <!-- SplashScreen API (core-splashscreen); installSplashScreen() swaps to Theme.MixaiMusic.
+         Icon = the generated logo intro (brand/scripts/build.mjs, res/values/brand.xml holds its length). -->
     <style name="Theme.MixaiMusic.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenBackground">@color/brand_canvas</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_brand_intro</item>
+        <item name="windowSplashScreenAnimationDuration">@integer/brand_intro_ms</item>
         <item name="postSplashScreenTheme">@style/Theme.MixaiMusic</item>
     </style>
 </resources>

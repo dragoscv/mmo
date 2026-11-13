@@ -42,7 +42,9 @@ const RE_ANNOUNCE_INTERVAL_MS = 3 * 1000;
 // so multi-step flows (pick → kind → watch toggle) feel snappy.
 const BURST_INTERVAL_MS = 750;
 const BURST_DURATION_MS = 20_000;
-const SERVICE_NAME = "MixAI Companion";
+// Human-readable instance name (the iOS server list shows it as is). The service TYPE below is the
+// wire identifier every client browses for and must not change.
+const SERVICE_NAME = "MixAI Server";
 const SERVICE_TYPE = "mmo-companion";
 
 let timer: NodeJS.Timeout | null = null;

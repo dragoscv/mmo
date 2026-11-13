@@ -1,15 +1,16 @@
 /**
  * MixAI product family (ADR-0013) — one list drives the suite landing, the download matrix and the signed-in
- * launcher. `accent` is a design-token custom property (never a hex), `internal` the route the launcher opens
- * (mapped to the product host by `hrefFor`).
+ * launcher. `brand` is the product's mark (`<BrandMark product>`, ADR-0016), `accent` its identity colour as a
+ * design-token custom property (never a hex), `internal` the route the launcher opens (mapped to the product host
+ * by `hrefFor`).
  */
-import { Clapperboard, Disc3, Headphones, LayoutDashboard, Server, type LucideIcon } from "lucide-react";
+import type { BrandId } from "@mmo/ui";
 
 export type SuiteProductKey = "tv" | "music" | "studio" | "dj" | "server";
 
 export interface SuiteProduct {
     key: SuiteProductKey;
-    icon: LucideIcon;
+    brand: Exclude<BrandId, "mark">;
     accent: string;
     /** Internal route the launcher opens (host-mapped), or an absolute URL. */
     internal: string;
@@ -22,15 +23,15 @@ export type PlatformKey =
     | "windows" | "macos" | "linux" | "docker" | "pi" | "chrome";
 
 export const SUITE_PRODUCTS: readonly SuiteProduct[] = [
-    { key: "tv", icon: Clapperboard, accent: "var(--chart-1)", internal: "/media",
+    { key: "tv", brand: "tv", accent: "var(--product-tv)", internal: "/media",
         platforms: ["web", "androidTv", "tizen", "android", "ios", "windows", "macos", "linux", "fireTv", "webos", "appleTv"] },
-    { key: "music", icon: Headphones, accent: "var(--chart-2)", internal: "/media/music",
+    { key: "music", brand: "music", accent: "var(--product-music)", internal: "/media/music",
         platforms: ["web", "android", "ios", "windows", "macos", "linux"] },
-    { key: "studio", icon: LayoutDashboard, accent: "var(--chart-3)", internal: "/dashboard",
+    { key: "studio", brand: "studio", accent: "var(--product-studio)", internal: "/dashboard",
         platforms: ["web", "windows", "macos", "linux", "chrome"] },
-    { key: "dj", icon: Disc3, accent: "var(--chart-4)", internal: "/dj",
+    { key: "dj", brand: "decks", accent: "var(--product-decks)", internal: "/dj",
         platforms: ["windows", "macos", "linux"] },
-    { key: "server", icon: Server, accent: "var(--chart-5)", internal: "/get",
+    { key: "server", brand: "server", accent: "var(--product-server)", internal: "/get",
         platforms: ["windows", "macos", "linux", "docker", "pi"] },
 ] as const;
 

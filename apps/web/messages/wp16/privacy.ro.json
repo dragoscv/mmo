@@ -3,13 +3,13 @@
     "metaDescription": "Ce colectează aplicațiile și site-ul MixAI, de ce, unde sunt stocate datele și cum le ștergi.",
     "title": "Politica de confidențialitate",
     "updated": "Ultima actualizare: 9 noiembrie 2026",
-    "intro": "MixAI este un player pentru propria ta bibliotecă media, servită de propriul tău MMO Server. Politica acoperă site-ul MixAI, aplicațiile MixAI pentru Android, iOS și TV, MixAI Decks și MixAI Key & BPM (telefon, Wear OS și Apple Watch). MixAI nu afișează reclame și nu te urmărește în alte aplicații sau site-uri.",
+    "intro": "MixAI este un player pentru propria ta bibliotecă media, servită de propriul tău MixAI Server. Politica acoperă site-ul MixAI, aplicațiile MixAI pentru Android, iOS și TV, MixAI Decks și MixAI Key & BPM (telefon, Wear OS și Apple Watch). MixAI nu afișează reclame și nu te urmărește în alte aplicații sau site-uri.",
     "controller": "Operator: Dragoș Cătălin Vlădulescu, România. Contact:",
     "langSwitch": "Read in English",
     "sections": {
         "server": {
             "title": "Serverul tău",
-            "body": "Filmele, serialele, muzica și sursele live rămân pe MMO Server-ul pe care îl rulezi tu. Aplicația vorbește direct cu acel server. Progresul vizionării, camerele și mesajele Watch Together, descărcările și istoricul ascultărilor sunt stocate pe serverul tău, nu de noi. Chatul Watch Together trece doar prin serverul tău și nu ajunge la MixAI."
+            "body": "Filmele, serialele, muzica și sursele live rămân pe serverul MixAI pe care îl rulezi tu. Aplicația vorbește direct cu acel server. Progresul vizionării, camerele și mesajele Watch Together, descărcările și istoricul ascultărilor sunt stocate pe serverul tău, nu de noi. Chatul Watch Together trece doar prin serverul tău și nu ajunge la MixAI."
         },
         "keybpm": {
             "title": "MixAI Key & BPM (tonalitate, tempo și identificare piese)",

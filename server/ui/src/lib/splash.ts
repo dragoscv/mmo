@@ -4,7 +4,7 @@ const startedAt = Date.now();
 /**
  * Fade out the inline splash from index.html once the first real view is
  * known. Minimum visible time keeps a fast cold start from flickering; under
- * reduced motion the CSS collapses the transition to a 200 ms opacity fade.
+ * reduced motion the CSS drops the scale and keeps a 200 ms opacity fade.
  */
 export function hideSplash(): void {
     const el = document.getElementById("splash");

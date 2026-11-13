@@ -27,7 +27,7 @@ export function DebugLogPanel() {
             const env = r.env ?? ({} as Partial<typeof r.env>);
             const lines = r.lines ?? [];
             const header =
-                `# MixAI Companion debug snapshot\n` +
+                `# MixAI Server debug snapshot\n` +
                 `# app=${env.appVersion} electron=${env.electron} node=${env.node}\n` +
                 `# platform=${env.platform}/${env.arch} uptime=${env.uptimeSec}s rss=${env.rssMB}MB\n` +
                 `# log file: ${r.logFile}\n` +

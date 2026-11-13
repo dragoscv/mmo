@@ -22,9 +22,6 @@ android/capacitor.settings.gradle
 ios/
 dist/
 
-# Generated icons (recreated by `pnpm tauri icon`)
-src-tauri/icons/
-
 # Node
 node_modules/
 *.log

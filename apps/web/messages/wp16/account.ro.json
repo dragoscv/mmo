@@ -11,14 +11,14 @@
         "whatTitle": "Ce se șterge",
         "what": {
             "account": "Contul, metodele de autentificare și toate sesiunile active (televizoare, telefoane, browsere)",
-            "devices": "Serverele MMO asociate, tokenurile de dispozitiv, înregistrările pentru notificări",
+            "devices": "Serverele MixAI asociate, tokenurile de dispozitiv, înregistrările pentru notificări",
             "media": "Profilurile de vizionare, istoricul, notele, colecțiile, playlisturile, istoricul de ascultare și metadatele bibliotecii sincronizate în cloud",
             "ai": "Conexiunile și cheile AI, audio generat, proiectele și setările salvate",
             "billing": "Clientul Stripe (un abonament activ este anulat)",
             "apple": "Autentificarea cu Apple: revocăm accesul MixAI la Apple ID-ul tău"
         },
         "keepTitle": "Ce nu este afectat",
-        "keep": "Fișierele de pe calculatorul sau serverul MMO propriu rămân unde sunt — MixAI nu îți încarcă biblioteca media. Facturile pe care legea ne obligă să le păstrăm rămân pe durata legală, fără legătură cu un cont activ.",
+        "keep": "Fișierele de pe calculatorul sau serverul MixAI propriu rămân unde sunt — MixAI nu îți încarcă biblioteca media. Facturile pe care legea ne obligă să le păstrăm rămân pe durata legală, fără legătură cu un cont activ.",
         "timing": "Ștergerea are loc imediat. Copiile de siguranță se rotesc în cel mult 30 de zile.",
         "signedInAs": "Conectat ca {email}",
         "signedInAsUnknown": "Ești conectat",

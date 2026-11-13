@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -43,6 +44,8 @@ import ro.mixai.tv.R
 import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
+import ro.mixai.tv.ui.theme.BrandMark
+import ro.mixai.tv.ui.theme.BrandProduct
 import ro.mixai.tv.ui.theme.Tokens
 
 private sealed interface Probe {
@@ -90,7 +93,10 @@ fun ConnectScreen(
 
     Box(Modifier.fillMaxSize().padding(64.dp), contentAlignment = Alignment.Center) {
         Column(Modifier.width(720.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = Tokens.foreground)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                BrandMark(product = BrandProduct.Tv, modifier = Modifier.size(44.dp), decorative = true)
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = Tokens.foreground)
+            }
             Text(stringResource(R.string.connect_subtitle), style = MaterialTheme.typography.titleMedium, color = Tokens.mutedForeground)
 
             TvField(

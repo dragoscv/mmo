@@ -1,12 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import { useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { Button } from "@mmo/ui";
+import { BrandMark, Button } from "@mmo/ui";
 import { LoginForm } from "@/components/login-form";
 import { useRenderCount } from "@/lib/dev-debugger";
 import { isMusicDesktop, openDesktopSignIn } from "@/lib/mmo/desktop-bridge";
+import { useHost } from "@/components/host/host-context";
+import { hostBrand } from "@/lib/host/brand";
 
 const noop = () => () => undefined;
 
@@ -36,17 +37,18 @@ function DesktopSignIn() {
 export function LoginPageClient({ callbackUrl = "/", appleEnabled }: { callbackUrl?: string; appleEnabled?: boolean }) {
     useRenderCount("Page:/login");
     const t = useTranslations("login");
+    // The sign-in page is shared by every product host: it carries the mark of the host it is opened on.
+    const { kind } = useHost();
     return (
         <div className="flex min-h-full items-center justify-center px-4">
             <div className="w-full max-w-sm space-y-8">
                 {/* Logo */}
                 <div className="flex flex-col items-center gap-3">
-                    <Image
-                        src="/logo.svg"
-                        alt="MixAI"
-                        width={56}
-                        height={56}
-                        className="rounded-2xl shadow-[0_0_24px_rgba(124,92,255,0.35)]"
+                    <BrandMark
+                        product={hostBrand(kind)}
+                        size={56}
+                        tile
+                        className="rounded-[22.5%] shadow-[0_0_24px_color-mix(in_oklch,var(--primary)_35%,transparent)]"
                     />
                     <div className="text-center">
                         <h1 className="text-2xl font-bold tracking-tight">

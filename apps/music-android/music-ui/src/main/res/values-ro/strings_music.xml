@@ -12,7 +12,7 @@
     <string name="music_row_random">Descoperă</string>
     <string name="music_shuffle_all">Amestecă tot</string>
     <string name="music_empty_title">Încă nu există o bibliotecă muzicală</string>
-    <string name="music_empty_hint">Adaugă un folder de muzică în MMO Server (Setări, Biblioteci). Albumele și artiștii apar aici după scanare.</string>
+    <string name="music_empty_hint">Adaugă un folder de muzică în MixAI Server (Setări, Biblioteci). Albumele și artiștii apar aici după scanare.</string>
     <string name="music_no_artists">Niciun artist</string>
     <string name="music_no_albums">Niciun album</string>
     <string name="music_no_playlists">Niciun playlist</string>

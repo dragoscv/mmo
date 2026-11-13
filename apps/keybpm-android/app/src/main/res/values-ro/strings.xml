@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MixAI Tonalitate &amp; BPM</string>
+    <string name="app_name">MixAI Key &amp; BPM</string>
     <string name="tab_live">Live</string>
     <string name="tab_tuner">Acordor</string>
     <string name="listen_start">Ascultă</string>
@@ -75,7 +75,7 @@
     <string name="tempo_start">Pornește ceasul</string>
     <string name="tempo_stop">Oprește ceasul</string>
     <string name="tempo_hint">Trimite MIDI Start, 24 de impulsuri de ceas pe bătaie și Stop către dispozitivul conectat.</string>
-    <string name="library_intro">Conectează serverul MMO ca să vezi care piese din colecția ta se mixează bine cu ce se aude acum. Opțional — restul funcționează offline.</string>
+    <string name="library_intro">Conectează MixAI Server ca să vezi care piese din colecția ta se mixează bine cu ce se aude acum. Opțional — restul funcționează offline.</string>
     <string name="library_connect">Conectează serverul</string>
     <string name="library_disconnect">Deconectează</string>
     <string name="library_need_reading">Ascultă o piesă sau deschide un fișier mai întâi.</string>

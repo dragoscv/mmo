@@ -87,9 +87,9 @@
     <string name="together_hub_connected">Conectat</string>
     <string name="together_hub_connecting">Se reconectează…</string>
     <string name="together_hub_disconnected">Deconectat</string>
-    <string name="together_waiting_hub">Se așteaptă MMO Server…</string>
+    <string name="together_waiting_hub">Se așteaptă MixAI Server…</string>
     <string name="together_update_title">Serverul trebuie actualizat</string>
-    <string name="together_update_server">Actualizează MMO Server la 3.5+ pentru Vizionare împreună (acest server rulează %1$s).</string>
+    <string name="together_update_server">Actualizează MixAI Server la 3.5+ pentru Vizionare împreună (acest server rulează %1$s).</string>
     <string name="together_err_not_found">Nu există o cameră cu acest cod.</string>
     <string name="together_err_full">Camera este plină.</string>
     <string name="together_err_not_in_room">Nu mai ești în cameră.</string>

@@ -181,7 +181,7 @@ function bootstrap(sqlite: Database.Database) {
         -- row are written through — in-flight progress mutations stay in
         -- RAM to avoid SQLite write amplification. On companion restart,
         -- any rows still in pending/discovering/scanning get marked as
-        -- 'error: companion restarted' so the UI shows a clear state and
+        -- 'error: server restarted' so the UI shows a clear state and
         -- the user can retry the scan from scratch.
         CREATE TABLE IF NOT EXISTS scan_jobs (
             id TEXT PRIMARY KEY,

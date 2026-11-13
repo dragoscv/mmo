@@ -1,0 +1,11 @@
+# Binary brand outputs and fonts: never line-ending converted, never diffed as text.
+*.png binary
+*.ico binary
+*.icns binary
+*.wav binary
+*.woff2 binary
+*.ttf binary
+
+# Shell scripts run on Linux and macOS: LF in every checkout (core.autocrlf=true on Windows would write CRLF,
+# which fails with "bad interpreter: /bin/bash^M").
+*.sh text eol=lf

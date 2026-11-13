@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ro.mixai.tv.data.AccountSession
@@ -125,6 +126,11 @@ class MainActivity : ComponentActivity() {
                             androidx.compose.runtime.LaunchedEffect(Unit) {
                                 androidx.compose.runtime.withFrameNanos { }
                                 window.setBackgroundDrawable(null)
+                            }
+                            // Brand signature: once per cold start, after the first frame is on screen.
+                            LaunchedEffect(Unit) {
+                                androidx.compose.runtime.withFrameNanos { }
+                                BrandSound.playAtStart(this@MainActivity, settings.startupSound.first())
                             }
                         }
                     }

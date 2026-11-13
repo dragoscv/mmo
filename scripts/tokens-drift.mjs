@@ -17,10 +17,23 @@ const GENERATED = [
     "apps/tv-tizen/src/tokens.css",
     "apps/extension/tokens.css",
     "apps/native/web/tokens.css",
+    "apps/music-desktop/web/tokens.css",
+    "apps/mixai/src-tauri/crates/decks-remote/assets/tokens.css",
+    "apps/live/engine/crates/live-remote/assets/tokens.css",
+    "server/ui/public/tokens.plain.css",
     "apps/web/public/prehydrate.js",
     "apps/tv-tizen/public/prehydrate.js",
     "apps/mixai/public/prehydrate.js",
     "server/ui/public/prehydrate.js",
+    "apps/tv-android/app/src/main/res/values/colors.xml",
+    "apps/phone-android/app/src/main/res/values/colors.xml",
+    "apps/music-android/app/src/main/res/values/colors.xml",
+    "apps/music-android/wear/src/main/res/values/colors.xml",
+    "apps/keybpm-android/app/src/main/res/values/colors.xml",
+    "apps/keybpm-android/wear/src/main/res/values/colors.xml",
+    "apps/live-android/app/src/main/res/values/colors.xml",
+    "apps/live-android/wear/src/main/res/values/colors.xml",
+    "apps/decks-android/app/src/main/res/values/colors.xml",
 ];
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";

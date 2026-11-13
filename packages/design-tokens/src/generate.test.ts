@@ -1,6 +1,92 @@
 import { describe, expect, it } from "vitest";
-import { kotlinRoles, kotlinTokens, oklchToHex, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate";
-import { ACCENTS, CAMELOT, DATA_ATTRS, PREFS_STORAGE_KEY, camelotColors, normalizePrefs, parseAccent } from "./tokens";
+import {
+  androidColorsXml,
+  kotlinRoles,
+  kotlinTokens,
+  markColors,
+  oklchToHex,
+  oklchToSrgbHex,
+  plainCss,
+  prehydrateScript,
+  productColors,
+  swiftTokens,
+  tailwindCss,
+  tokensJson,
+} from "./generate";
+import { ACCENTS, CAMELOT, DATA_ATTRS, PREFS_STORAGE_KEY, PRODUCTS, ROLES, camelotColors, normalizePrefs, parseAccent } from "./tokens";
+
+/** WCAG 2.x contrast ratio of two `#rrggbb` colours. */
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const ch = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+describe("product identity colours", () => {
+  const colors = productColors();
+  const mark = markColors();
+  it("maps OKLCH into sRGB by chroma reduction", () => {
+    expect(oklchToSrgbHex(1, 0, 0)).toBe("#ffffff");
+    expect(oklchToSrgbHex(0, 0, 0)).toBe("#000000");
+    expect(oklchToSrgbHex(0.6279554, 0.2576833, 29.2338851)).toBe("#ff0000");
+    // out of sRGB: clamping channels would shift the hue, chroma reduction keeps a valid colour
+    expect(oklchToSrgbHex(0.7, 0.4, 145)).toMatch(/^#[0-9a-f]{6}$/);
+  });
+  it("has eight products with hues at least 35 degrees apart and none on the destructive red", () => {
+    const hues = Object.values(PRODUCTS).map((p) => p.dark.h).sort((a, b) => a - b);
+    const red = Number(ROLES.dark.destructive.h);
+    expect(hues).toHaveLength(8);
+    expect(Number.isFinite(red)).toBe(true);
+    hues.forEach((h, i) => {
+      const next = hues[(i + 1) % hues.length]! + (i === hues.length - 1 ? 360 : 0);
+      expect(next - h).toBeGreaterThanOrEqual(35);
+      expect(Math.min(Math.abs(h - red), 360 - Math.abs(h - red))).toBeGreaterThanOrEqual(25);
+    });
+    for (const p of Object.values(PRODUCTS)) expect(p.light.h).toBe(p.dark.h);
+  });
+  it("every product colour passes WCAG AA where the brand uses it", () => {
+    for (const [id, c] of Object.entries(colors)) {
+      expect(contrast(c.dark, mark.tile), `${id} glyph on the icon tile`).toBeGreaterThanOrEqual(3);
+      expect(contrast(c.dark, mark.canvas), `${id} text on dark`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c.light, mark.canvasLight), `${id} text on light`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(mark.signal.dark, mark.tile)).toBeGreaterThanOrEqual(4.5);
+  });
+  it("emits the same sRGB value to css, json, kotlin and swift", () => {
+    const css = plainCss();
+    const json = JSON.parse(tokensJson());
+    const kt = kotlinTokens("x", true);
+    const sw = swiftTokens();
+    for (const [id, c] of Object.entries(colors)) {
+      expect(css).toContain(`--product-${id}: ${c.light};`);
+      expect(css).toContain(`--product-${id}: ${c.dark};`);
+      expect(json.products[id].hex).toEqual(c);
+      const Id = id[0]!.toUpperCase() + id.slice(1);
+      expect(kt).toContain(`val product${Id} = Color(0xFF${c.dark.slice(1).toUpperCase()})`);
+      expect(kt).toContain(`val product${Id} = Color(0xFF${c.light.slice(1).toUpperCase()})`);
+      const n = (i: number, hex: string) => (parseInt(hex.slice(i, i + 2), 16) / 255).toFixed(4);
+      expect(sw).toContain(`public static let ${id} = Color(.sRGB, red: ${n(1, c.dark)}, green: ${n(3, c.dark)}, blue: ${n(5, c.dark)}, opacity: 1.0000)`);
+    }
+    expect(css).toContain("--mark-a: var(--product-tv);");
+    expect(css).toContain("--mark-b: var(--product-music);");
+    expect(tailwindCss()).toContain("--color-product-keybpm: var(--product-keybpm);");
+    expect(json.mark.colors.tile).toBe(mark.tile);
+  });
+  it("android colors.xml takes its values from the dark roles and the brand constants", () => {
+    const xml = androidColorsXml({ bg: "background", accent: "primary", accent2: "brandCyanDark", danger: "destructive", decks_b: "brandDeckB" });
+    const kt = kotlinTokens();
+    const fromKotlin = (name: string) => "#" + kt.match(new RegExp(`val ${name} = Color\\(0xFF([0-9A-F]{6})\\)`))![1];
+    expect(xml).toContain(`<color name="bg">${fromKotlin("background")}</color>`);
+    expect(xml).toContain(`<color name="accent">${fromKotlin("primary")}</color>`);
+    expect(xml).toContain(`<color name="accent2">${fromKotlin("brandCyanDark")}</color>`);
+    expect(xml).toContain(`<color name="danger">${fromKotlin("destructive")}</color>`);
+    expect(xml).toContain(`<color name="decks_b">${fromKotlin("brandDeckB")}</color>`);
+    expect(xml.startsWith(`<?xml version="1.0" encoding="utf-8"?>`)).toBe(true);
+  });
+});
 
 describe("camelot key colours", () => {
   it("has 24 distinct keys, A darker than B, and emits them to json, kotlin and swift (not css yet)", () => {

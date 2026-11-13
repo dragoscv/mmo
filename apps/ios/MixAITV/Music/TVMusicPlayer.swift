@@ -114,6 +114,7 @@ final class TVMusicPlayer {
 
     private func load(autoplay: Bool) {
         guard let t = current, let u = url(for: t) else { stop(); return }
+        TVStartupSound.finish()
         let item = AVPlayerItem(url: u)
         duration = t.durationSec
         position = 0

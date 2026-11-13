@@ -3,13 +3,13 @@
     "metaDescription": "What the MixAI apps and website collect, why, where it is stored and how to delete it.",
     "title": "Privacy policy",
     "updated": "Last updated: 9 November 2026",
-    "intro": "MixAI is a player for your own media library, served by your own MMO Server. This policy covers the MixAI website, the MixAI apps for Android, iOS and TV, MixAI Decks, and MixAI Key & BPM (phone, Wear OS and Apple Watch). MixAI shows no ads and does not track you across apps or websites.",
+    "intro": "MixAI is a player for your own media library, served by your own MixAI Server. This policy covers the MixAI website, the MixAI apps for Android, iOS and TV, MixAI Decks, and MixAI Key & BPM (phone, Wear OS and Apple Watch). MixAI shows no ads and does not track you across apps or websites.",
     "controller": "Controller: Dragos Catalin Vladulescu, Romania. Contact:",
     "langSwitch": "Citește în română",
     "sections": {
         "server": {
             "title": "Your own server",
-            "body": "Your films, series, music and live sources stay on the MMO Server you run. The app talks to that server directly. Watch progress, Watch Together rooms and chat messages, downloads and listening history are stored on your server, not by us. Watch Together chat is relayed only through your server and is not sent to MixAI."
+            "body": "Your films, series, music and live sources stay on the MixAI Server you run. The app talks to that server directly. Watch progress, Watch Together rooms and chat messages, downloads and listening history are stored on your server, not by us. Watch Together chat is relayed only through your server and is not sent to MixAI."
         },
         "decks": {
             "title": "MixAI Decks (DJ app)",

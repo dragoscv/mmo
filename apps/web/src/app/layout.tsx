@@ -44,6 +44,7 @@ import { ThemeColorMeta } from "./theme-color-meta";
 import { HostProvider } from "@/components/host/host-context";
 import { currentHostKind, rootDomain } from "@/lib/host/server";
 import { productOrigin, type HostKind } from "@/lib/host/products";
+import { hostBrandAssets, type HostBrandAssets } from "@/lib/host/brand";
 
 const inter = localFont({
     src: "./fonts/InterVariable.woff2",
@@ -67,6 +68,23 @@ const jetbrainsMono = localFont({
     fallback: ["ui-monospace", "Consolas", "monospace"],
 });
 
+/**
+ * WP22-10: favicons per host. The shared 32 px `.ico` comes first and the product's SVG (own light/dark switch)
+ * last, so browsers that read SVG favicons take the SVG and the others fall back to the `.ico`.
+ */
+function brandIcons(a: HostBrandAssets): NonNullable<Metadata["icons"]> {
+    return {
+        icon: [
+            { url: a.favicon, sizes: "32x32" },
+            { url: a.iconSvg, type: "image/svg+xml" },
+        ],
+        apple: a.appleTouchIcon,
+    };
+}
+
+/** Run.app, localhost and LAN hosts carry the family mark. */
+const familyBrand = hostBrandAssets("legacy");
+
 const baseMetadata: Metadata = {
     metadataBase: new URL("https://mixai.ro"),
     title: {
@@ -89,7 +107,7 @@ const baseMetadata: Metadata = {
     authors: [{ name: "MixAI", url: "https://mixai.ro" }],
     creator: "MixAI",
     publisher: "MixAI",
-    manifest: "/manifest.webmanifest",
+    manifest: familyBrand.manifest,
     openGraph: {
         type: "website",
         siteName: "MixAI",
@@ -100,7 +118,7 @@ const baseMetadata: Metadata = {
         locale: "ro_RO",
         images: [
             {
-                url: "/og-image.png",
+                url: familyBrand.ogImage,
                 width: 1200,
                 height: 630,
                 alt: "MixAI — AI Music Suite",
@@ -112,20 +130,13 @@ const baseMetadata: Metadata = {
         title: "MixAI — AI Music Suite",
         description:
             "Your music library, mixed by intelligence. An AI-native music suite for DJs and producers.",
-        images: ["/og-image.png"],
+        images: [familyBrand.ogImage],
     },
     robots: {
         index: true,
         follow: true,
     },
-    icons: {
-        icon: [
-            { url: "/favicon.ico", sizes: "32x32" },
-            { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-            { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
-        ],
-        apple: "/apple-touch-icon.png",
-    },
+    icons: brandIcons(familyBrand),
     appleWebApp: {
         capable: true,
         statusBarStyle: "black-translucent",
@@ -136,31 +147,44 @@ const baseMetadata: Metadata = {
     },
 };
 
-/** WP17-10: product name, description, manifest and canonical origin per host (legacy hosts keep the suite). */
-const PRODUCT_META: Record<Exclude<HostKind, "legacy">, { name: string; description: string; manifest: string }> = {
-    suite: { name: "MixAI", description: "MixAI — TV, Music, Studio and Decks on every screen, powered by your own MixAI Server.", manifest: "/manifest-suite.webmanifest" },
-    tv: { name: "MixAI TV", description: "Movies, series, Live TV and Watch Together from your own MixAI Server, on every screen.", manifest: "/manifest-tv.webmanifest" },
-    music: { name: "MixAI Music", description: "Albums, artists, playlists, radio and synced lyrics from your own MixAI Server.", manifest: "/manifest-music.webmanifest" },
-    studio: { name: "MixAI Studio", description: "Organize, analyze, tag and mix your music library with AI. Server admin and dashboard.", manifest: "/manifest-studio.webmanifest" },
-    dj: { name: "MixAI Decks", description: "Pro DJ app with a Rust audio engine, AI stems and beat-matched automix.", manifest: "/manifest-suite.webmanifest" },
-    live: { name: "MixAI Live", description: "Realtime vocal processor for live singing: pitch correction, dynamics, effects and remote control.", manifest: "/manifest-suite.webmanifest" },
+/**
+ * WP17-10: description and canonical origin per host (legacy hosts keep the suite). The product name, manifest,
+ * favicons and social image come from `hostBrandAssets` (WP22-10).
+ */
+const PRODUCT_DESCRIPTION: Record<Exclude<HostKind, "legacy">, string> = {
+    suite: "MixAI — TV, Music, Studio and Decks on every screen, powered by your own MixAI Server.",
+    tv: "Movies, series, Live TV and Watch Together from your own MixAI Server, on every screen.",
+    music: "Albums, artists, playlists, radio and synced lyrics from your own MixAI Server.",
+    studio: "Organize, analyze, tag and mix your music library with AI. Server admin and dashboard.",
+    dj: "Pro DJ app with a Rust audio engine, AI stems and beat-matched automix.",
+    live: "Realtime vocal processor for live singing: pitch correction, dynamics, effects and remote control.",
 };
 
 export async function generateMetadata(): Promise<Metadata> {
     const kind = await currentHostKind();
     if (kind === "legacy") return baseMetadata;
-    const p = PRODUCT_META[kind];
+    const brand = hostBrandAssets(kind);
+    const name = brand.name;
+    const description = PRODUCT_DESCRIPTION[kind];
     const origin = productOrigin(kind, rootDomain());
     return {
         ...baseMetadata,
         metadataBase: new URL(origin),
-        title: { default: p.name, template: `%s · ${p.name}` },
-        applicationName: p.name,
-        description: p.description,
-        manifest: p.manifest,
-        openGraph: { ...baseMetadata.openGraph, siteName: p.name, title: p.name, description: p.description, url: origin },
-        twitter: { ...baseMetadata.twitter, title: p.name, description: p.description },
-        appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: p.name },
+        title: { default: name, template: `%s · ${name}` },
+        applicationName: name,
+        description,
+        manifest: brand.manifest,
+        icons: brandIcons(brand),
+        openGraph: {
+            ...baseMetadata.openGraph,
+            siteName: name,
+            title: name,
+            description,
+            url: origin,
+            images: [{ url: brand.ogImage, width: 1200, height: 630, alt: name }],
+        },
+        twitter: { ...baseMetadata.twitter, title: name, description, images: [brand.ogImage] },
+        appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: name },
         alternates: { canonical: "./" },
     };
 }

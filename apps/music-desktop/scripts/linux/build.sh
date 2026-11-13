@@ -22,7 +22,6 @@ log "pnpm $(pnpm --version), $(rustc --version)"
 
 cd "$APPDIR"
 pnpm install --frozen-lockfile >/dev/null
-[ -d src-tauri/icons ] || pnpm tauri:icon >/dev/null
 # Keep cargo output on the Linux filesystem (building on /mnt/e is ~5x slower and breaks file locks).
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/.cache/mixai-music-target}"
 pnpm tauri build --bundles appimage,deb

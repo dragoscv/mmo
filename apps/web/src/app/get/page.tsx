@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLockup, BrandMark } from "@mmo/ui";
 
 /**
  * Public /get landing page (formerly /downloads; redirected in next.config.ts).
  *
- * Auth-free entry point for sharing direct download links (companion,
- * native shells, browser extension, app stores). Mirrors the in-app
+ * Auth-free entry point for sharing direct download links (MixAI Server,
+ * native shells, MixAI Connector, app stores). Mirrors the in-app
  * Download Hub modal content but optimised for SEO and unauthenticated
  * visitors who land here from external links or search results.
  *
@@ -38,7 +38,7 @@ interface PlatformAsset {
     format: string;
 }
 interface Channel {
-    id: "companion" | "native" | "extension";
+    id: "companion" | "native" | "extension" | "music";
     name: string;
     version: string | null;
     releaseUrl: string | null;
@@ -46,7 +46,7 @@ interface Channel {
     assets: PlatformAsset[];
 }
 interface Manifest {
-    channels: { companion: Channel; native: Channel; extension: Channel };
+    channels: { companion: Channel; native: Channel; extension: Channel; music?: Channel };
     extensionStores: { chrome: string; firefox: string; edge: string };
     mobileStores: {
         appStore: string | null;
@@ -57,9 +57,9 @@ interface Manifest {
 }
 
 export const metadata: Metadata = {
-    title: { absolute: "Descarcă MixAI · companion, aplicație nativă, extensie de browser" },
+    title: { absolute: "Descarcă MixAI · MixAI Server, aplicații native, MixAI Connector" },
     description:
-        "Descarcă MixAI — suita muzicală AI pentru Windows, macOS, Linux, Android și iOS. Aplicația companion, build-uri native și extensia pentru Chrome, Firefox și Edge.",
+        "Descarcă MixAI — suita muzicală AI pentru Windows, macOS, Linux, Android și iOS. MixAI Server, build-uri native și MixAI Connector pentru Chrome, Firefox și Edge.",
     alternates: { canonical: "https://mixai.ro/get" },
     openGraph: {
         title: "Descarcă MixAI",
@@ -191,18 +191,19 @@ export default async function DownloadsPublicPage() {
         <main className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#0f0a1a] to-[#1a0a1f] px-4 py-12 text-white sm:px-6 lg:px-8">
             <div className="mx-auto max-w-5xl">
                 <header className="mb-12 text-center">
+                    {/* The page is dark in every theme: `.dark` makes the mark's token colours resolve to their dark values. */}
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-3"
+                        className="dark inline-flex items-center gap-3"
                     >
-                        <Image
-                            src="/icon-192.png"
-                            alt="MixAI"
-                            width={48}
-                            height={48}
-                            className="rounded-xl shadow-[0_0_24px_rgba(139,92,246,0.35)]"
+                        <BrandMark
+                            product="mark"
+                            size={48}
+                            tile
+                            decorative
+                            className="rounded-[22.5%] shadow-[0_0_24px_color-mix(in_oklch,var(--primary)_35%,transparent)]"
                         />
-                        <span className="font-heading text-2xl font-bold tracking-tight">Muzic<span className="text-brand-accent">AI</span></span>
+                        <BrandLockup product="mark" wordmarkOnly height={34} />
                     </Link>
                     <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">
                         Descarcă MixAI
@@ -237,6 +238,12 @@ export default async function DownloadsPublicPage() {
 
                 {manifest && (
                     <div className="space-y-5">
+                        {manifest.channels.music && (
+                            <ChannelSection
+                                channel={manifest.channels.music}
+                                blurb="Player-ul MixAI Music pentru serverul tău MixAI. Windows și macOS din Microsoft Store și Mac App Store; Linux ca AppImage sau .deb."
+                            />
+                        )}
                         <ChannelSection
                             channel={manifest.channels.native}
                             blurb="Build-uri native pentru Windows, macOS, Linux, Android și iOS. Folosesc aplicația web direct — fără export offline."
@@ -247,7 +254,7 @@ export default async function DownloadsPublicPage() {
                         />
                         <ChannelSection
                             channel={manifest.channels.extension}
-                            blurb="Extensie pentru browser care leagă MixAI de paginile de unde descarci muzică (YouTube, Bandcamp, SoundCloud)."
+                            blurb="MixAI Connector este extensia de browser care leagă MixAI de paginile de unde descarci muzică (YouTube, Bandcamp, SoundCloud)."
                         />
 
                         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5">

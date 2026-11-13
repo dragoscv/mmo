@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "MixAI",
+  "version": "1.0.0",
+  "date": "2026-11-12",
+  "owner": "Dragos Catalin Vladulescu",
+  "writtenAs": "MixAI",
+  "locales": ["ro", "en"],
+  "decisions": "docs/adr/0016-mixai-tv-name-brand-and-experience.md",
+  "guidelines": "BRAND.md",
+  "positioning": {
+    "ro": "Media ta, de pe serverul tău, pe orice ecran.",
+    "en": "Your media, from your own server, on every screen."
+  },
+  "markIdea": {
+    "ro": "Multe surse, un singur semnal.",
+    "en": "Many sources, one signal."
+  },
+  "products": [
+    { "id": "tv", "name": "MixAI TV", "short": "TV" },
+    { "id": "music", "name": "MixAI Music", "short": "Music" },
+    { "id": "decks", "name": "MixAI Decks", "short": "Decks" },
+    { "id": "live", "name": "MixAI Live", "short": "Live" },
+    { "id": "studio", "name": "MixAI Studio", "short": "Studio" },
+    { "id": "keybpm", "name": "MixAI Key & BPM", "short": "Key & BPM" },
+    { "id": "server", "name": "MixAI Server", "short": "Server", "technicalName": "MMO Server (repository, API, Docker image, service type)" },
+    { "id": "connector", "name": "MixAI Connector", "short": "Connector" }
+  ],
+  "sources": {
+    "marks": "src/marks.mjs",
+    "motion": "src/motion.mjs",
+    "sound": "src/sonic.mjs",
+    "lettering": "src/lettering.json",
+    "letteringScript": "scripts/outline-lettering.py",
+    "colours": "../packages/design-tokens/src/tokens.ts (PRODUCTS, MARK)"
+  },
+  "tokens": {
+    "format": "packages/design-tokens (OKLCH source, sRGB fallbacks; `pnpm tokens:build`)",
+    "cssVariables": ["--product-<id>", "--mark-a", "--mark-b", "--mark-signal", "--mark-tile"],
+    "contrastPairs": "contrast-pairs.json"
+  },
+  "fonts": [
+    {
+      "family": "Space Grotesk",
+      "role": "display, wordmark base (outlined)",
+      "licence": "OFL-1.1",
+      "licenceFile": "../apps/web/src/app/fonts/OFL-SpaceGrotesk.txt",
+      "files": ["../apps/web/src/app/fonts/SpaceGroteskVariable.woff2"],
+      "verifiedGlyphs": { "date": "2026-11-12", "mode": "single", "result": "ok" }
+    },
+    {
+      "family": "Inter",
+      "role": "ui",
+      "licence": "OFL-1.1",
+      "licenceFile": "../apps/web/src/app/fonts/OFL-Inter.txt",
+      "files": ["../apps/web/src/app/fonts/InterVariable.woff2"],
+      "verifiedGlyphs": { "date": "2026-11-12", "mode": "single", "result": "ok" }
+    },
+    {
+      "family": "JetBrains Mono",
+      "role": "code",
+      "licence": "OFL-1.1",
+      "licenceFile": "../apps/web/src/app/fonts/OFL-JetBrainsMono.txt",
+      "files": ["../apps/web/src/app/fonts/JetBrainsMonoVariable.woff2"],
+      "verifiedGlyphs": { "date": "2026-11-12", "mode": "single", "result": "ok" }
+    }
+  ],
+  "generator": {
+    "build": "node brand/scripts/build.mjs",
+    "check": "node brand/scripts/build.mjs --check",
+    "list": "node brand/scripts/build.mjs --list",
+    "test": "node --test brand/scripts/build.test.mjs",
+    "contrast": "node brand/scripts/contrast-gate.mjs brand/contrast-pairs.json",
+    "glyphs": "uv run --no-project --python 3.12 --with fonttools --with brotli python brand/scripts/check-glyphs.py <font files>",
+    "manifest": "dist/manifest.json"
+  },
+  "outputs": {
+    "masters": "dist/logo/<id>/{symbol,symbol-light,symbol-small,symbol-micro,symbol-mono,tile,lockup,lockup-light,lockup-mono,wordmark,wordmark-light}.svg",
+    "construction": "dist/logo/construction.svg",
+    "motion": "dist/motion/{logo.css,demo.html,<id>-<animation>.svg}",
+    "sound": "dist/sound/signature.wav",
+    "storeGraphics": "dist/store/<id>/ and apps/<app>/store/graphics/",
+    "react": "../packages/ui/src/brand/ (BrandMark, BrandLockup)",
+    "kotlin": "../apps/tv-android/app/src/main/java/ro/mixai/tv/ui/theme/Brand.kt, ../apps/mobile-android-common/src/main/java/ro/mixai/mobile/theme/Brand.kt",
+    "swift": "../apps/ios/MixaiCore/Sources/MixaiCore/Theme/Brand.swift"
+  },
+  "platforms": ["web", "pwa", "android", "android-tv", "wear-os", "ios", "tvos", "watchos", "macos", "windows", "linux", "tizen", "webos", "browser-extension", "tray"],
+  "archive": "archive/2026-11-12/"
+}

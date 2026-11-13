@@ -1,28 +1,32 @@
-# MixAI app inventory (2026-11-06, versions and names refreshed 2026-11-11)
+# MixAI app inventory (2026-11-06, versions and names refreshed 2026-11-12)
 
 Canonical list of every app and surface, today and target. Decisions: [ADR-0013](../adr/0013-product-family-and-domains.md),
 [ADR-0016](../adr/0016-mixai-tv-name-brand-and-experience.md) (MixAI TV name on phones, one Play listing, rebrand).
 Work: tracker §12 WP17 and §15 WP22. Update this table in the same commit as any release, rename or new store listing.
 
+Icons, splash screens, logo motion and store graphics of every surface below are generated from `brand/`
+(WP22-03..10): rules in [`brand/BRAND.md`](../../brand/BRAND.md), full output list with
+`node brand/scripts/build.mjs --list`.
+
 ## Today
 
 | Surface | Path | Name today | ID | Version | Purpose | Distribution today |
 |---|---|---|---|---|---|---|
-| Web | `apps/web` | MixAI | — | 3.5.0 | Watching (`/media`) + organizer + DJ live + AI | Cloud Run, `mixai.ro` |
-| Android TV | `apps/tv-android` | MixAI TV | `ro.mixai.tv` (moves to `ro.mixai.app`, D72) | 2.3.1 | Watching | Sideload / GitHub release `tv-v2.3.1` (unsigned) |
+| Web | `apps/web` | MixAI | — | 3.6.0 | Watching (`/media`) + organizer + DJ live + AI | Cloud Run, `mixai.ro` |
+| Android TV | `apps/tv-android` | MixAI TV | `ro.mixai.tv` (moves to `ro.mixai.app`, D72) | 2.4.0 in source (last release 2.3.1) | Watching | Sideload / GitHub release `tv-v2.3.1` (unsigned) |
 | Phone Android | `apps/phone-android` | MixAI TV (was MixAI up to 1.3.1) | `ro.mixai.app` | 1.3.2 | Watching, remote, downloads | **Google Play production** (1.3.1 live 2026-11-11 as "MixAI"; 1.3.2 carries the rename, WP22-01) |
 | Music Android | `apps/music-android/app` (`:music`) | MixAI Music | `ro.mixai.music` | 0.1.0 | Music: library, search, now playing, lyrics, queue | Debug builds; Play record pending (WP17-41i) |
 | Android shared libs | `apps/mobile-android-common` (`:mobile-common`), `apps/music-android/music-ui` (`:music-ui`) | — | `ro.mixai.mobile`, `ro.mixai.music.ui` | — | Theme/tokens, connect + sign-in, profiles; shared music screens (D50/D52) | Built into `:phone` and `:music` |
 | iPhone | `apps/ios` | MixAI TV in source from 1.1.2 (store record still "MixAI") | `ro.mixai.app` | 1.1.2 | Watching, remote, downloads, widgets | App Store: 1.1.1 approved 2026-11-11 (not sold in the 27 EU storefronts, WP16-48); 1.1.2 not submitted (WP22-02) |
 | Apple TV | `apps/ios/MixAITV` | MixAI TV (same store record as iPhone) | `ro.mixai.app` | 1.1.0 | Watching | App Store: 1.1.0 build 516 waiting for review |
 | Apple Watch | `apps/ios/MixAIWatch` | MixAI TV in source from 1.1.2 | `ro.mixai.app.watchkitapp` | 1.1.2 | Remote, now playing | Not embedded in 1.1.x |
-| Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.4.1 | Watching | Sideload (signed `.wgt`) |
+| Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.5.0 | Watching | Sideload (signed `.wgt`) |
 | Web shell | `apps/native` | MixAI Studio | `ro.mixai.studio` | 1.1.1 | Tauri/Capacitor wrapper that loads `mixai.ro` | GH Release |
 | Decks | `apps/mixai` | MixAI Decks (was MixAI DJ, D60) | `ro.mixai.dj` | 1.1.0 | DJ / creation. Rust crates in `apps/mixai/src-tauri/crates`: `mixai-core` (engine), `decks-analysis`, `decks-library`, `decks-mapping`, `decks-dvs`, `decks-render` + shared `crates/mixai-listen` — built and unit-tested; UniFFI facade + native UIs (2.0) todo. Docs: [`docs/decks/`](../decks/README.md) | 1.0.0 MSIX in MS Store certification (as MixAI DJ); 1.x Tauri on `decks-release.yml` |
 | Live (browser) | `apps/web` route `/live` | MixAI Live (web) | — | web | Browser vocal processor (Web Audio FX engine `lib/audio-fx-engine.ts`); host `live.mixai.ro` mounts it at `/` once host routing is on (ADR-0015) | Cloud Run (inside Studio today) |
 | Live (native) | `apps/live` | MixAI Live | `ro.mixai.live` | — | Realtime vocal processor: Rust engine (`apps/live/engine`), Tauri desktop, remote controllers (ADR-0015, WP21) | In development; no store records yet; tags `live-v*` |
-| Extension | `apps/extension` | MixAI downloader | `mixai-downloader@mixai.ro` | 3.0.1 | Download helper | Release workflow exists, not published |
-| Server | `server` | MixAI Companion — MMO Server | `ro.mixai.companion` | 3.15.0 | Server | GH Release, Docker, Pi |
+| Extension | `apps/extension` | MixAI Connector (was MixAI downloader up to 3.0.1) | `mixai-downloader@mixai.ro` | 3.1.0 | Connects the browser to MixAI Server (download helper) | Release workflow exists, not published |
+| Server | `server` | MixAI Server (was MixAI Companion up to 3.15; technical name MMO Server) | `ro.mixai.companion` | 3.16.0 in source (last release 3.15.0) | Server | GH Release, Docker, Pi |
 | Gateway | `apps/gateway` | — | — | 0.1.0 | Infra | Cloud Run |
 
 ## Target

@@ -14,6 +14,6 @@
     <string name="library_tracks_group">Tracks</string>
     <string name="library_artist_radio">%1$s radio</string>
     <string name="library_tracks">Tracks: %1$d</string>
-    <string name="library_sign_in">Open the app and connect to your MMO Server.</string>
+    <string name="library_sign_in">Open the app and connect to your MixAI Server.</string>
     <string name="library_error">The server could not be reached.</string>
 </resources>

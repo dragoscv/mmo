@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MixAI Decks: two platters (deck A cyan, deck B magenta). Placeholder until the brand pack ships a Decks icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:strokeColor="@color/decks_a"
+        android:strokeWidth="6"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M40,54 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+    <path
+        android:strokeColor="@color/decks_b"
+        android:strokeWidth="6"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M68,54 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+</vector>

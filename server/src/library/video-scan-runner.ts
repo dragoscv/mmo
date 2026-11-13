@@ -211,7 +211,7 @@ export async function runVideoScanJob(
                 failScanJob(
                     job.id,
                     `Could not read folder contents (${sampleErrors[0]?.error ?? "unknown"}). ` +
-                    `If this is an external/network drive, check it's connected and the companion has permission.`,
+                    `If this is an external/network drive, check it's connected and MixAI Server has permission.`,
                 );
                 onUpdate();
                 return;

@@ -233,7 +233,7 @@ fn browse(window: Duration) -> Vec<LanServer> {
             let name = info
                 .get_property_val_str("name")
                 .map(str::to_string)
-                .unwrap_or_else(|| info.get_fullname().split('.').next().unwrap_or("MMO Server").to_string());
+                .unwrap_or_else(|| info.get_fullname().split('.').next().unwrap_or("MixAI Server").to_string());
             if !out.iter().any(|s| s.url == url) {
                 out.push(LanServer { name, url });
             }

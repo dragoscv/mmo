@@ -83,7 +83,7 @@ function page(file, body) {
     writeFileSync(path.join(out, file), `${head}<body>\n${body}\n</body>\n\n</html>\n`);
 }
 page("popup.html", `    <div class="header">
-        <div class="logo">🎧</div>
+        <img class="logo" src="icons/icon48.png" width="28" height="28" alt="">
         <h1 data-i18n="popupTitle">MixAI Connector</h1>
         <span class="version" id="version"></span>
     </div>
@@ -120,7 +120,7 @@ page("popup.html", `    <div class="header">
     <script src="vendor/browser-polyfill.min.js"></script>
     <script src="i18n.js"></script>
     <script src="popup.js"></script>`);
-page("options.html", `    <h1><span class="logo">🎧</span> <span data-i18n="optionsHeading">MixAI Connector settings</span></h1>
+page("options.html", `    <h1><img class="logo" src="icons/icon48.png" width="24" height="24" alt=""> <span data-i18n="optionsHeading">MixAI Connector settings</span></h1>
 
     <div class="field">
         <label for="libraryUrl" data-i18n="libraryUrlLabel">MixAI library address</label>
@@ -145,7 +145,7 @@ for (const f of readdirSync(path.join(ext, "icons")).filter((n) => n.endsWith(".
     copyFileSync(path.join(ext, "icons", f), path.join(out, "icons", f));
 }
 for (const icon of Object.values(manifest.icons)) {
-    if (!existsSync(path.join(out, icon))) throw new Error(`missing icon ${icon} (run scripts/icons-png.mjs)`);
+    if (!existsSync(path.join(out, icon))) throw new Error(`missing icon ${icon} (run node brand/scripts/build.mjs)`);
 }
 
 // Guard: nothing in the store edition may reference a download flow or a third-party site.

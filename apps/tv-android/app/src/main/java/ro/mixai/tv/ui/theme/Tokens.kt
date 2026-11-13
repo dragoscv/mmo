@@ -53,6 +53,17 @@ object Tokens {
     val brandDeckC = Color(0xFFA3FF4F)
     val brandDeckD = Color(0xFFFFB14F)
 
+    // Product identity colours (fixed; identity only, never the UI accent)
+    val productTv = Color(0xFF9F88FF)
+    val productMusic = Color(0xFFF767C1)
+    val productDecks = Color(0xFF37D2F2)
+    val productLive = Color(0xFFFF8F4B)
+    val productStudio = Color(0xFFF2CF3B)
+    val productKeybpm = Color(0xFF61DC6B)
+    val productServer = Color(0xFF4C99F8)
+    val productConnector = Color(0xFF40D9C1)
+    val markTile = Color(0xFF11101A)
+
     // Accent hues (OKLCH) — for runtime re-tinting if ever needed
     const val ACCENT_HUE_VIOLET = 285
     const val ACCENT_HUE_MAGENTA = 330

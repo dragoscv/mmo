@@ -205,7 +205,7 @@
         },
         "network": {
             "title": "Server unreachable",
-            "body": "Check that your MMO Server is running and try again."
+            "body": "Check that your MixAI Server is running and try again."
         }
     },
     "guest": {
@@ -225,7 +225,7 @@
         "expiredBody": "Invites are valid for a limited time. Ask the host for a new one.",
         "invalidBody": "The room was closed or the invite is no longer valid. Ask the host for a new one.",
         "unreachableTitle": "The server cannot be reached",
-        "unreachableBody": "The host's MMO Server did not answer. Make sure you are on a network that can reach it.",
+        "unreachableBody": "The host's MixAI Server did not answer. Make sure you are on a network that can reach it.",
         "retry": "Try again",
         "joining": "Joining the room…",
         "waitingHost": "Waiting for the host to start something…",

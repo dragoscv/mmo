@@ -3,7 +3,7 @@
     <!-- Family stats (WP16-46 item 8) -->
     <string name="family_title">Family</string>
     <string name="family_empty_title">No profiles yet</string>
-    <string name="family_empty_hint">Create profiles on your MMO Server to see each person\'s viewing and listening time.</string>
+    <string name="family_empty_hint">Create profiles on your MixAI Server to see each person\'s viewing and listening time.</string>
     <string name="family_kid_badge">Kid</string>
     <string name="family_minutes">%1$d min</string>
     <string name="family_hours_minutes">%1$d h %2$02d min</string>
@@ -20,7 +20,7 @@
 
     <!-- Plex import (WP16-46 item 9) -->
     <string name="plex_title">Import from Plex</string>
-    <string name="plex_intro">Imports your Plex watch history, ratings and watchlist into the current profile. Your Plex token is sent once to your MMO Server for this import and is never stored.</string>
+    <string name="plex_intro">Imports your Plex watch history, ratings and watchlist into the current profile. Your Plex token is sent once to your MixAI Server for this import and is never stored.</string>
     <string name="plex_token_hint_title">How to find your Plex token</string>
     <string name="plex_token_hint">In Plex Web, open any media item, choose Get Info, then View XML. The address of the page that opens ends with X-Plex-Token=… — copy the value after the equals sign.</string>
     <string name="plex_profile_line">Importing into profile: %1$s</string>
@@ -43,7 +43,7 @@
     <string name="plex_error_401">Plex refused the token.</string>
     <string name="plex_error_403">Only the server owner can import.</string>
     <string name="plex_error_404">Plex server not found.</string>
-    <string name="plex_error_502">The MMO Server could not reach Plex.</string>
+    <string name="plex_error_502">MixAI Server could not reach Plex.</string>
     <string name="plex_error_generic">Import failed (HTTP %1$d).</string>
-    <string name="plex_error_network">Could not reach your MMO Server. Check your connection and try again.</string>
+    <string name="plex_error_network">Could not reach your MixAI Server. Check your connection and try again.</string>
 </resources>

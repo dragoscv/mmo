@@ -60,7 +60,6 @@ PNPM_PIN="$HOME/.pnpm-pin-10"
 export PATH="$PNPM_PIN/bin:$PATH" npm_config_manage_package_manager_versions=false
 cd "$APPDIR"
 pnpm install --frozen-lockfile >/dev/null
-[ -d src-tauri/icons ] || pnpm tauri:icon >/dev/null
 (
   unset APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE
   pnpm tauri build --target universal-apple-darwin --bundles app --config "$VERCONF"

@@ -17,7 +17,7 @@ codebase for Samsung Tizen, LG webOS and desktop (ADR-0013 D46). Tracker: `docs/
 |---|---|
 | `pnpm install` | own lockfile + `pnpm-workspace.yaml` (repo convention) |
 | `pnpm typecheck` | TS for the entry + the shared UI graph |
-| `pnpm tauri icon ../web/public/icon-512.png` | generate `src-tauri/icons` (gitignored) |
+| `node brand/scripts/build.mjs` (repo root) | regenerate the committed `src-tauri/icons` from the brand source (ADR-0016) |
 | `pnpm tauri dev` | dev window on Vite :13795 |
 | `pnpm tauri build --no-bundle` | release exe `src-tauri/target/release/mixai-tv.exe` |
 | `pnpm msix` (`scripts/package-msix.ps1 [-TestSign]`) | Microsoft Store MSIX in `msix-out/` |

@@ -95,7 +95,7 @@ export async function pollDeviceToken(deviceCode: string): Promise<TokenResult> 
                   .filter((c) => c && typeof c.token === "string")
                   .map((c) => ({
                       id: String(c.id ?? ""),
-                      name: typeof c.name === "string" ? c.name : "MMO Server",
+                      name: typeof c.name === "string" ? c.name : "MixAI Server",
                       lanUrl: typeof c.lanUrl === "string" && c.lanUrl ? c.lanUrl.replace(/\/+$/, "") : null,
                       apiUrl: typeof c.apiUrl === "string" && c.apiUrl ? c.apiUrl.replace(/\/+$/, "") : null,
                       tunnelHostname: typeof c.tunnelHostname === "string" ? c.tunnelHostname : null,

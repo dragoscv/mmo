@@ -6,7 +6,7 @@ import "./suite.css";
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { ArrowRight, Download, PlayCircle, ShieldCheck } from "lucide-react";
-import { Button } from "@mmo/ui";
+import { BrandLockup, BrandMark, Button } from "@mmo/ui";
 import Link from "@/components/host/host-context";
 import { SignInButton } from "@/components/sign-in-button";
 import { SuiteOrbit } from "./orbit";
@@ -45,14 +45,14 @@ export async function SuiteLanding() {
                     <p className="sx-lead">{t("sections.productsBody")}</p>
                     <ul className="sx-products">
                         {SUITE_PRODUCTS.map((p, i) => {
-                            const Icon = p.icon;
                             return (
                                 <li key={p.key} className="sx-card sx-rise" style={{ ["--c" as string]: p.accent, ["--i" as string]: i }}>
-                                    <span className="sx-card-icon"><Icon aria-hidden /></span>
+                                    <span className="sx-card-icon"><BrandMark product={p.brand} size={24} decorative /></span>
                                     <span className="sx-tag">{t(`products.${p.key}.tagline`)}</span>
-                                    <h3>{t(`products.${p.key}.name`)}</h3>
+                                    <h3 id={`sx-p-${p.key}`}>{t(`products.${p.key}.name`)}</h3>
                                     <p>{t(`products.${p.key}.body`)}</p>
-                                    <Link href={p.key === "dj" ? "/dj" : p.key === "server" ? "/get" : p.internal} className="sx-card-link">
+                                    {i === 0 ? <BrandMark product={p.brand} size={160} decorative className="sx-card-art" /> : null}
+                                    <Link id={`sx-more-${p.key}`} aria-labelledby={`sx-more-${p.key} sx-p-${p.key}`} href={p.key === "dj" ? "/dj" : p.key === "server" ? "/get" : p.internal} className="sx-card-link">
                                         {t("sections.learnMore")} <ArrowRight aria-hidden className="size-4" />
                                     </Link>
                                 </li>
@@ -88,10 +88,9 @@ export async function SuiteTopBar({ end }: { end?: ReactNode }) {
     return (
         <header className="sx-top">
             <div className="sx-wrap sx-top-in">
-                <Link href="/" className="sx-brand">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.svg" alt="" width={28} height={28} />
-                    <span>Mix<span className="text-gradient-accent">AI</span></span>
+                <Link href="/" className="sx-brand mixai-logo-press">
+                    {/* The family lockup as the brand book defines it: symbol + outlined lettering, one drawing. */}
+                    <BrandLockup product="mark" height={28} />
                 </Link>
                 <nav className="sx-top-nav" aria-label={t("sections.productsTitle")}>
                     {SUITE_PRODUCTS.map((p) => (

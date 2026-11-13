@@ -21,7 +21,7 @@ low-latency, every controller — with mixai.ro / AI integration nobody else has
 
 ## Appearance (surface presets)
 
-MixAI Decks shares one theme model with mixai.ro, the Companion and the TV apps:
+MixAI Decks shares one theme model with mixai.ro, MixAI Server and the TV apps:
 `mode` (light/dark/system) · `accent` · `surface` · `density` · `radius` ·
 `motion` · `locale`, persisted under `mixai:prefs:v1` and applied before first
 paint by `public/prehydrate.js`. The three original DJ skins live on as

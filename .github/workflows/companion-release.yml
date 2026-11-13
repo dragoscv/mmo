@@ -1,13 +1,12 @@
 name: Companion — build & release
 
-# Cross-platform builder for the MixAI Companion / MMO Server (Electron). Triggered by:
-#   1. Pushing a tag like `companion-v1.2.3` (legacy / manual path).
-#   2. Pushing to `main` with changes under `server/**` or to this
-#      workflow file. We read `server/package.json#version` and only
-#      build when no GitHub Release exists for that version yet — so
-#      pushing a perf fix without bumping the version is a no-op, but
-#      bumping the version automatically cuts a release.
-#   3. Manually via the Actions tab (workflow_dispatch).
+# Cross-platform builder for MixAI Server (Electron; technical name MMO Server). Triggered by:
+#   1. Pushing a tag like `companion-v1.2.3` (the release path).
+#   2. Manually via the Actions tab (workflow_dispatch).
+# A push to `main` does NOT release any more (owner 2026-11-12, WP22-10): a version bump is committed
+# together with the change, and the release is a separate, deliberate step — users on auto-update must
+# never receive a build nobody started. The `detect` job below only runs on a branch push, so it is
+# skipped now; it is kept so the old behaviour can be restored by adding the branch trigger back.
 # Bare `v*` tags are intentionally NOT a trigger so that tagging the
 # web app or another package never starts a 7-minute 3-runner build.
 #
@@ -24,11 +23,6 @@ on:
   push:
     tags:
       - "companion-v*"
-    branches:
-      - main
-    paths:
-      - "server/**"
-      - ".github/workflows/companion-release.yml"
   workflow_dispatch:
     inputs:
       publish:
@@ -45,7 +39,7 @@ permissions:
   id-token: write
 
 jobs:
-  # On a branch push (auto-trigger), decide whether the build should run.
+  # NOT REACHED today (no branch trigger, see the header). On a branch push it decides whether to build.
   # We build iff `server/package.json#version` does not already have a
   # matching GitHub Release — so bumping the version is what cuts a
   # release, not every commit under server/**. Tag pushes and manual

@@ -16,7 +16,7 @@
         "favFailed": "Favoritele nu au putut fi actualizate: {msg}",
         "noSources": {
             "title": "Nicio sursă TV live încă",
-            "body": "Adaugă un playlist M3U, un cont Xtream Codes sau un tuner HDHomeRun pe serverul MMO și canalele apar aici.",
+            "body": "Adaugă un playlist M3U, un cont Xtream Codes sau un tuner HDHomeRun pe serverul MixAI și canalele apar aici.",
             "cta": "Adaugă o sursă M3U / Xtream / HDHomeRun"
         },
         "noChannels": {
@@ -145,7 +145,7 @@
         "ruleDisabled": "În pauză",
         "empty": {
             "title": "Nicio înregistrare",
-            "body": "Înregistrează o emisiune din ghid sau din player. Înregistrările se salvează pe serverul MMO exact cum au fost difuzate.",
+            "body": "Înregistrează o emisiune din ghid sau din player. Înregistrările se salvează pe serverul MixAI exact cum au fost difuzate.",
             "cta": "Deschide ghidul"
         },
         "deleted": "„{title}” a fost șters",
@@ -156,14 +156,14 @@
             "cancelTitle": "Anulezi această înregistrare?",
             "cancelBody": "„{title}” nu va fi înregistrat. Ce s-a capturat deja rămâne ca fișier parțial.",
             "deleteTitle": "Ștergi această înregistrare?",
-            "deleteBody": "„{title}” și fișierul de pe serverul MMO se șterg definitiv.",
+            "deleteBody": "„{title}” și fișierul de pe serverul MixAI se șterg definitiv.",
             "ruleTitle": "Ștergi această regulă?",
             "ruleBody": "Episoadele noi din „{title}” nu se mai înregistrează. Înregistrările existente rămân.",
             "keep": "Păstrează",
             "confirm": "Da, continuă"
         },
         "playerLabel": "Înregistrare: {title}",
-        "notInLibrary": "Folderul de înregistrări nu este un folder de bibliotecă pe serverul MMO, așa că fișierul nu poate fi redat. Adaugă un folder de tip „înregistrări” în setările serverului.",
+        "notInLibrary": "Folderul de înregistrări nu este un folder de bibliotecă pe serverul MixAI, așa că fișierul nu poate fi redat. Adaugă un folder de tip „înregistrări” în setările serverului.",
         "unsupported": "Acest browser nu poate reda această înregistrare."
     },
     "sources": {
@@ -197,7 +197,7 @@
         "deleteFailed": "Nu s-a putut șterge: {msg}",
         "empty": {
             "title": "Nicio sursă încă",
-            "body": "Adaugă o sursă M3U / Xtream / HDHomeRun. Serverul MMO încarcă canalele și ghidul, apoi toate dispozitivele le văd."
+            "body": "Adaugă o sursă M3U / Xtream / HDHomeRun. Serverul MixAI încarcă canalele și ghidul, apoi toate dispozitivele le văd."
         },
         "confirmDelete": {
             "title": "Ștergi această sursă?",
@@ -225,7 +225,7 @@
                 "hdhomerun": "192.168.1.50"
             },
             "urlHint": {
-                "m3u": "Este citit de serverul MMO, deci merge și o cale locală de pe server.",
+                "m3u": "Este citit de serverul MixAI, deci merge și o cale locală de pe server.",
                 "xtream": "Doar adresa și portul, fără /player_api.php.",
                 "hdhomerun": "Adresa tunerului; discover.json și lineup.json sunt găsite automat."
             },
@@ -244,7 +244,7 @@
             "create": "Adaugă sursa",
             "created": "{name} a fost adăugată. Se încarcă canalele…",
             "updated": "{name} a fost salvată",
-            "serverError": "Serverul MMO a refuzat sursa: {msg}",
+            "serverError": "Serverul MixAI a refuzat sursa: {msg}",
             "errors": {
                 "name": "Dă un nume sursei.",
                 "url": "Introdu adresa.",

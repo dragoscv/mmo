@@ -91,7 +91,9 @@ run_remote "cd '$LINUX_DIR' \
      fi"
 
 # Free port 17899 — kill any installed Companion that may be holding it.
-run_remote "pkill -TERM -f '/opt/MMO Companion/' 2>/dev/null || true; \
+run_remote "pkill -TERM -f '/opt/MixAI Server/' 2>/dev/null || true; \
+            pkill -TERM -f '/opt/MixAI Companion/' 2>/dev/null || true; \
+            pkill -TERM -f '/opt/MMO Companion/' 2>/dev/null || true; \
             pkill -TERM -f mmo-companion 2>/dev/null || true; \
             sleep 1"
 

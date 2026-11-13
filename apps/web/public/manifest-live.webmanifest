@@ -1,0 +1,37 @@
+{
+    "name": "MixAI Live",
+    "short_name": "MixAI Live",
+    "description": "Realtime vocal processor for live singing: pitch correction, dynamics, effects and remote control.",
+    "start_url": "/",
+    "id": "/?app=live",
+    "display": "standalone",
+    "background_color": "#0a0a0f",
+    "theme_color": "#7c5cff",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/icon-live-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-live-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-live-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [],
+    "categories": [
+        "music",
+        "utilities"
+    ],
+    "scope": "/"
+}

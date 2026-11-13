@@ -1,12 +1,12 @@
 {
     "state": {
         "error": "Something went wrong",
-        "errorBody": "The MMO Server answered with an error: {message}",
+        "errorBody": "The MixAI Server answered with an error: {message}",
         "retry": "Retry",
         "restricted": "Not available on this profile",
         "restrictedBody": "This title is above the age limit set for the active profile.",
-        "unsupported": "Your MMO Server is too old for this page",
-        "unsupportedBody": "Update the MMO Server to the latest version to browse movies and shows here."
+        "unsupported": "Your MixAI Server is too old for this page",
+        "unsupportedBody": "Update the MixAI Server to the latest version to browse movies and shows here."
     },
     "search": {
         "title": "Search",
@@ -40,7 +40,7 @@
         "allGenres": "All genres",
         "loading": "Loading your library…",
         "empty": "Nothing in your library yet",
-        "emptyBody": "Add a movie or TV folder on the MMO Server and scan it.",
+        "emptyBody": "Add a movie or TV folder on the MixAI Server and scan it.",
         "resolving": "Loading title details…",
         "noMatch": "No titles match these filters",
         "noMatchBody": "Pick another genre or clear the filters.",

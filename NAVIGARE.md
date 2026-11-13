@@ -133,7 +133,7 @@ mindmap
 
 ---
 
-## 🖥️ MMO Server / MixAI Companion (desktop Electron)
+## 🖥️ MMO Server / MixAI Server (desktop Electron)
 
 | Document | Descriere |
 |----------|-----------|

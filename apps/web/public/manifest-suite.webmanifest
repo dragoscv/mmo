@@ -1,7 +1,7 @@
 {
     "name": "MixAI",
     "short_name": "MixAI",
-    "description": "MixAI: TV, Music, Studio and DJ on every screen, powered by your own MixAI Server.",
+    "description": "MixAI: TV, Music, Studio and Decks on every screen, powered by your own MixAI Server.",
     "start_url": "/",
     "id": "/?app=suite",
     "display": "standalone",
@@ -16,19 +16,13 @@
             "purpose": "any"
         },
         {
-            "src": "/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
             "src": "/icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon-512.png",
+            "src": "/icon-maskable-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"

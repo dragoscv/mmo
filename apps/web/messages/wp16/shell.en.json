@@ -31,11 +31,11 @@
         "addFailed": "Could not add {server} to your account"
     },
     "noServer": {
-        "title": "Pair an MMO Server first",
-        "body": "Movies, shows, music and Live TV come from your own MMO Server. Pair one and it shows up here.",
+        "title": "Pair a MixAI Server first",
+        "body": "Movies, shows, music and Live TV come from your own MixAI Server. Pair one and it shows up here.",
         "cta": "Pair a server",
-        "guestTitle": "Connect to your MMO Server",
-        "guestBody": "Your music, movies and Live TV come from your own MMO Server. Connect this browser to it, try the demo, or sign in to use the servers from your account.",
+        "guestTitle": "Connect to your MixAI Server",
+        "guestBody": "Your music, movies and Live TV come from your own MixAI Server. Connect this browser to it, try the demo, or sign in to use the servers from your account.",
         "connect": "Connect to a server",
         "demo": "Try the demo",
         "signIn": "Sign in"

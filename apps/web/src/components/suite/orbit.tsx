@@ -1,9 +1,11 @@
-import { Server } from "lucide-react";
+import { BrandMark } from "@mmo/ui";
 import { SUITE_PRODUCTS } from "./products";
 
 /**
  * Hero subject (WP17-12): the MixAI Server as a breathing core with TV / Music / Studio / Decks orbiting on two
- * tilted rings. Pure CSS (transform + opacity only, GPU-cheap); reduced motion freezes it (suite.css).
+ * tilted rings, each as its app icon (dark tile, mark in the product colour; brand/BRAND.md). The core carries the
+ * Server mark on the Server colour. Pure CSS (transform + opacity only, GPU-cheap); reduced motion freezes it
+ * (suite.css).
  */
 export function SuiteOrbit({ label }: { label: string }) {
     const planets = SUITE_PRODUCTS.filter((p) => p.key !== "server");
@@ -18,12 +20,15 @@ export function SuiteOrbit({ label }: { label: string }) {
                 <div key={ri} className="sx-ring" aria-hidden style={{ ["--inset" as string]: r.inset, ["--tilt" as string]: r.tilt }}>
                     <div className="sx-ring-spin" style={{ ["--dur" as string]: r.dur, animationDirection: ri ? "reverse" : "normal" }}>
                         {r.items.map((p, i) => {
-                            const Icon = p.icon;
-                            const a = `${(360 / r.items.length) * i + ri * 40}deg`;
+                            // Start angles (the ring's own tilt adds to them): inner ring 102° / 282° = its left
+                            // and right ends, outer ring 17° / 197° = upper right and lower left. In this frame
+                            // the four icons are clear of the core and of each other; with reduced motion it is
+                            // the permanent picture (measured: docs/design-critic/wp22-brand.md).
+                            const a = `${(360 / r.items.length) * i + (ri ? 17 : 102)}deg`;
                             return (
                                 <div key={p.key} className="sx-planet" style={{ ["--a" as string]: a }}>
-                                    <div className="sx-planet-body" style={{ ["--c" as string]: p.accent, ["--dur" as string]: r.dur, animationDirection: ri ? "reverse" : "normal" }}>
-                                        <Icon aria-hidden />
+                                    <div className="sx-planet-body" style={{ ["--dur" as string]: r.dur, animationDirection: ri ? "reverse" : "normal" }}>
+                                        <BrandMark product={p.brand} size={56} tile decorative />
                                     </div>
                                 </div>
                             );
@@ -32,7 +37,8 @@ export function SuiteOrbit({ label }: { label: string }) {
                 </div>
             ))}
             <div className="sx-core" aria-hidden>
-                <Server className="size-[38%]" />
+                {/* One colour: the core is the Server colour, the mark takes the page background (suite.css). */}
+                <BrandMark product="server" size={64} mono decorative className="size-[38%]" />
             </div>
         </div>
     );

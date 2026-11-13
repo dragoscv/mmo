@@ -381,13 +381,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key & BPM"
+            "value": "MixAI Key & BPM"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key & BPM"
+            "value": "MixAI Key & BPM"
           }
         }
       }
@@ -1231,13 +1231,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect your MMO Server to see which of your own tracks mix well with what is playing. Optional — everything else works offline."
+            "value": "Connect your MixAI Server to see which of your own tracks mix well with what is playing. Optional — everything else works offline."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Conectează serverul MMO ca să vezi care piese din colecția ta se mixează bine cu ce se aude acum. Opțional — restul funcționează offline."
+            "value": "Conectează-te la MixAI Server ca să vezi care piese din colecția ta se mixează bine cu ce se aude acum. Opțional — restul funcționează offline."
           }
         }
       }
@@ -2608,13 +2608,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key & BPM"
+            "value": "MixAI Key & BPM"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key & BPM"
+            "value": "MixAI Key & BPM"
           }
         }
       }
@@ -2931,13 +2931,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key & BPM"
+            "value": "MixAI Key & BPM"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Key & BPM"
+            "value": "MixAI Key & BPM"
           }
         }
       }

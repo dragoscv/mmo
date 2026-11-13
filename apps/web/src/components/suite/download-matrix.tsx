@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
+import { BrandMark } from "@mmo/ui";
 import Link from "@/components/host/host-context";
 import { detectPlatform, PLATFORM_STATUS, SUITE_PRODUCTS, type PlatformKey } from "./products";
 import { platformHref } from "./platform-links";
@@ -16,10 +17,9 @@ export function DownloadMatrix() {
     return (
         <div className="sx-matrix">
             {SUITE_PRODUCTS.map((p) => {
-                const Icon = p.icon;
                 return (
                     <div key={p.key} className="sx-row" style={{ ["--c" as string]: p.accent }}>
-                        <div className="sx-row-name"><Icon aria-hidden />{t(`products.${p.key}.name`)}</div>
+                        <div className="sx-row-name"><BrandMark product={p.brand} size={20} decorative />{t(`products.${p.key}.name`)}</div>
                         <ul className="sx-chips" aria-label={t(`products.${p.key}.name`)}>
                             {p.platforms.map((pl) => {
                                 const status = PLATFORM_STATUS[p.key][pl] ?? "soon";

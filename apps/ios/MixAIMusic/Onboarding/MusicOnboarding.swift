@@ -34,7 +34,7 @@ struct MusicOnboarding: View {
             RadialGradient(colors: [Tokens.Brand.violetDark.opacity(0.45), .clear], center: .top, startRadius: 0, endRadius: 520).ignoresSafeArea()
             VStack(spacing: 20) {
                 Spacer()
-                Image("BrandMark").resizable().scaledToFit().frame(width: 112).accessibilityLabel("MixAI Music")
+                BrandMarkView(.music, animation: .intro).frame(width: 112, height: 112)
                 Text("music.welcome.title").font(Theme.heading(34)).multilineTextAlignment(.center)
                 Text("music.welcome.subtitle").font(Theme.body(17)).foregroundStyle(Theme.mutedForeground).multilineTextAlignment(.center).padding(.horizontal, 24)
                 VStack(alignment: .leading, spacing: 10) {

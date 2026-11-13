@@ -28,14 +28,14 @@
     <string name="signin_err_status">%1$s a răspuns cu eroarea %2$d.</string>
     <string name="signin_err_invalid">%1$s a trimis un răspuns neașteptat.</string>
     <string name="discover_title">Alege un server</string>
-    <string name="discover_subtitle">Servere MMO găsite în această rețea Wi-Fi.</string>
+    <string name="discover_subtitle">Servere MixAI găsite în această rețea Wi-Fi.</string>
     <string name="discover_searching">Se caută în rețea…</string>
     <string name="discover_manual">Introdu adresa manual</string>
     <string name="discover_manual_hint">De exemplu http://192.168.1.10:17899</string>
     <string name="pair_title">Asociere cu %1$s</string>
     <string name="pair_requesting">Se cere serverului un cod de asociere…</string>
     <string name="pair_your_code">Cod de asociere</string>
-    <string name="pair_instructions">Aprobă acest cod în MixAI (Setări, Dispozitive) sau în aplicația MMO Server de pe calculator.</string>
+    <string name="pair_instructions">Aprobă acest cod în MixAI (Setări, Dispozitive) sau în aplicația MixAI Server de pe calculator.</string>
     <string name="pair_approve_here">Aprobă pe acest telefon</string>
     <string name="pair_waiting">Se așteaptă aprobarea…</string>
     <string name="pair_expired">Codul de asociere a expirat.</string>

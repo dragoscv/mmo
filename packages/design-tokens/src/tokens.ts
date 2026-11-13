@@ -235,6 +235,31 @@ export const BRAND = {
 } as const;
 
 /**
+ * Product identity colours (WP22-06, ADR-0016 D73; owner gate C 2026-11-12: "vivid spectrum, no red").
+ * Identity only: app icon, splash, wordmark, product page, suite badge. This is NOT the UI accent, which stays
+ * the user's choice (ACCENTS). Fixed, never re-hued. `dark` is used on dark surfaces, `light` on light ones.
+ * Hues sit at least 35 degrees apart and none sits on the destructive red (22 to 27).
+ */
+export const PRODUCTS = {
+  tv: { name: "MixAI TV", short: "TV", dark: { l: 0.7, c: 0.19, h: 290 }, light: { l: 0.5, c: 0.21, h: 290 } },
+  music: { name: "MixAI Music", short: "Music", dark: { l: 0.72, c: 0.2, h: 345 }, light: { l: 0.52, c: 0.2, h: 345 } },
+  decks: { name: "MixAI Decks", short: "Decks", dark: { l: 0.8, c: 0.13, h: 215 }, light: { l: 0.5, c: 0.11, h: 215 } },
+  live: { name: "MixAI Live", short: "Live", dark: { l: 0.76, c: 0.17, h: 50 }, light: { l: 0.53, c: 0.15, h: 50 } },
+  studio: { name: "MixAI Studio", short: "Studio", dark: { l: 0.86, c: 0.16, h: 95 }, light: { l: 0.5, c: 0.11, h: 95 } },
+  keybpm: { name: "MixAI Key & BPM", short: "Key & BPM", dark: { l: 0.8, c: 0.19, h: 145 }, light: { l: 0.5, c: 0.15, h: 145 } },
+  server: { name: "MixAI Server", short: "Server", dark: { l: 0.68, c: 0.16, h: 255 }, light: { l: 0.5, c: 0.18, h: 255 } },
+  connector: { name: "MixAI Connector", short: "Connector", dark: { l: 0.8, c: 0.13, h: 180 }, light: { l: 0.5, c: 0.1, h: 180 } },
+} as const;
+export type ProductId = keyof typeof PRODUCTS;
+
+/**
+ * Parent mark colours (owner gate C: "two sources, two colours"): the left stream takes the first product
+ * colour, the right stream the second, the signal dot is the text colour (ivory on dark, ink on light).
+ * The app-icon tile is always the dark `card` role, in every mode.
+ */
+export const MARK = { streamA: "tv", streamB: "music" } as const satisfies Record<string, ProductId>;
+
+/**
  * Camelot wheel key colours (MixAI Key & BPM, WP18, D69): one OKLCH hue per wheel position, walking the hue circle
  * in Camelot order so neighbours (compatible keys) sit next to each other in colour too. A (minor) is a step darker
  * than B (major). Fixed — not re-hued by the accent preset.

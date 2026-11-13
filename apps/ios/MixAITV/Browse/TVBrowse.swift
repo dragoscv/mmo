@@ -205,9 +205,10 @@ struct TVLiveView: View {
     }
 }
 
-/// Server, profile, version, disconnect.
+/// Server, profile, startup sound, version, disconnect.
 struct TVSettingsView: View {
     @Environment(TVModel.self) private var model
+    @AppStorage(TVPrefs.startupSoundKey) private var startupSound = true
 
     var body: some View {
         List {
@@ -219,6 +220,13 @@ struct TVSettingsView: View {
             Section("settings.profiles") {
                 LabeledContent("settings.active_profile", value: model.activeProfile?.name ?? "—")
                 Button("settings.switch_profile") { Task { await model.switchProfile() } }
+            }
+            Section {
+                Toggle("settings.startup_sound", isOn: $startupSound)
+            } header: {
+                Text("settings.sound")
+            } footer: {
+                Text("settings.startup_sound_hint")
             }
             Section("settings.about") {
                 LabeledContent("settings.version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")

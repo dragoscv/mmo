@@ -31,7 +31,7 @@ media controls, not a copy of the web code. Tracker: `docs/mixai-design-tracker.
 | Command | What |
 |---|---|
 | `pnpm install` | own lockfile + `pnpm-workspace.yaml` (repo convention) |
-| `pnpm tauri:icon` | `src-tauri/icons` from the MixAI Music app icon (gitignored) |
+| `node brand/scripts/build.mjs` (repo root) | regenerate the committed `src-tauri/icons` from the brand source (ADR-0016) |
 | `pnpm test:launcher` | launcher unit tests (node --test) |
 | `cargo test` / `cargo clippy -- -D warnings` in `src-tauri` | Rust unit tests (links, commands, i18n, auth) |
 | `pnpm tauri dev` | dev window against `http://localhost:13789` (or `MMO_WEB_APP_URL`) |

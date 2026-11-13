@@ -16,7 +16,7 @@ struct OnboardingFlow: View {
                         ServerListView { path.append(.pair($0)) }
                     case .signIn:
                         DeviceSignInView(origin: app.origin) { app.accountStore.adopt($0, app: app) } onConnect: { c, base in
-                            await app.connect(ServerConnection(name: c.name ?? "MMO Server", baseURL: base), token: c.token)
+                            await app.connect(ServerConnection(name: c.name ?? "MixAI Server", baseURL: base), token: c.token)
                         }
                     case .pair(let server):
                         PairView(server: server) { token in
@@ -49,7 +49,7 @@ struct WelcomeView: View {
             RadialGradient(colors: [Tokens.Brand.violetDark.opacity(0.45), .clear], center: .top, startRadius: 0, endRadius: 520).ignoresSafeArea()
             VStack(spacing: 20) {
                 Spacer()
-                Image("BrandMark").resizable().scaledToFit().frame(width: 112).accessibilityLabel("MixAI TV")
+                BrandMarkView(.tv, animation: .intro).frame(width: 112, height: 112)
                 Text("welcome.title").font(Theme.heading(34)).multilineTextAlignment(.center)
                 Text("welcome.subtitle").font(Theme.body(17)).foregroundStyle(Theme.mutedForeground).multilineTextAlignment(.center).padding(.horizontal, 24)
                 Spacer()

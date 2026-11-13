@@ -54,7 +54,7 @@ export const SETTINGS_INDEX: readonly SettingEntry[] = [
     { id: "controllers.ble", tab: "controllers", labelKey: "settings.ble", keywords: ["bluetooth", "ble", "wireless", "midi", "fara fir"] },
     { id: "controllers.hid", tab: "controllers", labelKey: "settings.hid", keywords: ["hid", "cdj", "usb", "jog", "controller"] },
     { id: "keyboard.shortcuts", tab: "keyboard", labelKey: "settings.keyboardOpen", keywords: ["keyboard", "shortcuts", "keys", "hotkeys", "bind", "tastatura", "scurtaturi", "taste"] },
-    { id: "library.companion", tab: "library", labelKey: "settings.library", keywords: ["library", "companion", "token", "pairing", "mixai.ro", "account", "biblioteca", "cont", "asociere"] },
+    { id: "library.companion", tab: "library", labelKey: "settings.library", keywords: ["library", "server", "companion", "token", "pairing", "mixai.ro", "account", "biblioteca", "cont", "asociere"] },
     { id: "plugins.manager", tab: "plugins", labelKey: "settings.plugins", keywords: ["plugins", "extensions", "macro", "install", "pluginuri", "extensii"] },
     { id: "marketplace.store", tab: "marketplace", labelKey: "settings.tabMarketplace", keywords: ["marketplace", "store", "packs", "skins", "magazin", "pachete"] },
     { id: "marketplace.filters", tab: "marketplace", labelKey: "pack.search", keywords: ["search packs", "filter", "free", "pro", "layouts", "bundles", "cauta", "gratuite", "aranjamente"] },

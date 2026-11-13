@@ -3,11 +3,11 @@
     <string name="app_name">MixAI Music</string>
     <string name="connect_title">Connect</string>
     <string name="connect_from_phone">Use phone connection</string>
-    <string name="connect_searching">Looking for MMO Server on this network…</string>
+    <string name="connect_searching">Looking for MixAI Server on this network…</string>
     <string name="connect_manual">Enter address</string>
     <string name="connect_manual_hint">Server address, e.g. 192.168.1.10</string>
     <string name="pair_code">Approve this code</string>
-    <string name="pair_hint">In MixAI Music on your phone, on mixai.ro or in the companion</string>
+    <string name="pair_hint">In MixAI Music on your phone, on mixai.ro or in MixAI Server</string>
     <string name="pair_expired">The code expired</string>
     <string name="pair_failed">Could not connect: %1$s</string>
     <string name="action_retry">Try again</string>

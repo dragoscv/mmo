@@ -1,7 +1,7 @@
 {
   "name": "mmo-server",
-  "version": "3.15.0",
-  "description": "MMO Server (MixAI Companion) — serves local music and video files to the MixAI web app",
+  "version": "3.16.0",
+  "description": "MixAI Server — serves your own music and video files to the MixAI apps",
   "main": "dist/main.js",
   "author": {
     "name": "mwrty",
@@ -44,7 +44,7 @@
   },
   "build": {
     "appId": "ro.mixai.companion",
-    "productName": "MixAI Companion",
+    "productName": "MixAI Server",
     "artifactName": "${productName}-Setup-${version}.${ext}",
     "afterPack": "scripts/mac-adhoc-sign.js",
     "publish": [
@@ -135,7 +135,8 @@
           ]
         }
       ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.png",
+      "executableName": "MixAI Companion"
     },
     "mac": {
       "target": [
@@ -186,14 +187,14 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "assets/icon.png",
       "category": "AudioVideo;Audio",
-      "synopsis": "MixAI Companion — MMO Server, local media server for the MixAI web app",
-      "description": "Electron companion daemon (MMO Server) that serves your local music library, recordings, and downloads to the MixAI web app. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
+      "synopsis": "MixAI Server — your own media server for the MixAI apps",
+      "description": "MixAI Server serves your own movies, series, music, recordings and downloads to the MixAI apps on TVs, phones, desktop and the web. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
       "maintainer": "mwrty <vladulescu.catalin@gmail.com>",
       "vendor": "mwrty",
       "desktop": {
         "entry": {
-          "Name": "MixAI Companion — MMO Server",
-          "Comment": "Local media server for the MixAI web app",
+          "Name": "MixAI Server",
+          "Comment": "Your own media server for the MixAI apps",
           "Categories": "AudioVideo;Audio;"
         }
       }
@@ -235,7 +236,7 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MixAI Companion",
+      "shortcutName": "MixAI Server",
       "deleteAppDataOnUninstall": false
     }
   },

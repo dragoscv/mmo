@@ -1,6 +1,6 @@
 {
     "name": "MixAI Studio",
-    "short_name": "Studio",
+    "short_name": "MixAI Studio",
     "description": "Organize, analyze, tag and mix your music library with AI. Server admin and dashboard.",
     "start_url": "/",
     "id": "/?app=studio",
@@ -10,25 +10,19 @@
     "orientation": "any",
     "icons": [
         {
-            "src": "/icon-192.png",
+            "src": "/icon-studio-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
-            "src": "/icon-512.png",
+            "src": "/icon-studio-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon-512.png",
+            "src": "/icon-studio-maskable-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"

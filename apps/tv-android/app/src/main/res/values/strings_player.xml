@@ -87,9 +87,9 @@
     <string name="together_hub_connected">Connected</string>
     <string name="together_hub_connecting">Reconnecting…</string>
     <string name="together_hub_disconnected">Offline</string>
-    <string name="together_waiting_hub">Waiting for MMO Server…</string>
+    <string name="together_waiting_hub">Waiting for MixAI Server…</string>
     <string name="together_update_title">Server update needed</string>
-    <string name="together_update_server">Update MMO Server to 3.5+ to use Watch Together (this server runs %1$s).</string>
+    <string name="together_update_server">Update MixAI Server to 3.5+ to use Watch Together (this server runs %1$s).</string>
     <string name="together_err_not_found">No room with this code.</string>
     <string name="together_err_full">The room is full.</string>
     <string name="together_err_not_in_room">You are no longer in the room.</string>

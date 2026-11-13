@@ -29,7 +29,7 @@ export function CompanionSection() {
         : !status.online
           ? "Offline"
           : status.authed
-            ? `Online · ${status.hostname ?? "companion"} v${status.version ?? "?"}`
+                        ? `Online · ${status.hostname ?? "MixAI Server"} v${status.version ?? "?"}`
             : "Online · not paired";
 
     return (
@@ -43,7 +43,7 @@ export function CompanionSection() {
             </div>
 
             <Field
-                label="Companion URL"
+                label="Server URL"
                 value={baseUrl}
                 placeholder="http://127.0.0.1:17899"
                 onChange={(v) => update({ baseUrl: v })}
@@ -51,7 +51,7 @@ export function CompanionSection() {
             <Field
                 label="Device token"
                 value={deviceToken}
-                placeholder="from the companion app"
+                placeholder="from MixAI Server"
                 type="password"
                 onChange={(v) => update({ deviceToken: v })}
             />
@@ -62,7 +62,7 @@ export function CompanionSection() {
                 onChange={(v) => update({ userId: v })}
             />
             <p style={{ fontSize: 11, color: "var(--fg-dim)", lineHeight: 1.5 }}>
-                Find the device token and user id in the MMO Companion app under its
+                Find the device token and user id in MixAI Server under its
                 pairing/settings screen. These let MIXAI read your synced library.
             </p>
         </div>

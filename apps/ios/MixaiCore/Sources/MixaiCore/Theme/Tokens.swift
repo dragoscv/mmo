@@ -95,6 +95,31 @@ public enum Tokens {
         public static let deckD = Color(.sRGB, red: 1.0000, green: 0.6941, blue: 0.3098, opacity: 1.0000)
     }
 
+    /// Product identity colours on dark surfaces (fixed; identity only, never the UI accent).
+    public enum Product {
+        public static let tv = Color(.sRGB, red: 0.6235, green: 0.5333, blue: 1.0000, opacity: 1.0000)
+        public static let music = Color(.sRGB, red: 0.9686, green: 0.4039, blue: 0.7569, opacity: 1.0000)
+        public static let decks = Color(.sRGB, red: 0.2157, green: 0.8235, blue: 0.9490, opacity: 1.0000)
+        public static let live = Color(.sRGB, red: 1.0000, green: 0.5608, blue: 0.2941, opacity: 1.0000)
+        public static let studio = Color(.sRGB, red: 0.9490, green: 0.8118, blue: 0.2314, opacity: 1.0000)
+        public static let keybpm = Color(.sRGB, red: 0.3804, green: 0.8627, blue: 0.4196, opacity: 1.0000)
+        public static let server = Color(.sRGB, red: 0.2980, green: 0.6000, blue: 0.9725, opacity: 1.0000)
+        public static let connector = Color(.sRGB, red: 0.2510, green: 0.8510, blue: 0.7569, opacity: 1.0000)
+        public static let markTile = Color(.sRGB, red: 0.0667, green: 0.0627, blue: 0.1020, opacity: 1.0000)
+    }
+
+    /// Product identity colours on light surfaces.
+    public enum ProductLight {
+        public static let tv = Color(.sRGB, red: 0.4078, green: 0.2431, blue: 0.8118, opacity: 1.0000)
+        public static let music = Color(.sRGB, red: 0.6941, green: 0.1255, blue: 0.5137, opacity: 1.0000)
+        public static let decks = Color(.sRGB, red: 0.0000, green: 0.4353, blue: 0.5137, opacity: 1.0000)
+        public static let live = Color(.sRGB, red: 0.6627, green: 0.3059, blue: 0.0000, opacity: 1.0000)
+        public static let studio = Color(.sRGB, red: 0.4627, green: 0.3843, blue: 0.0000, opacity: 1.0000)
+        public static let keybpm = Color(.sRGB, red: 0.0627, green: 0.4706, blue: 0.1373, opacity: 1.0000)
+        public static let server = Color(.sRGB, red: 0.0000, green: 0.3804, blue: 0.7451, opacity: 1.0000)
+        public static let connector = Color(.sRGB, red: 0.0000, green: 0.4549, blue: 0.3961, opacity: 1.0000)
+    }
+
     /// Accent hues (OKLCH degrees).
     public enum AccentHue {
         public static let violet: Double = 285

@@ -71,6 +71,9 @@
     <string name="set_sub_off">Oprite</string>
     <string name="set_sub_forced_only">Doar subtitrări forțate</string>
     <string name="set_sub_forced_hint">Afișează doar părțile în limbi străine și inscripțiile.</string>
+    <string name="set_sound">Sunet</string>
+    <string name="set_startup_sound">Sunet la pornire</string>
+    <string name="set_startup_sound_hint">Un sunet scurt când se deschide MixAI TV. Se aude la volumul televizorului.</string>
 
     <!-- Stil subtitrări -->
     <string name="set_sub_size">Mărime</string>
@@ -101,7 +104,7 @@
     <string name="set_server_status">Stare</string>
     <string name="set_server_recheck">Verifică din nou</string>
     <string name="set_change_server_title">Schimbi serverul?</string>
-    <string name="set_change_server_body">Televizorul se deconectează de la MMO Server-ul curent. Contul rămâne conectat.</string>
+    <string name="set_change_server_body">Televizorul se deconectează de la MixAI Server-ul curent. Contul rămâne conectat.</string>
     <string name="set_livetv_sources">Surse TV live</string>
     <string name="set_livetv_sources_hint">Sursele M3U, Xtream și HDHomeRun sunt pe server.</string>
 

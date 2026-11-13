@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MixAI Key & BPM: a Camelot ring (accent) with a beat dot (cyan). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:strokeColor="@color/accent"
+        android:strokeWidth="7"
+        android:fillColor="#00000000"
+        android:pathData="M54,30 A24,24 0 1,1 53.99,30 Z" />
+    <path android:fillColor="@color/accent2" android:pathData="M54,46 A8,8 0 1,1 53.99,46 Z" />
+    <path android:fillColor="@color/accent2" android:pathData="M51,24 L57,24 L57,34 L51,34 Z" />
+</vector>

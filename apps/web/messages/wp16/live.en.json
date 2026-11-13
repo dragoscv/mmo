@@ -16,7 +16,7 @@
         "favFailed": "Could not update favourites: {msg}",
         "noSources": {
             "title": "No Live TV sources yet",
-            "body": "Add an M3U playlist, an Xtream Codes account or an HDHomeRun tuner on your MMO Server and your channels show up here.",
+            "body": "Add an M3U playlist, an Xtream Codes account or an HDHomeRun tuner on your MixAI Server and your channels show up here.",
             "cta": "Add an M3U / Xtream / HDHomeRun source"
         },
         "noChannels": {
@@ -145,7 +145,7 @@
         "ruleDisabled": "Paused",
         "empty": {
             "title": "No recordings",
-            "body": "Record a programme from the guide or the player. Recordings are saved on your MMO Server exactly as broadcast.",
+            "body": "Record a programme from the guide or the player. Recordings are saved on your MixAI Server exactly as broadcast.",
             "cta": "Open the guide"
         },
         "deleted": "“{title}” deleted",
@@ -156,14 +156,14 @@
             "cancelTitle": "Cancel this recording?",
             "cancelBody": "“{title}” will not be recorded. Anything already captured is kept as a partial file.",
             "deleteTitle": "Delete this recording?",
-            "deleteBody": "“{title}” and its file on the MMO Server are deleted for good.",
+            "deleteBody": "“{title}” and its file on the MixAI Server are deleted for good.",
             "ruleTitle": "Delete this series rule?",
             "ruleBody": "New episodes of “{title}” stop being recorded. Existing recordings stay.",
             "keep": "Keep",
             "confirm": "Yes, continue"
         },
         "playerLabel": "Recording: {title}",
-        "notInLibrary": "The recordings folder is not a library folder on the MMO Server, so the file cannot be streamed. Add a “recordings” folder in the server settings.",
+        "notInLibrary": "The recordings folder is not a library folder on the MixAI Server, so the file cannot be streamed. Add a “recordings” folder in the server settings.",
         "unsupported": "This browser cannot play this recording."
     },
     "sources": {
@@ -197,7 +197,7 @@
         "deleteFailed": "Could not delete: {msg}",
         "empty": {
             "title": "No sources yet",
-            "body": "Add an M3U / Xtream / HDHomeRun source. The MMO Server loads the channels and the guide; every device then sees them."
+            "body": "Add an M3U / Xtream / HDHomeRun source. The MixAI Server loads the channels and the guide; every device then sees them."
         },
         "confirmDelete": {
             "title": "Delete this source?",
@@ -225,7 +225,7 @@
                 "hdhomerun": "192.168.1.50"
             },
             "urlHint": {
-                "m3u": "Read by the MMO Server, so a local path on the server works too.",
+                "m3u": "Read by the MixAI Server, so a local path on the server works too.",
                 "xtream": "Only the address and port, without /player_api.php.",
                 "hdhomerun": "The tuner’s address; discover.json and lineup.json are found automatically."
             },
@@ -244,7 +244,7 @@
             "create": "Add source",
             "created": "{name} added. Loading channels…",
             "updated": "{name} saved",
-            "serverError": "The MMO Server refused the source: {msg}",
+            "serverError": "The MixAI Server refused the source: {msg}",
             "errors": {
                 "name": "Give the source a name.",
                 "url": "Enter the address.",

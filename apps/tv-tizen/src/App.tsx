@@ -13,6 +13,7 @@ import {
 } from "./lib/config";
 import { APP_VERSION, type Companion } from "./lib/device-auth";
 import { MmoClient } from "./lib/api";
+import { playStartupSound } from "./lib/brand-sound";
 import { MediaClient } from "./lib/media";
 import { MusicClient } from "./lib/music";
 import { LiveTvClient } from "./lib/livetv";
@@ -125,6 +126,9 @@ function AppRoot({ lang }: { lang: Locale }) {
     const restart = useCallback((route: Route) => setStart((s) => ({ n: (s?.n ?? 0) + 1, route })), []);
 
     useEffect(() => { registerTvKeys(); installRowMemory(); if (hasPointer()) installPointer(); installE2ePressHook(); }, []);
+
+    // Sonic signature: once per app start, after the first screen is up (ADR-0016; Settings → Sound turns it off).
+    useEffect(() => { if (start !== null) playStartupSound(); }, [start]);
 
     // Hub: one socket per server config.
     useEffect(() => {

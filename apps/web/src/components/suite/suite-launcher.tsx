@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent } fr
 import { useTranslations } from "next-intl";
 import { useReducedMotion } from "motion/react";
 import { Server } from "lucide-react";
-import { Button, EmptyState, Skeleton, Switch } from "@mmo/ui";
+import { BrandMark, Button, EmptyState, Skeleton, Switch } from "@mmo/ui";
 import { useThemePrefs } from "@mmo/ui/theme";
 import Link, { useHref } from "@/components/host/host-context";
 import { getLauncherContinue } from "@/actions/media";
@@ -125,12 +125,11 @@ export function SuiteLauncher({ name }: { name: string | null }) {
             <nav aria-label={t("launcher.appsLabel")}>
                 <ul className="lx-grid">
                     {order.map((p, i) => {
-                        const Icon = p.icon;
                         return (
                             <li key={p.key} className="sx-rise" style={{ ["--i" as string]: i + 1 }}>
                                 <a href={map(p.internal)} onClick={onTile(p)} className="lx-tile" style={{ ["--c" as string]: p.accent }}>
                                     {p.key === lastUsed ? <span className="lx-badge">{t("launcher.lastUsed")}</span> : null}
-                                    <span className="sx-card-icon"><Icon aria-hidden /></span>
+                                    <span className="sx-card-icon"><BrandMark product={p.brand} size={24} decorative /></span>
                                     <strong>{t(`products.${p.key}.name`)}</strong>
                                     <span className="lx-sub">{t(`products.${p.key}.tagline`)}</span>
                                 </a>
@@ -169,7 +168,7 @@ export function SuiteLauncher({ name }: { name: string | null }) {
                     }}
                 >
                     <div className="lx-morph-label">
-                        <span className="sx-card-icon" style={{ ["--c" as string]: morph.p.accent }}><morph.p.icon aria-hidden /></span>
+                        <span className="sx-card-icon" style={{ ["--c" as string]: morph.p.accent }}><BrandMark product={morph.p.brand} size={24} decorative /></span>
                         {t(`products.${morph.p.key}.name`)}
                     </div>
                 </div>

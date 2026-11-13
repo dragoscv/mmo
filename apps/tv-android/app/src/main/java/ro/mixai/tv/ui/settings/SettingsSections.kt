@@ -163,6 +163,7 @@ internal fun PlaybackPane(deps: ScreenDeps) {
     var pick by remember { mutableStateOf<String?>(null) } // "audio" | "sub" | "format"
     val scope = rememberCoroutineScope()
     val formatKey by deps.settings.screenFormat.collectAsState(initial = "auto")
+    val startupSound by deps.settings.startupSound.collectAsState(initial = true)
     val p = active
     val auto = stringResource(R.string.set_lang_auto)
     val off = stringResource(R.string.set_sub_off)
@@ -217,6 +218,16 @@ internal fun PlaybackPane(deps: ScreenDeps) {
             OptionChip("32:9", formatKey == ScreenFormat.Super32x9.key, { set(ScreenFormat.Super32x9.key) })
         }
         Text(stringResource(R.string.settings_screen_hint), color = Tokens.mutedForeground, style = MaterialTheme.typography.bodySmall)
+    }
+
+    // Device-wide: the brand sound when the app opens (on until turned off here).
+    Section(stringResource(R.string.set_sound)) {
+        ToggleRow(
+            stringResource(R.string.set_startup_sound),
+            startupSound,
+            { on -> scope.launch { deps.settings.setStartupSound(on) } },
+            subtitle = stringResource(R.string.set_startup_sound_hint),
+        )
     }
 }
 

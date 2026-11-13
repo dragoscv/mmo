@@ -7,7 +7,7 @@
     <string name="action_retry">Retry</string>
     <string name="common_nothing_yet">nothing yet</string>
     <string name="common_row_error">error: %1$s</string>
-    <string name="common_mmo_server">MMO Server</string>
+    <string name="common_mmo_server">MixAI Server</string>
     <string name="common_saved_server">Saved server</string>
     <string name="common_your_code">Your code</string>
     <string name="common_expires_in">Expires in %1$d:%2$02d</string>
@@ -19,7 +19,7 @@
     <string name="welcome_signin_desc">A code on this screen, confirm it on your phone. Your servers appear automatically.</string>
     <string name="welcome_recommended">Recommended</string>
     <string name="welcome_local_title">Connect to a server on this network</string>
-    <string name="welcome_local_desc">Find MMO Server on your LAN and pair with a 6-digit code.</string>
+    <string name="welcome_local_desc">Find MixAI Server on your LAN and pair with a 6-digit code.</string>
 
     <!-- Sign in (device code) -->
     <string name="signin_title">Sign in with MixAI account</string>
@@ -38,8 +38,8 @@
     <string name="signin_err_invalid">Unexpected reply from %1$s</string>
 
     <!-- Discover (LAN) -->
-    <string name="discover_scanning">Searching for MMO Servers on your network…</string>
-    <string name="discover_pick">Choose your MMO Server</string>
+    <string name="discover_scanning">Searching for MixAI Servers on your network…</string>
+    <string name="discover_pick">Choose your MixAI Server</string>
     <string name="discover_no_pairing">v%1$s · pairing not supported</string>
     <string name="discover_quick">v%1$s · Quick Connect</string>
     <string name="discover_manual">Enter address manually</string>
@@ -50,11 +50,11 @@
     <string name="pair_scan">Scan with your phone or open mixai.ro/pair\nand enter the code</string>
     <string name="pair_waiting">Waiting for approval…</string>
     <string name="pair_expired">The code expired.</string>
-    <string name="pair_failed_hint">This server may not support Quick Connect yet — update MMO Server or enter the token manually.</string>
+    <string name="pair_failed_hint">This server may not support Quick Connect yet — update MixAI Server or enter the token manually.</string>
     <string name="pair_err_no_token">Server approved without a token</string>
 
     <!-- Connect (manual) -->
-    <string name="connect_subtitle">Connect to your MMO Server manually</string>
+    <string name="connect_subtitle">Connect to your MixAI Server manually</string>
     <string name="connect_host_label">Server (host or http://host:17899)</string>
     <string name="connect_token_label">Device token (optional — leave empty to pair with a code)</string>
     <string name="connect_submit">Connect</string>
@@ -77,7 +77,7 @@
     <string name="home_change_server">Change server</string>
     <string name="home_sign_out">Sign out</string>
     <string name="home_movies_empty">No movies</string>
-    <string name="home_movies_empty_hint">Add a Movies folder in MMO Server → Settings.</string>
+    <string name="home_movies_empty_hint">Add a Movies folder in MixAI Server → Settings.</string>
     <string name="home_shows_empty">No TV shows</string>
     <string name="home_shows_empty_hint">Episodes are detected from S01E02-style file names.</string>
     <string name="home_albums_empty">No albums</string>
@@ -109,7 +109,7 @@
 
     <!-- Player -->
     <string name="player_error">Playback error</string>
-    <string name="player_err_missing">The file is no longer on disk. Rescan the library in MMO Server.</string>
+    <string name="player_err_missing">The file is no longer on disk. Rescan the library in MixAI Server.</string>
     <string name="player_err_server">The server could not start playback (HTTP %1$d).</string>
 
     <!-- Settings -->

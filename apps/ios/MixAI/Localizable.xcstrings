@@ -1571,13 +1571,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add movies and shows to your MMO Server folders and they appear here."
+            "value": "Add movies and shows to your MixAI Server folders and they appear here."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Adaugă filme și seriale în folderele serverului MMO și apar aici."
+            "value": "Adaugă filme și seriale în folderele de pe MixAI Server și apar aici."
           }
         }
       }
@@ -1843,13 +1843,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect MixAI to your MMO Server first."
+            "value": "Connect to your MixAI Server first."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Conectează mai întâi MixAI la serverul MMO."
+            "value": "Conectează-te mai întâi la MixAI Server."
           }
         }
       }
@@ -2302,13 +2302,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add your own sources (M3U, Xtream, HDHomeRun) in the MMO Server settings."
+            "value": "Add your own sources (M3U, Xtream, HDHomeRun) in the MixAI Server settings."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Adaugă propriile surse (M3U, Xtream, HDHomeRun) în setările serverului MMO."
+            "value": "Adaugă propriile surse (M3U, Xtream, HDHomeRun) în setările MixAI Server."
           }
         }
       }
@@ -2897,13 +2897,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Point the MMO Server at your music folder to listen here."
+            "value": "Point MixAI Server at your music folder to listen here."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Indică serverului MMO folderul cu muzică pentru a asculta aici."
+            "value": "Alege în MixAI Server folderul cu muzică pentru a asculta aici."
           }
         }
       }
@@ -4189,13 +4189,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Approve this code on your MMO Server or on mixai.ro"
+            "value": "Approve this code on your MixAI Server or on mixai.ro"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aprobă acest cod pe serverul MMO sau pe mixai.ro"
+            "value": "Aprobă acest cod pe MixAI Server sau pe mixai.ro"
           }
         }
       }
@@ -5634,13 +5634,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open MixAI TV on your TV connected to the same MMO Server."
+            "value": "Open MixAI TV on your TV connected to the same MixAI Server."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deschide MixAI TV pe televizorul conectat la același server MMO."
+            "value": "Deschide MixAI TV pe televizorul conectat la același MixAI Server."
           }
         }
       }
@@ -6008,13 +6008,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI looks for MMO Servers on your Wi-Fi."
+            "value": "The app looks for MixAI Server on your Wi-Fi."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI caută servere MMO în rețeaua ta Wi-Fi."
+            "value": "Aplicația caută MixAI Server în rețeaua ta Wi-Fi."
           }
         }
       }
@@ -6093,13 +6093,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No MMO Server answered at that address."
+            "value": "No MixAI Server answered at that address."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Niciun server MMO nu a răspuns la această adresă."
+            "value": "Niciun MixAI Server nu a răspuns la această adresă."
           }
         }
       }
@@ -6576,6 +6576,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "Conectat ca"
+          }
+        }
+      }
+    },
+    "settings.sound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunet"
+          }
+        }
+      }
+    },
+    "settings.startup_sound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startup sound"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunet la pornire"
+          }
+        }
+      }
+    },
+    "settings.startup_sound_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays the MixAI sound once when the app opens."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redă sunetul MixAI o dată, la deschiderea aplicației."
           }
         }
       }
@@ -7674,13 +7725,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect to an MMO Server first."
+            "value": "Connect to a MixAI Server first."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Conectează-te mai întâi la un server MMO."
+            "value": "Conectează-te mai întâi la un MixAI Server."
           }
         }
       }
@@ -7725,13 +7776,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This invite is for a different MMO Server."
+            "value": "This invite is for a different MixAI Server."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Invitația este pentru alt server MMO."
+            "value": "Invitația este pentru alt MixAI Server."
           }
         }
       }
@@ -8116,13 +8167,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No TVs connected to your MMO Server"
+            "value": "No TVs connected to your MixAI Server"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Niciun televizor conectat la serverul MMO"
+            "value": "Niciun televizor conectat la MixAI Server"
           }
         }
       }
@@ -8354,13 +8405,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your movies, shows, music and live TV from your own MMO Server."
+            "value": "Your movies, shows, music and live TV from your own MixAI Server."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Filmele, serialele, muzica și TV-ul live de pe propriul server MMO."
+            "value": "Filmele, serialele, muzica și TV-ul live de pe propriul tău MixAI Server."
           }
         }
       }

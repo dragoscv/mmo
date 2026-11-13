@@ -57,7 +57,6 @@ cd apps/native
 pnpm install
 
 # Desktop (Tauri)
-pnpm tauri:icon            # one-off: generates icons from apps/web/public/icon-512.png
 pnpm tauri:dev             # opens the desktop shell against mixai.ro
 
 # Mobile (Capacitor)
@@ -68,9 +67,10 @@ pnpm cap:open:android      # opens Android Studio
 pnpm cap:open:ios          # opens Xcode
 ```
 
-`ios/`, `dist/` and `src-tauri/icons/` are **gitignored** and regenerated on
-each build; `android/` is tracked because its manifest carries the TV/Leanback
-declarations.
+`ios/` and `dist/` are **gitignored** and regenerated on each build; `android/` is
+tracked because its manifest carries the TV/Leanback declarations. `src-tauri/icons/`
+is committed — regenerate it with `node brand/scripts/build.mjs` from the repo root
+(ADR-0016), never by hand.
 
 ## Production build
 

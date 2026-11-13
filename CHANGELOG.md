@@ -10,6 +10,48 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI brand pack 1.0: new mark, product icons, logo motion (WP22-03..10, 2026-11-12)
+
+Web 3.6.0, MixAI Server 3.16.0, MixAI Connector 3.1.0, MixAI TV for Android TV 2.4.0, Tizen 2.5.0, `@mmo/ui` 1.1.0,
+design tokens 1.5.0. Brand book: [`brand/BRAND.md`](brand/BRAND.md). Decisions: ADR-0016, tracker D74 and D78.
+Nothing was sent to a store and no release was cut.
+
+- **One mark, one family.** The idea is "many sources, one signal": lines are the sources, one dot is the signal.
+  The family mark is an M made of two streams and a dot. Each product has its own glyph in the same grammar and
+  its own colour: TV, Music, Decks, Live, Studio, Key & BPM, Server, Connector. The five different marks used
+  before are archived in `brand/archive/2026-11-12/`.
+- **Names.** "MixAI Companion" is now **MixAI Server** and "MixAI downloader" is **MixAI Connector**, in every
+  text a person sees, in Romanian and English: web app (messages and 70 files of hard-coded text), MixAI Decks,
+  the Android and Apple apps, the TV apps, the extension, the server itself. The generic word "companion" is gone
+  from the interface too ("Server offline", "Install MixAI Server"). "MixAI Key & BPM" has the same name in every
+  language. Unchanged on purpose: the app id, the data folder, the Windows program file `MixAI Companion.exe`,
+  API paths and the network service type, so updates keep pairing, firewall permission and shortcuts.
+- **Product colours** are design tokens (`--product-*`, `--mark-*`), each with a value for dark and for light
+  surfaces. They are identity only (icon, start screen, wordmark, product page); the accent of the interface is
+  still your choice. Contrast is checked by a gate: 87 pairings, 0 WCAG 2.2 AA failures, lowest 5.41:1.
+- **One generator** (`node brand/scripts/build.mjs`) draws every icon, start screen, store graphic and code
+  module from `brand/src`: 496 files for web, Android, Apple, Windows, macOS, Linux, Tizen, webOS, the extension
+  and the server tray. A drift gate (commit hook and CI) rejects a committed file that the generator would draw
+  differently. The per-app icon scripts are removed, and the Tauri icons are committed instead of being built in CI.
+- **Logo motion** from one definition: intro, loading, success, error, press and morph, as CSS, animated SVG,
+  Android splash drawables, Compose and SwiftUI code. Each starts and ends on the still mark and has a
+  reduced-motion variant. In use now: intro on the Android splash and the MixAI Decks page, loading on the start
+  screens, press on the logo links of the web app. The morph from the start screen into the first screen is not
+  wired yet (it is being redesigned); screens fade.
+- **Startup sound** on the TV apps (Android TV, Apple TV, Tizen / webOS / TV for desktop): two notes that become
+  one, 1.4 s, synthesised, with a setting to turn it off. Phones stay silent.
+- **Web.** Every host has its own icons, manifest and share image (suite, TV, Music, Live, Decks, Studio).
+  `mixai.ro`: the orbit shows the real app icons around a core in the MixAI Server colour, each sentence of the
+  title keeps its own line on phones too, cards lift on hover again (the entrance animation used to cancel it),
+  hover borders keep the product hue, and the sections below the fold animate when they scroll into view.
+  `decks.mixai.ro` shows the MixAI Decks mark with its intro.
+- **MixAI Server**: download files are named `MixAI-Server-…`; a release starts only from a `companion-v*` tag or
+  a manual run (a push to `main` no longer starts one). The start screen fades out under reduced motion too
+  (it used to cut).
+- **Not verified yet:** the Apple apps are not compiled with these changes; the Tauri, Electron and Compose
+  desktop packages are not built; the startup sound and the splash were not checked on real devices; the suite
+  and Decks pages were checked on a local production build, not on the live hosts.
+
 ## MixAI Live — safe and correct, part 2 (WP21-18, 2026-11-12)
 
 Engine 0.1.0 (unreleased). Three more defects from the reality check, each with a test that failed before the

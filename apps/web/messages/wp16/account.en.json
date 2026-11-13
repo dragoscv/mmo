@@ -11,14 +11,14 @@
         "whatTitle": "What gets deleted",
         "what": {
             "account": "Your account, sign-in methods and every active session (TVs, phones, browsers)",
-            "devices": "Paired MMO Servers, device tokens, push notification registrations",
+            "devices": "Paired MixAI Servers, device tokens, push notification registrations",
             "media": "Watch profiles, watch history, ratings, collections, playlists, listening history and library metadata synced to the cloud",
             "ai": "AI connections and keys, generated audio, projects and saved settings",
             "billing": "Your Stripe customer record (an active subscription is cancelled)",
             "apple": "Sign in with Apple: we revoke MixAI's access to your Apple ID"
         },
         "keepTitle": "What is not affected",
-        "keep": "Files on your own computer or MMO Server stay where they are — MixAI never uploads your media library. Invoices we are legally required to keep are retained for the statutory period without being linked to an active account.",
+        "keep": "Files on your own computer or MixAI Server stay where they are — MixAI never uploads your media library. Invoices we are legally required to keep are retained for the statutory period without being linked to an active account.",
         "timing": "Deletion happens immediately. Backups roll over within 30 days.",
         "signedInAs": "Signed in as {email}",
         "signedInAsUnknown": "You are signed in",

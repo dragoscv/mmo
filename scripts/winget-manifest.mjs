@@ -1,4 +1,4 @@
-// winget manifest for MixAI Server (Companion) from a published GitHub release (WP17-52).
+// winget manifest for MixAI Server from a published GitHub release (WP17-52).
 //   node scripts/winget-manifest.mjs [version]   -> packaging/winget/manifests/m/MixAI/Server/<version>/*.yaml
 // Reads the NSIS installer asset of release v<version> (default: server/package.json version), downloads it to hash
 // it (SHA-256, as winget requires), and writes the 3-file multi-manifest (version, installer, defaultLocale en-US).
@@ -62,7 +62,7 @@ PackageUrl: https://mixai.ro
 License: AGPL-3.0-or-later
 LicenseUrl: https://github.com/${repo}/blob/main/LICENSE
 ShortDescription: Self-hosted media server for the MixAI apps (TV, Music, Studio, DJ).
-Description: MixAI Server (MixAI Companion) serves your own movies, series, music, Live TV sources and recordings to the MixAI apps on TVs, phones, desktop and the web. Your library stays on your computer.
+Description: MixAI Server serves your own movies, series, music, Live TV sources and recordings to the MixAI apps on TVs, phones, desktop and the web. Your library stays on your computer.
 Moniker: mixai-server
 Tags:
   - media-server

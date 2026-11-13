@@ -65,8 +65,8 @@
         "category": "Music",
         "shortDescription": "MixAI Decks — native DJ software",
         "longDescription": "MixAI Decks is the native DJ application of the mixai.ro suite: low-latency Rust audio engine, themeable animated UI, broad controller support, and mixai.ro library + AI integration.",
-        "copyright": "© mwrty",
-        "publisher": "mwrty",
+        "copyright": "© 2026 MixAI",
+        "publisher": "MixAI",
         "homepage": "https://decks.mixai.ro",
         "icon": [
             "icons/32x32.png",

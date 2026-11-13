@@ -8,7 +8,6 @@
         "tauri": "tauri",
         "tauri:dev": "tauri dev",
         "tauri:build": "tauri build --no-bundle",
-        "tauri:icon": "tauri icon ../ios/MixAIMusic/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
         "test:launcher": "node --test web/launcher.test.mjs",
         "msix": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-msix.ps1"
     },

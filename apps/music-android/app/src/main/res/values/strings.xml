@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">MixAI Music</string>
-    <string name="welcome_tagline">The music on your own MMO Server: albums, playlists, radio and lyrics, everywhere.</string>
+    <string name="welcome_tagline">The music on your own MixAI Server: albums, playlists, radio and lyrics, everywhere.</string>
     <string name="tab_home">Music</string>
     <string name="tab_search">Search</string>
     <string name="tab_settings">Settings</string>

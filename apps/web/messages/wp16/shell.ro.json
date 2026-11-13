@@ -31,11 +31,11 @@
         "addFailed": "Nu am putut adăuga {server} în contul tău"
     },
     "noServer": {
-        "title": "Asociază mai întâi un MMO Server",
-        "body": "Filmele, serialele, muzica și TV-ul live vin de pe propriul tău MMO Server. Asociază unul și apare aici.",
+        "title": "Asociază mai întâi un MixAI Server",
+        "body": "Filmele, serialele, muzica și TV-ul live vin de pe propriul tău MixAI Server. Asociază unul și apare aici.",
         "cta": "Asociază un server",
-        "guestTitle": "Conectează-te la serverul tău MMO",
-        "guestBody": "Muzica, filmele și TV-ul live vin de pe propriul tău MMO Server. Conectează acest browser la el, încearcă demo-ul sau autentifică-te ca să folosești serverele din cont.",
+        "guestTitle": "Conectează-te la serverul tău MixAI",
+        "guestBody": "Muzica, filmele și TV-ul live vin de pe propriul tău MixAI Server. Conectează acest browser la el, încearcă demo-ul sau autentifică-te ca să folosești serverele din cont.",
         "connect": "Conectează-te la un server",
         "demo": "Încearcă demo-ul",
         "signIn": "Autentificare"

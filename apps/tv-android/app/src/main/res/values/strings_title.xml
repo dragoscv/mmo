@@ -25,7 +25,7 @@
     <string name="wp16_title_play_failed">Could not start playback: %1$s</string>
     <string name="wp16_title_back">Back</string>
     <string name="wp16_title_error">Could not load this title</string>
-    <string name="wp16_title_tmdb_missing">TMDB is not configured on the server. Add a TMDB key in MMO Server settings.</string>
+    <string name="wp16_title_tmdb_missing">TMDB is not configured on the server. Add a TMDB key in MixAI Server settings.</string>
     <string name="wp16_title_age_title">This one is not for this profile</string>
     <string name="wp16_title_age_message">It is rated for older viewers. Pick something else, or ask a grown-up to switch profiles.</string>
     <string name="wp16_title_seasons">%1$d seasons</string>

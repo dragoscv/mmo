@@ -89,7 +89,9 @@ run_remote "cd '$MAC_DIR' \
      fi"
 
 # Free port 17899 — the installed Companion binds it on launch.
-run_remote "pkill -TERM -f '/Applications/MMO Companion.app' 2>/dev/null || true; sleep 2"
+run_remote "pkill -TERM -f '/Applications/MixAI Server.app' 2>/dev/null || true; \
+            pkill -TERM -f '/Applications/MixAI Companion.app' 2>/dev/null || true; \
+            pkill -TERM -f '/Applications/MMO Companion.app' 2>/dev/null || true; sleep 2"
 
 if [ "$WATCH_MODE" = "1" ]; then
   echo "[dev] starting tsc --watch on the VM"

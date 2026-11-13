@@ -1,11 +1,12 @@
 /**
- * Settings sections other than Profiles (WP16-33): Playback, Subtitles, Language, Navigation, Screen format,
+ * Settings sections other than Profiles (WP16-33): Playback, Subtitles, Language, Navigation, Screen format, Sound,
  * Server, Account, Cache, Watch Together device name, About/diagnostics. Profile prefs are written with
  * `ctx.profiles.update(id, {prefs})` (server merges) and mirrored locally for the Player's first frame.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../../i18n/messages";
 import { useLocale } from "../../i18n/useLocale";
+import { setStartupSound, startupSoundEnabled } from "../../lib/brand-sound";
 import { APP_VERSION } from "../../lib/device-auth";
 import type { HubStatus } from "../../lib/hub";
 import { clearLoaded } from "../../lib/image";
@@ -140,6 +141,17 @@ export function ScreenSection() {
         <Section title={t("set.screen")} sub={t("set.screenSub")} testId="set-screen">
             <ChipRow label={t("pl.format")} rowId="set-format" value={fmt} items={items} onChange={(id) => setFmt(id as ScreenFormatKey)} />
             <Note>{t("set.screenNow", { w: window.innerWidth, h: window.innerHeight, k: k === 1 ? "1" : k.toFixed(3) })}</Note>
+        </Section>
+    );
+}
+
+/** Per-TV sounds (shared prefs blob, not a profile pref): the brand signature played once when the app starts. */
+export function SoundSection() {
+    const [startup, setStartup] = useState(() => startupSoundEnabled());
+    return (
+        <Section title={t("set.sound")} sub={t("set.soundSub")} testId="set-sound">
+            <ToggleRow label={t("set.startupSound")} sub={t("set.startupSoundSub")} checked={startup}
+                onChange={(v) => { setStartupSound(v); setStartup(v); }} focusKey="set:snd:startup" testId="set-startup-sound" />
         </Section>
     );
 }

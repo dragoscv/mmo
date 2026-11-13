@@ -38,7 +38,7 @@ Copy-Item $exe $layout
 $icons = Join-Path $app 'src-tauri\icons'
 foreach ($n in 'StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png', 'Square310x310Logo.png') {
     $src = Join-Path $icons $n
-    if (-not (Test-Path $src)) { throw "missing icon $src - run 'pnpm tauri icon <png>'" }
+    if (-not (Test-Path $src)) { throw "missing icon $src - regenerate with 'node brand/scripts/build.mjs' (repo root)" }
     Copy-Item $src (Join-Path $layout "Assets\$n")
 }
 $manifest = Get-Content (Join-Path $app 'packaging\msix\AppxManifest.xml') -Raw

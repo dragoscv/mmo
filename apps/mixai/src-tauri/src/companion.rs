@@ -242,7 +242,7 @@ pub async fn companion_tracks(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured (missing device token or user id)".into());
+            return Err("Server not configured (missing device token or user id)".into());
         }
         (
             cfg.base().to_string(),
@@ -270,7 +270,7 @@ pub async fn companion_tracks(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     let parsed: TracksResp = resp.json().await.map_err(|e| e.to_string())?;
 
@@ -314,7 +314,7 @@ pub async fn companion_track_peaks(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -333,7 +333,7 @@ pub async fn companion_track_peaks(
         return Ok(tauri::ipc::Response::new(Vec::new()));
     }
     if !resp.status().is_success() {
-        return Err(format!("companion {}", resp.status()));
+        return Err(format!("server {}", resp.status()));
     }
     // The sidecar is ~8 kB; refuse anything absurd instead of buffering it for the webview.
     read_capped(resp, MAX_PEAKS_BYTES, "peaks sidecar too large")
@@ -350,7 +350,7 @@ pub async fn companion_toggle_favorite(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -367,7 +367,7 @@ pub async fn companion_toggle_favorite(
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Err(format!("companion {}", resp.status()));
+        return Err(format!("server {}", resp.status()));
     }
     #[derive(Deserialize)]
     struct FavResp {
@@ -439,7 +439,7 @@ pub async fn companion_track_stems(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -458,7 +458,7 @@ pub async fn companion_track_stems(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     let t = resp
         .json::<TrackDetailResp>()
@@ -485,7 +485,7 @@ pub async fn companion_request_stems(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -509,7 +509,7 @@ pub async fn companion_request_stems(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     #[derive(Deserialize)]
     struct Job {
@@ -541,7 +541,7 @@ pub async fn companion_stem_job(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -560,7 +560,7 @@ pub async fn companion_stem_job(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     #[derive(Deserialize)]
     struct StemsData {
@@ -616,7 +616,7 @@ pub async fn companion_get_profile(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -635,7 +635,7 @@ pub async fn companion_get_profile(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     #[derive(Deserialize)]
     struct ProfileResp {
@@ -656,7 +656,7 @@ pub async fn companion_put_profile(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -678,7 +678,7 @@ pub async fn companion_put_profile(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     Ok(())
 }
@@ -707,7 +707,7 @@ pub async fn fetch_track_audio(
     let (base, token, user) = {
         let cfg = state.0.lock().unwrap();
         if cfg.device_token.is_empty() || cfg.user_id.is_empty() {
-            return Err("Companion not configured".into());
+            return Err("Server not configured".into());
         }
         (
             cfg.base().to_string(),
@@ -752,11 +752,11 @@ pub async fn fetch_track_audio(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("companion {status}: {body}"));
+        return Err(format!("server {status}: {body}"));
     }
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?.to_vec();
     if bytes.is_empty() {
-        return Err("companion returned empty audio".into());
+        return Err("server returned empty audio".into());
     }
     Ok(RemoteAudio { bytes, ext })
 }

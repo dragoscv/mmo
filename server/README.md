@@ -1,6 +1,10 @@
-# 🖥️ MixAI Companion — Setup pentru dezvoltatori
+# 🖥️ MixAI Server — Setup pentru dezvoltatori
 
-> Setup, comenzi și convenții pentru lucrul la **MixAI Companion** (Electron desktop, `server/`).
+> Setup, comenzi și convenții pentru lucrul la **MixAI Server** (aplicație desktop Electron + nucleu headless, `server/`).
+> Numele văzut de utilizator este **MixAI Server** (ADR-0016). „MMO Server” rămâne doar numele tehnic: pachetul
+> `mmo-server`, API-ul din `openapi.yaml`, imaginile Docker, serviciul mDNS `_mmo-companion._tcp`. „Companion” mai apare
+> doar în identificatori vechi (`appId` `ro.mixai.companion`, folderul de date `mixai-companion`, numele fișierelor de
+> instalare, tag-urile `companion-v*`).
 > Pentru ghidul utilizatorului → [`docs/companion/`](../docs/companion/).
 > Pentru arhitectura globală → [`docs/arhitectura/`](../docs/arhitectura/).
 
@@ -8,7 +12,7 @@
 
 ---
 
-## 🎯 Ce este Companion-ul
+## 🎯 Ce este MixAI Server
 
 App Electron desktop care rulează în background și expune un **server HTTP local pe `127.0.0.1:17899`**. Web app-ul (din browser) îl detectează la încărcare și activează features care necesită access nativ:
 
@@ -28,7 +32,7 @@ pnpm install
 pnpm dev                            # compilează TS + pornește Electron
 ```
 
-Companion-ul va porni cu o fereastră (UI minimal în `ui/`) și un server HTTP pe `127.0.0.1:17899`.
+MixAI Server pornește cu o fereastră (UI în `ui/`), o iconiță în system tray și un server HTTP pe `127.0.0.1:17899`.
 
 Verifică că funcționează:
 ```bash
@@ -107,7 +111,9 @@ server/
 │   └── audio/               Native audio (audify) — playback, recording, devices
 ├── ui/                      Renderer Vite 8 + React 19 pe @mmo/ui (src/, vite.config.ts, tsconfig.json)
 │   └── dist/                Build renderer (gitignored) — încărcat de main.ts, împachetat în asar
-├── assets/                  Iconuri (icon.png pentru toate platformele)
+├── assets/                  Iconuri GENERATE de `node brand/scripts/build.mjs` (nu se editează manual): icon.png/.svg
+│                            (aplicație + installer), tray.png + tray@2x.png (tray Windows/Linux, 16/32 px),
+│                            trayTemplate.png + @2x (bara de meniu macOS, negru + alpha)
 ├── scripts/
 │   └── mac-adhoc-sign.js    Ad-hoc signing pentru macOS dist
 ├── release/                 Build output (gitignored)
@@ -155,7 +161,7 @@ server/
 
 ## 🎧 OpenSubsonic API (`/rest/*`)
 
-MMO Server expune API-ul Subsonic 1.16.1 + extensii OpenSubsonic (ADR-0005), deci
+MixAI Server expune API-ul Subsonic 1.16.1 + extensii OpenSubsonic (ADR-0005), deci
 orice client Subsonic (Symfonium, Feishin, Amperfy, DSub, Supersonic, Music
 Assistant…) poate reda biblioteca direct. Cod în `src/subsonic/`.
 
@@ -194,7 +200,7 @@ Ghid utilizator: `docs/aplicatie/opensubsonic.md`.
 
 ### Push relay
 
-Companion-ul anunță evenimente aplicației web, care le trimite pe telefoane (FCM v1 / APNs). Contract:
+MixAI Server anunță evenimente aplicației web, care le trimite pe telefoane (FCM v1 / APNs). Contract:
 
 ```http
 POST {webAppUrl}/api/push/relay
@@ -204,7 +210,7 @@ Content-Type: application/json
 {
    "event": "recording.done" | "recording.failed" | "download.ready" | "episode.new",
    "eventId": "uuid v4 (idempotency key — relay must dedupe on it)",
-   "serverId": "<companion deviceId>",
+   "serverId": "<server deviceId>",
    "at": 1762300000000,
    "profileId": "p_x",                         # optional: only that profile's phones
    "title": "Recording ready",
@@ -214,9 +220,9 @@ Content-Type: application/json
 }
 ```
 
-- Răspuns așteptat `2xx` (corp ignorat). `401/403` ⇒ companion-ul oprește relay-ul până se schimbă tokenul;
+- Răspuns așteptat `2xx` (corp ignorat). `401/403` ⇒ serverul oprește relay-ul până se schimbă tokenul;
    alte `4xx` sunt finale; `429`/`5xx`/rețea ⇒ 3 încercări (0, 1 s, 4 s).
-- Debounce în companion: același `(event, deepLink, profileId)` max o dată pe minut; `episode.new` o dată la
+- Debounce în server: același `(event, deepLink, profileId)` max o dată pe minut; `episode.new` o dată la
    10 min per serial + profil (un sezon întreg = un push). No-op fără `webAppUrl` sau device token.
 - `episode.new` pleacă pentru fiecare profil care are serialul în watchlist când un episod nou intră în bibliotecă.
 - Cod: `src/media/push-relay.ts`; legături în `server.ts` (DVR `onRecordingFinished`, download cache `onReady`,
@@ -229,7 +235,7 @@ Content-Type: application/json
 - HTTP **doar pe loopback** (`127.0.0.1`), niciodată pe `0.0.0.0`
 - CORS **allowlist** pentru web app origin
 - Path validation: nu acceptăm path-uri cu `..` sau care nu sunt sub root configurat
-- Device token: companion cere un JWT de la web app la pornire și îl include în request-uri inițiate de companion → web app
+- Device token: serverul cere un JWT de la web app la pornire și îl include în request-urile pe care le inițiază către web app
 - macOS: ad-hoc signing (`scripts/mac-adhoc-sign.js`) — nu Apple Developer ID, deci utilizatorul vede warning Gatekeeper la prima rulare
 - Auto-update verifică signature din GitHub Releases
 
@@ -238,15 +244,23 @@ Content-Type: application/json
 ## 🚢 Release flow
 
 1. Bump versiunea în `server/package.json` (`3.0.0` → `3.0.1`) + intrare în `server/CHANGELOG.md`
-2. Commit + push pe `main`
-3. Workflow-ul `.github/workflows/companion-release.yml` pornește automat (job `detect`: build doar
-   dacă nu există deja release `v<version>`)
+2. Commit + push pe `main` — **nu lansează nimic** (din 2026-11-12, WP22-10: lansarea e un pas explicit)
+3. Lansare: tag `companion-v<versiune>` pe commit-ul dorit (`git tag companion-v3.0.1; git push origin
+   companion-v3.0.1`) sau pornire manuală din Actions (`workflow_dispatch`, `publish=true`). Workflow-ul
+   `.github/workflows/companion-release.yml` verifică întâi că tag-ul = versiunea din `package.json`, apoi:
    - Node 24 + pnpm 10, cache `~/.cache/electron` + `electron-builder`
    - `pnpm build` (Vite renderer → `ui/dist` + `tsc`), apoi `electron-builder` per OS
    - Upload în GitHub Releases la `dragoscv/mmo`
 4. Utilizatorii primesc notificare auto-update la următoarea pornire (sau în 24h)
 
 > **Notă**: electron-builder folosește versiunea din `package.json` ca tag git (`v3.0.0`), nu un custom prefix.
+>
+> **Nume de fișiere**: produsul se numește „MixAI Server” (`build.productName`: titlu installer, shortcut-uri, Add/Remove
+> Programs, `MixAI Server.app`) și de la 3.16.0 fișierele publicate poartă același nume
+> (`MixAI-Server-Setup-X.Y.Z.exe`, `MixAI-Server-X.Y.Z-<arch>.dmg|zip|AppImage|deb|rpm`; GitHub pune `-` în locul
+> spațiului). Doar executabilul instalat pe Windows rămâne `MixAI Companion.exe` (`win.executableName`), ca regulile
+> Windows Firewall și shortcut-urile fixate ale instalărilor existente să rămână valabile după auto-update. Folderul
+> de date (`mixai-companion`) și id-ul aplicației (`ro.mixai.companion`) nu se schimbă.
 
 ---
 

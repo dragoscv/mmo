@@ -19,6 +19,10 @@ Capacitor shell in the stores under the same application id.
 - Theme: `ui/theme/Tokens.kt` is **generated** by `packages/design-tokens` (`pnpm tokens:build`, dark `Tokens` +
   `TokensLight`); never hand-edit it. Fonts: Space Grotesk + Inter variable TTF (SIL OFL 1.1, licences in
   `src/main/assets/licenses`). Dynamic colour is off (brand).
+- Brand: launcher icon (adaptive + monochrome layer), `drawable/avd_brand_intro.xml`, `drawable/ic_stat_mixai.xml`
+  and `values/brand.xml` are **generated** by `brand/scripts/build.mjs` (ADR-0016); never hand-edit them. The
+  system splash (`Theme.MixaiPhone.Starting`) plays `avd_brand_intro` for `@integer/brand_intro_ms` on
+  `@color/brand_canvas`. In-app the mark is `BrandMark` from `:mobile-common` (`ro.mixai.mobile.theme`).
 - Strings: `res/values/strings*.xml` + `res/values-ro/strings*.xml`, identical key sets.
 
 ## Build (Windows)

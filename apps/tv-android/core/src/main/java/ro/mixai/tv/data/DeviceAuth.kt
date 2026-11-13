@@ -33,7 +33,7 @@ data class SessionUser(val id: String, val name: String? = null, val image: Stri
 @Serializable
 data class CompanionServer(
     val id: String = "",
-    val name: String = "MMO Server",
+    val name: String = "MixAI Server",
     val lanUrl: String? = null,
     val apiUrl: String? = null,
     val tunnelHostname: String? = null,

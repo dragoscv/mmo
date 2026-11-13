@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="color-scheme" content="dark light">
-    <title data-i18n="optionsTitle">MixAI Downloader – Settings</title>
+    <title data-i18n="optionsTitle">MixAI Connector – Settings</title>
     <script>
         // Options page cannot read the site's localStorage; follow the OS scheme.
         var m = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
@@ -38,7 +38,9 @@
         }
 
         .logo {
-            font-size: 20px;
+            width: 24px;
+            height: 24px;
+            display: block;
         }
 
         .field {
@@ -151,7 +153,7 @@
 </head>
 
 <body>
-    <h1><span class="logo">🎧</span> <span data-i18n="optionsHeading">MixAI Downloader settings</span></h1>
+    <h1><img class="logo" src="icons/icon48.png" width="24" height="24" alt=""> <span data-i18n="optionsHeading">MixAI Connector settings</span></h1>
 
     <div class="field">
         <label for="baseUrl" data-i18n="baseUrlLabel">MixAI app base URL</label>

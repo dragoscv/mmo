@@ -3,7 +3,7 @@
     <!-- Statistici familie (WP16-46 item 8) -->
     <string name="family_title">Familie</string>
     <string name="family_empty_title">Niciun profil încă</string>
-    <string name="family_empty_hint">Creează profiluri pe serverul MMO ca să vezi timpul de vizionare și de ascultare al fiecăruia.</string>
+    <string name="family_empty_hint">Creează profiluri pe MixAI Server ca să vezi timpul de vizionare și de ascultare al fiecăruia.</string>
     <string name="family_kid_badge">Copil</string>
     <string name="family_minutes">%1$d min</string>
     <string name="family_hours_minutes">%1$d h %2$02d min</string>
@@ -20,7 +20,7 @@
 
     <!-- Import Plex (WP16-46 item 9) -->
     <string name="plex_title">Import din Plex</string>
-    <string name="plex_intro">Importă istoricul de vizionare, notele și lista de urmărit din Plex în profilul curent. Tokenul Plex este trimis o singură dată către serverul tău MMO pentru acest import și nu este stocat niciodată.</string>
+    <string name="plex_intro">Importă istoricul de vizionare, notele și lista de urmărit din Plex în profilul curent. Tokenul Plex este trimis o singură dată către MixAI Server pentru acest import și nu este stocat niciodată.</string>
     <string name="plex_token_hint_title">Cum găsești tokenul Plex</string>
     <string name="plex_token_hint">În Plex Web, deschide orice element media, alege Get Info, apoi View XML. Adresa paginii care se deschide se termină cu X-Plex-Token=… — copiază valoarea de după semnul egal.</string>
     <string name="plex_profile_line">Import în profilul: %1$s</string>
@@ -43,7 +43,7 @@
     <string name="plex_error_401">Plex a refuzat tokenul.</string>
     <string name="plex_error_403">Doar proprietarul serverului poate importa.</string>
     <string name="plex_error_404">Serverul Plex nu a fost găsit.</string>
-    <string name="plex_error_502">Serverul MMO nu a putut contacta Plex.</string>
+    <string name="plex_error_502">MixAI Server nu a putut contacta Plex.</string>
     <string name="plex_error_generic">Importul a eșuat (HTTP %1$d).</string>
-    <string name="plex_error_network">Serverul MMO nu poate fi contactat. Verifică conexiunea și încearcă din nou.</string>
+    <string name="plex_error_network">MixAI Server nu poate fi contactat. Verifică conexiunea și încearcă din nou.</string>
 </resources>

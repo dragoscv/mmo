@@ -12,6 +12,6 @@
     <string name="home_empty_title">Încă nu e nimic aici</string>
     <string name="home_empty_hint">Adaugă filme și seriale în biblioteca serverului sau trage în jos pentru reîmprospătare.</string>
     <string name="home_not_configured_title">Media Home nu este configurat</string>
-    <string name="home_not_configured_hint">Configurează o cheie TMDB pe MMO Server (Setări, Media) ca să vezi aici recomandări și biblioteca ta.</string>
+    <string name="home_not_configured_hint">Configurează o cheie TMDB pe MixAI Server (Setări, Media) ca să vezi aici recomandări și biblioteca ta.</string>
     <string name="home_refresh">Reîmprospătează</string>
 </resources>

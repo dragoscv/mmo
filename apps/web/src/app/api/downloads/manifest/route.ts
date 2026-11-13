@@ -6,9 +6,9 @@
  * channel and platform, with direct download URLs.
  *
  * Sources:
- *   - Companion: latest GitHub release whose tag starts with `v` and that
+ *   - MixAI Server: latest GitHub release whose tag starts with `v` and that
  *     ships .exe/.dmg/.AppImage/.deb/.rpm assets.
- *   - Browser extension: latest release whose tag starts with `extension-v`.
+ *   - MixAI Connector (browser extension): latest release whose tag starts with `extension-v`.
  *   - Native shells: latest release whose tag starts with `native-v`.
  *   - Extension store URLs: static (no API call needed).
  *
@@ -77,7 +77,7 @@ interface PlatformAsset {
     format: string;
 }
 interface Channel {
-    id: "companion" | "native" | "extension";
+    id: "companion" | "native" | "extension" | "music";
     name: string;
     version: string | null;
     releaseUrl: string | null;
@@ -202,7 +202,7 @@ function buildChannel(
     return {
         id,
         name,
-        version: found.tag_name.replace(/^(companion-|native-|extension-)?v/, ""),
+        version: found.tag_name.replace(/^(companion-|native-|extension-|music-desktop-)?v/, ""),
         releaseUrl: found.html_url,
         publishedAt: found.published_at,
         assets,
@@ -212,12 +212,12 @@ function buildChannel(
 export async function GET() {
     const releases = await fetchReleases();
 
-    // Companion: bare `v0.9.12`-style tags (electron-builder convention),
+    // MixAI Server (channel id stays `companion`): bare `v0.9.12`-style tags (electron-builder convention),
     // and we require at least one electron-style installer asset so we
     // don't grab a tag that belongs to a different component.
     const companion = buildChannel(
         "companion",
-        "MMO Companion (local audio server)",
+        "MixAI Server",
         releases,
         /^v\d/,
         (a) => /\.(exe|dmg|appimage|deb|rpm)$/i.test(a.name)
@@ -225,16 +225,24 @@ export async function GET() {
 
     const native = buildChannel(
         "native",
-        "MMO Native (desktop + mobile)",
+        "MixAI Studio (desktop + mobile)",
         releases,
         /^native-v/
     );
 
     const extension = buildChannel(
         "extension",
-        "MMO Browser Extension",
+        "MixAI Connector",
         releases,
         /^extension-v/
+    );
+
+    // MixAI Music desktop (Tauri). Windows + macOS ship through the stores; GitHub carries the Linux build.
+    const music = buildChannel(
+        "music",
+        "MixAI Music (desktop)",
+        releases,
+        /^music-desktop-v/
     );
 
     // Web-store URLs are stable; we expose them even when there's no
@@ -266,7 +274,7 @@ export async function GET() {
 
     return NextResponse.json(
         {
-            channels: { companion, native, extension },
+            channels: { companion, native, extension, music },
             extensionStores,
             mobileStores,
             generatedAt: new Date().toISOString(),

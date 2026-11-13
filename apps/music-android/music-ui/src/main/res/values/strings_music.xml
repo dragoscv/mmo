@@ -12,7 +12,7 @@
     <string name="music_row_random">Discover</string>
     <string name="music_shuffle_all">Shuffle all</string>
     <string name="music_empty_title">No music library yet</string>
-    <string name="music_empty_hint">Add a music folder in MMO Server (Settings, Libraries). Albums and artists appear here after the scan.</string>
+    <string name="music_empty_hint">Add a music folder in MixAI Server (Settings, Libraries). Albums and artists appear here after the scan.</string>
     <string name="music_no_artists">No artists</string>
     <string name="music_no_albums">No albums</string>
     <string name="music_no_playlists">No playlists</string>

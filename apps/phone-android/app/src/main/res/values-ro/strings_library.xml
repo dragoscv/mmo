@@ -14,7 +14,7 @@
     <string name="library_decade_value">Anii %1$d</string>
     <string name="library_unwatched">Nevăzute</string>
     <string name="library_empty_title">Biblioteca ta este goală</string>
-    <string name="library_empty_hint">Adaugă foldere cu filme și seriale în MMO Server, apoi lasă-l să le scaneze.</string>
+    <string name="library_empty_hint">Adaugă foldere cu filme și seriale în MixAI Server, apoi lasă-l să le scaneze.</string>
     <string name="library_empty_kind">Încă nu ai titluri de acest tip în bibliotecă</string>
     <string name="library_no_match">Niciun titlu nu corespunde filtrelor</string>
     <string name="library_clear_filters">Șterge filtrele</string>

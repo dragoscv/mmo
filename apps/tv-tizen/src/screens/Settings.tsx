@@ -12,18 +12,18 @@ import { Icon, ScreenHeader, useBackdrop, type IconName } from "../ui";
 import { ProfilesSection } from "./settings/ProfilesSection";
 import {
     AboutSection, AccountSection, CacheSection, LanguageSection, NavigationSection, PlaybackSection, ScreenSection,
-    ServerSection, SubtitlesSection, TogetherSection,
+    ServerSection, SoundSection, SubtitlesSection, TogetherSection,
 } from "./settings/Sections";
 import "./settings/settings.css";
 
 export const SECTIONS = [
-    "profiles", "playback", "subtitles", "language", "navigation", "screen", "together", "server", "account", "cache", "about",
+    "profiles", "playback", "subtitles", "language", "navigation", "screen", "sound", "together", "server", "account", "cache", "about",
 ] as const;
 export type SectionId = (typeof SECTIONS)[number];
 
 const ICONS: Record<SectionId, IconName> = {
     profiles: "user", playback: "play", subtitles: "subtitles", language: "chevronRight", navigation: "queue", screen: "aspect",
-    together: "group", server: "server", account: "lock", cache: "refresh", about: "info",
+    sound: "audio", together: "group", server: "server", account: "lock", cache: "refresh", about: "info",
 };
 
 function asSection(s: string | undefined): SectionId {
@@ -71,6 +71,7 @@ export function Settings({ ctx, params }: ScreenProps<"settings">) {
                     {section === "language" && <LanguageSection />}
                     {section === "navigation" && <NavigationSection />}
                     {section === "screen" && <ScreenSection />}
+                    {section === "sound" && <SoundSection />}
                     {section === "together" && <TogetherSection ctx={ctx} />}
                     {section === "server" && <ServerSection ctx={ctx} />}
                     {section === "account" && <AccountSection ctx={ctx} />}

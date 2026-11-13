@@ -7,7 +7,7 @@
     <string name="action_retry">Reîncearcă</string>
     <string name="common_nothing_yet">nimic încă</string>
     <string name="common_row_error">eroare: %1$s</string>
-    <string name="common_mmo_server">MMO Server</string>
+    <string name="common_mmo_server">MixAI Server</string>
     <string name="common_saved_server">Server salvat</string>
     <string name="common_your_code">Codul tău</string>
     <string name="common_expires_in">Expiră în %1$d:%2$02d</string>
@@ -19,7 +19,7 @@
     <string name="welcome_signin_desc">Un cod pe ecran, îl confirmi de pe telefon. Serverele tale apar automat.</string>
     <string name="welcome_recommended">Recomandat</string>
     <string name="welcome_local_title">Conectare la un server din această rețea</string>
-    <string name="welcome_local_desc">Caută MMO Server în rețeaua locală și împerechează cu un cod de 6 cifre.</string>
+    <string name="welcome_local_desc">Caută MixAI Server în rețeaua locală și împerechează cu un cod de 6 cifre.</string>
 
     <!-- Sign in (device code) -->
     <string name="signin_title">Conectare cu contul MixAI</string>
@@ -38,7 +38,7 @@
     <string name="signin_err_invalid">Răspuns invalid de la %1$s</string>
 
     <!-- Discover (LAN) -->
-    <string name="discover_scanning">Se caută MMO Server în rețeaua locală…</string>
+    <string name="discover_scanning">Se caută MixAI Server în rețeaua locală…</string>
     <string name="discover_pick">Alege serverul la care vrei să te conectezi</string>
     <string name="discover_no_pairing">v%1$s · împerecherea nu e suportată</string>
     <string name="discover_quick">v%1$s · Quick Connect</string>
@@ -50,11 +50,11 @@
     <string name="pair_scan">Scanează cu telefonul sau deschide mixai.ro/pair\nși introdu codul</string>
     <string name="pair_waiting">Se așteaptă aprobarea…</string>
     <string name="pair_expired">Codul a expirat.</string>
-    <string name="pair_failed_hint">Serverul poate nu suportă încă Quick Connect — actualizează MMO Server sau introdu tokenul manual.</string>
+    <string name="pair_failed_hint">Serverul poate nu suportă încă Quick Connect — actualizează MixAI Server sau introdu tokenul manual.</string>
     <string name="pair_err_no_token">Serverul a aprobat fără token</string>
 
     <!-- Connect (manual) -->
-    <string name="connect_subtitle">Conectează-te la MMO Server din rețeaua locală</string>
+    <string name="connect_subtitle">Conectează-te la MixAI Server din rețeaua locală</string>
     <string name="connect_host_label">Server (IP sau http://host:17899)</string>
     <string name="connect_token_label">Device token (opțional — gol = împerechere cu cod)</string>
     <string name="connect_submit">Conectare</string>
@@ -77,7 +77,7 @@
     <string name="home_change_server">Schimbă serverul</string>
     <string name="home_sign_out">Deconectare din cont</string>
     <string name="home_movies_empty">Niciun film</string>
-    <string name="home_movies_empty_hint">Adaugă un folder Movies în MMO Server → Settings.</string>
+    <string name="home_movies_empty_hint">Adaugă un folder Movies în MixAI Server → Settings.</string>
     <string name="home_shows_empty">Niciun serial</string>
     <string name="home_shows_empty_hint">Episoadele sunt detectate din nume de fișier de tip S01E02.</string>
     <string name="home_albums_empty">Niciun album</string>
@@ -109,7 +109,7 @@
 
     <!-- Player -->
     <string name="player_error">Eroare la redare</string>
-    <string name="player_err_missing">Fișierul nu mai există pe disc. Rescanează biblioteca în MMO Server.</string>
+    <string name="player_err_missing">Fișierul nu mai există pe disc. Rescanează biblioteca în MixAI Server.</string>
     <string name="player_err_server">Serverul nu a putut porni redarea (HTTP %1$d).</string>
 
     <!-- Settings -->

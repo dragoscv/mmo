@@ -42,4 +42,5 @@ export * from "./components/sidebar";
 export * from "./components/bottom-tab-bar";
 export * from "./components/app-shell";
 export * from "./components/theme-settings";
+export * from "./brand/brand-mark";
 export * from "./lib/shortcuts-registry";

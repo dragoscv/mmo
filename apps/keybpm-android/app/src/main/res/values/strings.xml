@@ -75,7 +75,7 @@
     <string name="tempo_start">Start clock</string>
     <string name="tempo_stop">Stop clock</string>
     <string name="tempo_hint">Sends MIDI Start, 24 clock ticks per beat and Stop to the connected device.</string>
-    <string name="library_intro">Connect your MMO Server to see which of your own tracks mix well with what is playing. Optional — everything else works offline.</string>
+    <string name="library_intro">Connect your MixAI Server to see which of your own tracks mix well with what is playing. Optional — everything else works offline.</string>
     <string name="library_connect">Connect server</string>
     <string name="library_disconnect">Disconnect</string>
     <string name="library_need_reading">Listen to a song or open a file first.</string>

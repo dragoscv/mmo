@@ -3,7 +3,8 @@
   MixAI Music desktop — Microsoft Store MSIX (WP17-43). Wraps the shared scripts/package-msix.ps1.
 .DESCRIPTION
   Product 9PC31TGKW4FP. -IdentityName must be the Partner Center "Package/Identity/Name" (Product identity page).
-  Needs `pnpm tauri build --no-bundle` first (release exe) and `pnpm tauri:icon` (icons are gitignored).
+  Needs `pnpm tauri build --no-bundle` first (release exe). The Store icons in src-tauri/icons are committed;
+  regenerate with `node brand/scripts/build.mjs` (repo root) if one is missing.
   The mixai-music: protocol is declared through -Protocol (uap:Protocol extension) so links open the Store app.
 #>
 param(

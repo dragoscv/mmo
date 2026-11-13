@@ -24,6 +24,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import ro.mixai.tv.R
+import ro.mixai.tv.ui.theme.BrandMark
+import ro.mixai.tv.ui.theme.BrandProduct
 import ro.mixai.tv.ui.theme.Tokens
 import ro.mixai.tv.ui.theme.mixaiCardBorder
 import ro.mixai.tv.ui.theme.mixaiCardColors
@@ -37,7 +39,12 @@ fun WelcomeScreen(onSignIn: () -> Unit, onLocal: () -> Unit) {
 
     Box(Modifier.fillMaxSize().padding(64.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineLarge, color = Tokens.foreground)
+            // Mark on the title line: the column is as tall as the screen allows (2 cards of 260 dp on 540 dp).
+            // The title names the app, so the mark is decorative.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                BrandMark(product = BrandProduct.Tv, modifier = Modifier.size(40.dp), decorative = true)
+                Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineLarge, color = Tokens.foreground)
+            }
             Text(stringResource(R.string.welcome_subtitle), color = Tokens.mutedForeground)
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {

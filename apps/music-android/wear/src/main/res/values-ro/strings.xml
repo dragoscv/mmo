@@ -3,11 +3,11 @@
     <string name="app_name">MixAI Music</string>
     <string name="connect_title">Conectare</string>
     <string name="connect_from_phone">Folosește conexiunea telefonului</string>
-    <string name="connect_searching">Caut MMO Server în această rețea…</string>
+    <string name="connect_searching">Caut MixAI Server în această rețea…</string>
     <string name="connect_manual">Introdu adresa</string>
     <string name="connect_manual_hint">Adresa serverului, ex. 192.168.1.10</string>
     <string name="pair_code">Aprobă acest cod</string>
-    <string name="pair_hint">În MixAI Music pe telefon, pe mixai.ro sau în companion</string>
+    <string name="pair_hint">În MixAI Music pe telefon, pe mixai.ro sau în MixAI Server</string>
     <string name="pair_expired">Codul a expirat</string>
     <string name="pair_failed">Conectarea a eșuat: %1$s</string>
     <string name="action_retry">Reîncearcă</string>

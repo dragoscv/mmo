@@ -230,6 +230,7 @@ private fun Screen(
             tagline = stringResource(R.string.welcome_tagline),
             onSignIn = { nav.push(Dest.SignIn) },
             onLocal = { nav.push(Dest.Discover()) },
+            product = ro.mixai.mobile.theme.BrandProduct.Music,
         )
         Dest.SignIn -> SignInScreen(
             onSignedIn = { body, picked ->

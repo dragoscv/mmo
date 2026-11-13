@@ -71,6 +71,9 @@
     <string name="set_sub_off">Off</string>
     <string name="set_sub_forced_only">Forced subtitles only</string>
     <string name="set_sub_forced_hint">Shows only foreign-language parts and signs.</string>
+    <string name="set_sound">Sound</string>
+    <string name="set_startup_sound">Startup sound</string>
+    <string name="set_startup_sound_hint">A short sound when MixAI TV opens. It plays at the volume of the TV.</string>
 
     <!-- Subtitle style -->
     <string name="set_sub_size">Size</string>
@@ -101,7 +104,7 @@
     <string name="set_server_status">Status</string>
     <string name="set_server_recheck">Check again</string>
     <string name="set_change_server_title">Change server?</string>
-    <string name="set_change_server_body">This TV disconnects from the current MMO Server. Your account stays signed in.</string>
+    <string name="set_change_server_body">This TV disconnects from the current MixAI Server. Your account stays signed in.</string>
     <string name="set_livetv_sources">Live TV sources</string>
     <string name="set_livetv_sources_hint">M3U, Xtream and HDHomeRun sources live on the server.</string>
 

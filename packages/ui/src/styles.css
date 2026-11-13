@@ -6,6 +6,9 @@
  *   @source "../../packages/ui/src";    (so Tailwind sees the classes used by the components)
  */
 
+/* MixAI logo motion (generated from brand/src/motion.mjs). Used by <BrandMark animation> / <BrandLockup>. */
+@import "./brand/generated/logo.css";
+
 @layer base {
   * {
     border-color: var(--border);

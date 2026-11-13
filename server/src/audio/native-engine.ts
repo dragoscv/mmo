@@ -1,7 +1,7 @@
 /**
  * native-engine.ts
  *
- * Cross-platform low-latency audio engine for the MixAI Companion.
+ * Cross-platform low-latency audio engine for MixAI Server.
  * Uses RtAudio (via `audify`) for direct OS audio backend access:
  *   - Windows: WASAPI (shared/exclusive auto), ASIO if present
  *   - macOS:   Core Audio

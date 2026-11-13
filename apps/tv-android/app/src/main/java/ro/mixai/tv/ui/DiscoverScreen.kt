@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,8 @@ import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.PairInfo
 import ro.mixai.tv.data.discoverServers
+import ro.mixai.tv.ui.theme.BrandMark
+import ro.mixai.tv.ui.theme.BrandProduct
 import ro.mixai.tv.ui.theme.Tokens
 import ro.mixai.tv.ui.theme.mixaiCardBorder
 import ro.mixai.tv.ui.theme.mixaiCardColors
@@ -81,7 +84,10 @@ fun DiscoverScreen(
 
     Box(Modifier.fillMaxSize().padding(64.dp), contentAlignment = Alignment.Center) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = Tokens.foreground)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                BrandMark(product = BrandProduct.Tv, modifier = Modifier.size(44.dp), decorative = true)
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = Tokens.foreground)
+            }
             Text(
                 stringResource(if (servers.isEmpty()) R.string.discover_scanning else R.string.discover_pick),
                 style = MaterialTheme.typography.titleMedium, color = Tokens.mutedForeground,

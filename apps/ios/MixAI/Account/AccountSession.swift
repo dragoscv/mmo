@@ -128,7 +128,7 @@ final class AccountStore {
                     session.cancel()
                     adopt(ok, app: app)
                     if app.server == nil, let (comp, base) = await auth.pickReachable(ok.companions ?? []) {
-                        await app.connect(ServerConnection(name: comp.name ?? "MMO Server", baseURL: base), token: comp.token)
+                        await app.connect(ServerConnection(name: comp.name ?? "MixAI Server", baseURL: base), token: comp.token)
                     }
                     return
                 }

@@ -417,7 +417,7 @@ export async function startServer(): Promise<void> {
 <html><head><meta charset="UTF-8"><title>Auth Failed</title>
 <style>body{background:#0a0a0a;color:#fafafa;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh}
 .c{text-align:center;padding:40px}.icon{font-size:52px;margin-bottom:16px}.err{color:#ef4444}</style></head>
-<body><div class="c"><div class="icon">✗</div><h2 class="err">Auth Failed</h2><p style="color:#71717a">Invalid or expired auth state. Please try again from the companion app.</p></div></body></html>`);
+<body><div class="c"><div class="icon">✗</div><h2 class="err">Auth Failed</h2><p style="color:#71717a">Invalid or expired auth state. Please try again from MixAI Server.</p></div></body></html>`);
             return;
         }
         pendingAuthStates.delete(state);
@@ -442,7 +442,7 @@ export async function startServer(): Promise<void> {
 .c{text-align:center;padding:40px}.icon{font-size:52px;margin-bottom:16px}.ok{color:#22c55e}.name{color:#a855f7;font-weight:600}</style></head>
 <body><div class="c"><div class="icon">✓</div><h2 class="ok">Connected!</h2>
 <p style="color:#71717a">Signed in as <span class="name">${displayName}</span></p>
-<p style="margin-top:16px;color:#3f3f46;font-size:13px">You can close this tab and return to the companion app.</p></div></body></html>`);
+<p style="margin-top:16px;color:#3f3f46;font-size:13px">You can close this tab and return to MixAI Server.</p></div></body></html>`);
     });
 
     // ─── Health / Status ─────────────────────────────────────────────────
@@ -1851,7 +1851,7 @@ export async function startServer(): Promise<void> {
             if (addr && typeof addr === "object" && typeof addr.port === "number" && addr.port > 0) {
                 serverPort = addr.port;
             }
-            console.log(`MixAI Companion (MMO Server) running on port ${serverPort}`);
+            console.log(`MixAI Server running on port ${serverPort}`);
             // Publish LAN URL + mDNS so other devices on the user's
             // network can discover the companion. Re-announces every
             // 5 min so DHCP renewals / Wi-Fi roams self-heal.

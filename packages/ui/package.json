@@ -1,6 +1,6 @@
 {
   "name": "@mmo/ui",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "description": "MixAI shared UI — Base UI primitives styled with Tailwind v4 on @mmo/design-tokens, ThemeProvider (mode/accent/surface/density/radius/motion/locale), motion presets, hooks, shared RO/EN UI messages. Consumed by apps/web, apps/mixai, server/ui via tsconfig paths.",
   "type": "module",

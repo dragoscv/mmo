@@ -82,13 +82,19 @@ compose.desktop {
             copyright = "© 2026 MixAI"
             appResourcesRootDir.set(appResDir)
             modules("java.desktop", "jdk.unsupported")
+            // App icons are GENERATED into icons/ by brand/scripts/build.mjs (ADR-0016); never edit them by hand.
             windows {
+                iconFile.set(project.file("icons/icon.ico"))
                 menuGroup = "MixAI"
                 upgradeUuid = "6f2b7a3e-1c9d-4f58-9b0a-2d7e5c4a8b31"
                 perUserInstall = true
                 dirChooser = true
             }
+            macOS {
+                iconFile.set(project.file("icons/icon.icns"))
+            }
             linux {
+                iconFile.set(project.file("icons/icon.png"))
                 packageName = "mixai-decks"
                 debMaintainer = "support@mixai.ro"
                 appCategory = "AudioVideo"

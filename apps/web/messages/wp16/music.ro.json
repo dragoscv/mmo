@@ -43,14 +43,14 @@
     "state": {
         "loading": "Se încarcă muzica…",
         "error": "Muzica nu s-a putut încărca",
-        "errorBody": "MMO Server nu a răspuns. Verifică dacă rulează, apoi încearcă din nou.",
+        "errorBody": "MixAI Server nu a răspuns. Verifică dacă rulează, apoi încearcă din nou.",
         "retry": "Reîncearcă",
         "emptyLibrary": "Biblioteca de muzică e goală",
         "emptyLibraryBody": "Adaugă un folder de muzică pe server și scanează-l. Albumele și artiștii apar aici imediat.",
         "notFound": "Nu a fost găsit",
         "notFoundBody": "Elementul nu mai este în bibliotecă. Poate a fost mutat sau șters.",
         "backToMusic": "Înapoi la Muzică",
-        "serverTooOld": "Lista de melodii are nevoie de MMO Server 3.10 sau mai nou. Actualizează serverul ca să vezi toate melodiile aici."
+        "serverTooOld": "Lista de melodii are nevoie de MixAI Server 3.10 sau mai nou. Actualizează serverul ca să vezi toate melodiile aici."
     },
     "track": {
         "playLabel": "Redă {title}, {duration}",
@@ -124,7 +124,7 @@
         "fromSong": "Pornește radio din {title}",
         "empty": "Nu ai încă destulă muzică pentru un radio.",
         "error": "Radioul nu a pornit. Încearcă din nou.",
-        "unsupported": "Radioul are nevoie de MMO Server 3.10 sau mai nou. Actualizează serverul și încearcă din nou."
+        "unsupported": "Radioul are nevoie de MixAI Server 3.10 sau mai nou. Actualizează serverul și încearcă din nou."
     },
     "download": {
         "all": "Descarcă tot",

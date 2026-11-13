@@ -89,6 +89,18 @@
   --brand-accent: #22d3ee;
   --brand-gradient: linear-gradient(135deg, #7c5cff 0%, #e84ff0 100%);
   --accent-gradient: linear-gradient(135deg, oklch(var(--primary-l) var(--primary-c) var(--accent-h)) 0%, oklch(var(--primary-l) var(--primary-c) calc(var(--accent-h) + 45)) 100%);
+  --product-tv: #683ecf;
+  --product-music: #b12083;
+  --product-decks: #006f83;
+  --product-live: #a94e00;
+  --product-studio: #766200;
+  --product-keybpm: #107823;
+  --product-server: #0061be;
+  --product-connector: #007465;
+  --mark-a: var(--product-tv);
+  --mark-b: var(--product-music);
+  --mark-signal: var(--foreground);
+  --mark-tile: #11101a;
   color-scheme: light;
 }
 
@@ -135,6 +147,18 @@
   --brand-accent: #38dcf2;
   --brand-gradient: linear-gradient(135deg, #8b6dff 0%, #ef62f3 100%);
   --accent-gradient: linear-gradient(135deg, oklch(var(--primary-l) var(--primary-c) var(--accent-h)) 0%, oklch(var(--primary-l) var(--primary-c) calc(var(--accent-h) + 45)) 100%);
+  --product-tv: #9f88ff;
+  --product-music: #f767c1;
+  --product-decks: #37d2f2;
+  --product-live: #ff8f4b;
+  --product-studio: #f2cf3b;
+  --product-keybpm: #61dc6b;
+  --product-server: #4c99f8;
+  --product-connector: #40d9c1;
+  --mark-a: var(--product-tv);
+  --mark-b: var(--product-music);
+  --mark-signal: var(--foreground);
+  --mark-tile: #11101a;
   color-scheme: dark;
 }
 
@@ -267,6 +291,18 @@
   --color-deck-b: var(--deck-b);
   --color-deck-c: var(--deck-c);
   --color-deck-d: var(--deck-d);
+  --color-product-tv: var(--product-tv);
+  --color-product-music: var(--product-music);
+  --color-product-decks: var(--product-decks);
+  --color-product-live: var(--product-live);
+  --color-product-studio: var(--product-studio);
+  --color-product-keybpm: var(--product-keybpm);
+  --color-product-server: var(--product-server);
+  --color-product-connector: var(--product-connector);
+  --color-mark-a: var(--mark-a);
+  --color-mark-b: var(--mark-b);
+  --color-mark-signal: var(--mark-signal);
+  --color-mark-tile: var(--mark-tile);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

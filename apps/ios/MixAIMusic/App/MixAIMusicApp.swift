@@ -103,7 +103,7 @@ struct MusicRootView: View {
             case .launching:
                 ZStack {
                     Theme.background.ignoresSafeArea()
-                    Image("BrandMark").resizable().scaledToFit().frame(width: 96).accessibilityLabel("MixAI Music")
+                    BrandMarkView(.music, animation: .intro).frame(width: 96, height: 96)
                 }
             case .onboarding:
                 MusicOnboarding()

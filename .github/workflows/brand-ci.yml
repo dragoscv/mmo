@@ -1,0 +1,70 @@
+name: brand-ci
+
+# Brand pack gates (WP22-07, ADR-0016): every committed icon, splash, store graphic and generated code module
+# must match brand/src + the design tokens. Pure Node, no install: the drift check compares text outputs byte
+# for byte and rasters through brand/dist/manifest.json, so it does not render anything.
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "brand/**"
+            - "scripts/brand-drift.mjs"
+            - "packages/design-tokens/**"
+            - "packages/ui/src/brand/**"
+            - "apps/web/public/**"
+            - "apps/**/res/**"
+            - "apps/**/icons/**"
+            - "apps/**/store/graphics/**"
+            - "apps/**/*.xcassets/**"
+            - "apps/**/index.html"
+            - "apps/**/Brand.kt"
+            - "apps/**/Brand.swift"
+            - "apps/tv-tizen/*.png"
+            - "apps/tv-tizen/webos/*.png"
+            - "server/assets/**"
+            - "server/ui/index.html"
+            - ".github/workflows/brand-ci.yml"
+    pull_request:
+        paths:
+            - "brand/**"
+            - "scripts/brand-drift.mjs"
+            - "packages/design-tokens/**"
+            - "packages/ui/src/brand/**"
+            - "apps/web/public/**"
+            - "apps/**/res/**"
+            - "apps/**/icons/**"
+            - "apps/**/store/graphics/**"
+            - "apps/**/*.xcassets/**"
+            - "apps/**/index.html"
+            - "apps/**/Brand.kt"
+            - "apps/**/Brand.swift"
+            - "apps/tv-tizen/*.png"
+            - "apps/tv-tizen/webos/*.png"
+            - "server/assets/**"
+            - "server/ui/index.html"
+            - ".github/workflows/brand-ci.yml"
+
+concurrency:
+    group: brand-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    brand:
+        name: brand drift, tests, contrast
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v5
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+            - name: Generated brand outputs match brand/src
+              run: node scripts/brand-drift.mjs
+            - name: Brand source and generator tests
+              run: node --test brand/scripts/build.test.mjs
+            - name: Contrast (WCAG 2.2 AA) on the shipped colour pairs
+              run: node brand/scripts/contrast-gate.mjs brand/contrast-pairs.json

@@ -42,7 +42,7 @@ struct TVRootView: View {
             case .launching:
                 ZStack {
                     TVTheme.background.ignoresSafeArea()
-                    Image("BrandMark").resizable().scaledToFit().frame(width: 180).accessibilityLabel("MixAI TV")
+                    BrandMarkView(.tv, animation: .intro).frame(width: 180, height: 180)
                 }
             case .onboarding:
                 TVOnboardingView()
@@ -53,6 +53,8 @@ struct TVRootView: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: model.phase)
+        // Brand sound, once per cold start, together with the mark's intro (Settings › Sound turns it off).
+        .onAppear { TVStartupSound.playOnce() }
         .fullScreenCover(item: $model.playing) { req in
             TVPlayerView(request: req).ignoresSafeArea()
         }

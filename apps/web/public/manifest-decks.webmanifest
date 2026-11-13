@@ -1,0 +1,37 @@
+{
+    "name": "MixAI Decks",
+    "short_name": "MixAI Decks",
+    "description": "Pro DJ app with a Rust audio engine, AI stems and beat-matched automix.",
+    "start_url": "/",
+    "id": "/?app=decks",
+    "display": "standalone",
+    "background_color": "#0a0a0f",
+    "theme_color": "#7c5cff",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/icon-decks-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-decks-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-decks-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [],
+    "categories": [
+        "music",
+        "entertainment"
+    ],
+    "scope": "/"
+}

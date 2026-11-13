@@ -1,7 +1,8 @@
-# MixAI TV — Samsung Tizen (.wgt)
+# MixAI TV — Samsung Tizen (.wgt) and LG webOS (.ipk)
 
 Tizen web application for Samsung Smart Hub TVs/monitors (tested target: Odyssey OLED G8,
-Tizen 7). Connects to **MMO Server** on the LAN (`http://<host>:17899`), browses movies and
+Tizen 7); the same build is packaged for LG webOS and runs inside the desktop shell
+(`apps/tv-desktop`). Connects to **MixAI Server** on the LAN (`http://<host>:17899`), browses movies and
 music and plays them with the platform `<video>` element — progressive MP4 direct, HLS via
 `hls.js` (lazy-loaded) for everything the server has to remux, WebVTT subtitles.
 
@@ -13,13 +14,18 @@ user guide in [`docs/aplicatie/tv-tizen.md`](../../docs/aplicatie/tv-tizen.md).
 
 ```
 config.xml              Tizen widget manifest (id http://mixai.ro/tv, app mXa1TvApp0.MixAI)
-index.html              <html data-tv data-mode="dark" …>, seeds mixai:prefs:v1, loads prehydrate.js + webapis.js + the bundle
+icon.png                GENERATED (brand/scripts/build.mjs) — 512×512 Tizen launcher icon, copied into dist/ by package-wgt.ps1
+webos/appinfo.json      LG webOS manifest (id ro.mixai.tv); webos/icon.png (80×80) + webos/largeIcon.png (130×130) are GENERATED
+index.html              <html data-tv data-mode="dark" …>, seeds mixai:prefs:v1, loads prehydrate.js + webapis.js + the bundle;
+                        the boot screen between the `brand:*` markers is GENERATED (logo intro until React renders)
 public/prehydrate.js    GENERATED (packages/design-tokens) — applies theme prefs to <html> before paint
+public/brand-signature.wav  GENERATED (brand/scripts/build.mjs) — the ~1.4 s sonic signature
 src/tokens.css          GENERATED (packages/design-tokens) — role colours (oklch), TV overrides under :root[data-tv]
 src/styles.css          app CSS on top of the tokens; sRGB @supports fallback for Chromium < 111
 src/i18n/messages.ts    RO + EN strings, t(), getLocale()/setLocale() (locale lives in mixai:prefs:v1)
 src/i18n/useLocale.ts   [locale, setLocale] hook; App re-keys the tree on the mixai:locale event
-src/lib/api.ts          MMO Server client (/video/*, OpenSubsonic /rest/*)
+src/lib/api.ts          MixAI Server client (/video/*, OpenSubsonic /rest/*)
+src/lib/brand-sound.ts  plays the sonic signature once per app start (Settings → Sound → Startup sound, prefs key `startupSound`)
 src/lib/focus.ts        geometric D-pad navigation over [data-focusable]
 src/lib/tv-keys.ts      remote keyCodes (10009 back, 415/19/10252 media, colour keys)
 src/lib/playback.ts     direct-play vs HLS decision for Tizen, codec caps
@@ -32,7 +38,11 @@ src/lib/pair.ts         Quick Connect client (/pair/request, /pair/poll)
 src/screens/*.tsx       Welcome · SignIn · Discover · Pair · Connect (manual + Quick Connect) · Home · Show · Search · Album · Player
 src/screens/cards.tsx   VideoCard / ShowCard / AlbumCard / SkeletonCard / Row (shared)
 scripts/package-wgt.ps1 build → .wgt (signed via Tizen Studio, or unsigned zip)
+scripts/package-ipk.ps1 build → webos-out/ro.mixai.tv_<ver>_all.ipk (stages dist/ + webos/appinfo.json + both webOS icons)
 ```
+
+Brand assets (icons, boot screen, sound) come from `node brand/scripts/build.mjs` at the repo root
+([ADR-0016](../../docs/adr/0016-mixai-tv-name-brand-and-experience.md)); never edit them by hand.
 
 ## Build
 
@@ -42,6 +52,7 @@ pnpm install   # own lockfile + pnpm-workspace.yaml (standalone project)
 pnpm typecheck               # tsc --noEmit
 pnpm build                   # tsc + vite → dist/
 pnpm package                 # dist/MixAITV.wgt (+ -Install to push via sdb)
+pnpm package:webos           # webos-out/*.ipk (ares-package)
 ```
 
 `@vitejs/plugin-legacy` with `renderModernChunks=false` emits classic SystemJS scripts
@@ -78,6 +89,14 @@ when a file needs HLS.
 Search is a Home header button (OK on the input opens the Tizen IME). Language (RO/EN) and
 "clear resume data" live in the Home → Settings row.
 
+## Startup sound
+
+The sonic signature (`./brand-signature.wav`, relative URL because the widget runs from `file://`) plays once
+per app start, after the first screen renders, through a plain `HTMLAudioElement` at volume 0.6. It is on by
+default on TV; **Settings → Sound → Startup sound** turns it off (`startupSound: false` in `mixai:prefs:v1`).
+If the engine blocks autoplay (the desktop webview can, before the first interaction), the sound is skipped for
+that start — the rejection is ignored and there is no retry.
+
 ## Sideload (Developer Mode)
 
 1. On the monitor: **Apps** → type `1 2 3 4 5` on the remote → *Developer mode* **ON**,
@@ -102,7 +121,7 @@ Full RO walkthrough: [docs/aplicatie/tv-tizen.md](../../docs/aplicatie/tv-tizen.
   responsive in width — never hardcode 1920. `lib/screen-format.ts` squeezes the UI only as a fallback
   when the engine still renders 16:9 on a wider panel (Settings → Screen format overrides).
 - **HTTP only on the LAN.** `access origin="*"` + `use.network` allow plain http to the
-  server's IP; there is no TLS on MMO Server.
+  server's IP; there is no TLS on MixAI Server.
 - **HEVC** plays only from MP4/MKV/TS containers via the server remux (`caps` includes
   `hevc`); the pre-remuxed sidecar (hvc1 + AAC) is preferred automatically by `/video/direct`.
 - **MSE cap:** Tizen's MSE path (hls.js) is limited to FHD on most models; 4K needs native

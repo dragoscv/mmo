@@ -112,11 +112,13 @@ final class TVModel {
     }
 
     func play(_ t: PlayTarget, title: String, subtitle: String?) {
+        TVStartupSound.finish()
         musicPlayer.pause() // video takes over the audio
         playing = TVPlayRequest(source: .file(fileId: t.fileId, ref: t.ref, startSec: t.resumeSec ?? 0), title: title, subtitle: subtitle)
     }
 
     func playLive(_ channel: LiveTvChannel) {
+        TVStartupSound.finish()
         musicPlayer.pause()
         playing = TVPlayRequest(source: .live(channelId: channel.id), title: channel.name, subtitle: nil)
     }
@@ -147,6 +149,10 @@ enum TVPrefs {
         get { d.data(forKey: "profile").flatMap { try? JSONDecoder().decode(SavedProfile.self, from: $0) } ?? SavedProfile() }
         set { d.set(try? JSONEncoder().encode(newValue), forKey: "profile") }
     }
+
+    /// Brand sound at cold start (Settings › Sound, `TVStartupSound`). On until the user turns it off.
+    static let startupSoundKey = "startupSound"
+    static var startupSound: Bool { d.object(forKey: startupSoundKey) as? Bool ?? true }
 }
 
 /// Generic-password Keychain items for device tokens.

@@ -39,7 +39,7 @@ class MusicDownloadService : DownloadService(
             Intent(this, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(android.net.Uri.parse("mixai-music://downloads")),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return helper.buildProgressNotification(this, R.drawable.ic_launcher_foreground, open, getString(R.string.downloads_notification), downloads, notMetRequirements)
+        return helper.buildProgressNotification(this, R.drawable.ic_stat_mixai, open, getString(R.string.downloads_notification), downloads, notMetRequirements)
     }
 
     companion object {

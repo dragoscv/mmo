@@ -205,7 +205,7 @@
         },
         "network": {
             "title": "Serverul nu răspunde",
-            "body": "Verifică dacă MMO Server rulează și încearcă din nou."
+            "body": "Verifică dacă MixAI Server rulează și încearcă din nou."
         }
     },
     "guest": {
@@ -225,7 +225,7 @@
         "expiredBody": "Invitațiile sunt valabile un timp limitat. Cere gazdei una nouă.",
         "invalidBody": "Camera a fost închisă sau invitația nu mai este valabilă. Cere gazdei una nouă.",
         "unreachableTitle": "Serverul nu poate fi contactat",
-        "unreachableBody": "MMO Server-ul gazdei nu a răspuns. Asigură-te că ești într-o rețea din care poate fi accesat.",
+        "unreachableBody": "Serverul MixAI al gazdei nu a răspuns. Asigură-te că ești într-o rețea din care poate fi accesat.",
         "retry": "Încearcă din nou",
         "joining": "Se intră în cameră…",
         "waitingHost": "Se așteaptă ca gazda să pornească ceva…",

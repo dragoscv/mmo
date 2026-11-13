@@ -4,7 +4,7 @@
     <!-- Home -->
     <string name="wp16_home_error">Could not load Home</string>
     <string name="wp16_home_empty_title">Nothing to watch yet</string>
-    <string name="wp16_home_empty_message">Add movie and TV folders on your MMO Server, then scan the library.</string>
+    <string name="wp16_home_empty_message">Add movie and TV folders on your MixAI Server, then scan the library.</string>
     <string name="wp16_home_open_settings">Open settings</string>
     <string name="wp16_home_play_failed">Could not start playback: %1$s</string>
     <string name="wp16_home_more_info">More info</string>
@@ -32,9 +32,9 @@
     <string name="wp16_lib_count">%1$d of %2$d titles</string>
     <string name="wp16_lib_empty_movies">No movies in your library</string>
     <string name="wp16_lib_empty_tv">No TV shows in your library</string>
-    <string name="wp16_lib_empty_hint">Add a folder on your MMO Server and scan it; titles appear here once matched with TMDB.</string>
+    <string name="wp16_lib_empty_hint">Add a folder on your MixAI Server and scan it; titles appear here once matched with TMDB.</string>
     <string name="wp16_lib_unmatched">%1$d files are not matched with TMDB yet. Check the file names or TMDB settings on the server.</string>
-    <string name="wp16_lib_old_server">This MMO Server is too old for the library view. Update it to 3.4 or later.</string>
+    <string name="wp16_lib_old_server">This MixAI Server is too old for the library view. Update it to 3.4 or later.</string>
     <string name="wp16_lib_sort">Sort by</string>
     <string name="wp16_lib_sort_label">Sort: %1$s</string>
     <string name="wp16_lib_sort_added">Recently added</string>

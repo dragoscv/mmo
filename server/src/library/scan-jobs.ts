@@ -167,7 +167,7 @@ export function hydrateScanJobsOnBoot(): void {
         sqlite
             .prepare(
                 `UPDATE scan_jobs
-                 SET status='error', error='companion restarted before scan finished', finished_at=?
+                 SET status='error', error='server restarted before scan finished', finished_at=?
                  WHERE status IN ('pending','discovering','scanning')`,
             )
             .run(now);

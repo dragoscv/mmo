@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
-        id="http://mixai.ro/tv" version="2.4.1" viewmodes="fullscreen">
+    id="http://mixai.ro/tv" version="2.5.0" viewmodes="fullscreen">
     <tizen:application id="mXa1TvApp0.MixAI" package="mXa1TvApp0" required_version="2.3"/>
     <content src="index.html"/>
     <feature name="http://tizen.org/feature/network.internet"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
     <icon src="icon.png"/>
     <name>MixAI TV</name>
-    <description>MixAI TV — filme si muzica din MMO Server pe Samsung Smart Hub.</description>
+    <description>MixAI TV — filmele, serialele, TV live si muzica ta, de pe propriul MixAI Server.</description>
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>

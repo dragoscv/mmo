@@ -1,12 +1,12 @@
 {
     "state": {
         "error": "Ceva nu a mers",
-        "errorBody": "MMO Server a răspuns cu o eroare: {message}",
+        "errorBody": "MixAI Server a răspuns cu o eroare: {message}",
         "retry": "Reîncearcă",
         "restricted": "Indisponibil pentru acest profil",
         "restrictedBody": "Titlul depășește limita de vârstă setată pentru profilul activ.",
-        "unsupported": "MMO Server este prea vechi pentru această pagină",
-        "unsupportedBody": "Actualizează MMO Server la ultima versiune ca să răsfoiești filme și seriale aici."
+        "unsupported": "MixAI Server este prea vechi pentru această pagină",
+        "unsupportedBody": "Actualizează MixAI Server la ultima versiune ca să răsfoiești filme și seriale aici."
     },
     "search": {
         "title": "Căutare",
@@ -40,7 +40,7 @@
         "allGenres": "Toate genurile",
         "loading": "Se încarcă biblioteca…",
         "empty": "Biblioteca ta e încă goală",
-        "emptyBody": "Adaugă un folder de filme sau seriale în MMO Server și scanează-l.",
+        "emptyBody": "Adaugă un folder de filme sau seriale în MixAI Server și scanează-l.",
         "resolving": "Se încarcă detaliile titlurilor…",
         "noMatch": "Niciun titlu nu corespunde filtrelor",
         "noMatchBody": "Alege alt gen sau șterge filtrele.",

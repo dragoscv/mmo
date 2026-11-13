@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Tile picker preview (static theme, loaded state "8A · Am / 124.0 BPM"); a PNG capture from the watch replaces it
-     for the store. Vector so it needs no binary asset. -->
+    for the store. Vector so it needs no binary asset. Colours: res/values/brand.xml (generated). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="200dp"
     android:height="200dp"
     android:viewportWidth="200"
     android:viewportHeight="200">
-    <path android:fillColor="#000000" android:pathData="M0,0h200v200h-200z" />
+    <path android:fillColor="@android:color/black" android:pathData="M0,0h200v200h-200z" />
     <path
-        android:strokeColor="#9588FF"
+        android:strokeColor="@color/brand_product"
         android:strokeWidth="6"
-        android:fillColor="#00000000"
+        android:fillColor="@android:color/transparent"
         android:pathData="M100,12 A88,88 0 1,1 99.9,12 Z" />
-    <path android:fillColor="#38DCF2" android:pathData="M100,20 A6,6 0 1,1 99.9,20 Z" />
-    <path android:fillColor="#F4F3FA" android:pathData="M62,82h76v28h-76z" android:fillAlpha="0.9" />
-    <path android:fillColor="#9588FF" android:pathData="M78,120h44v10h-44z" />
-    <path android:fillColor="#9588FF" android:pathData="M50,160h100a12,12 0 0,1 0,24h-100a12,12 0 0,1 0,-24z" />
+    <path android:fillColor="@color/brand_signal" android:pathData="M100,20 A6,6 0 1,1 99.9,20 Z" />
+    <path android:fillColor="@color/brand_signal" android:pathData="M62,82h76v28h-76z" android:fillAlpha="0.9" />
+    <path android:fillColor="@color/brand_product" android:pathData="M78,120h44v10h-44z" />
+    <path android:fillColor="@color/brand_product" android:pathData="M50,160h100a12,12 0 0,1 0,24h-100a12,12 0 0,1 0,-24z" />
 </vector>

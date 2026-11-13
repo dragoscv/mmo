@@ -121,7 +121,7 @@ export function ProfileSection() {
             )}
             <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
             <p style={{ fontSize: 12, color: "var(--fg-dim)" }}>
-                Or sync to your account through the companion — sign in to your library
+                Or sync to your account through MixAI Server — sign in to your library
                 (device token + user) in the Library tab first.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -142,7 +142,7 @@ export function ProfileSection() {
             </div>
             {!cloudReady && (
                 <span style={{ fontSize: 11, color: "var(--fg-dim)" }}>
-                    Connect the companion library to enable account sync.
+                    Connect the server library to enable account sync.
                 </span>
             )}
             {cloud === "empty" && (
@@ -152,7 +152,7 @@ export function ProfileSection() {
             )}
             {cloud === "error" && (
                 <span style={{ fontSize: 11, color: "var(--danger)" }}>
-                    Couldn't reach your account. Check the companion connection.
+                    Couldn't reach your account. Check the server connection.
                 </span>
             )}
         </div>

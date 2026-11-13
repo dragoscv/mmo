@@ -10,6 +10,10 @@
         "check:version-generic": "node scripts/check-version-generic.mjs",
         "tokens:build": "pnpm -C packages/design-tokens build",
         "tokens:drift": "node scripts/tokens-drift.mjs",
+        "brand:build": "node brand/scripts/build.mjs",
+        "brand:check": "node scripts/brand-drift.mjs",
+        "brand:test": "node --test brand/scripts/build.test.mjs",
+        "brand:contrast": "node brand/scripts/contrast-gate.mjs brand/contrast-pairs.json",
         "hex:check": "node scripts/hex-gate.mjs",
         "i18n:check": "pnpm -C apps/web i18n:check && pnpm -C apps/extension i18n:check",
         "bundle:check": "pnpm -C apps/web bundle:check",
@@ -39,7 +43,11 @@
     "lint-staged": {
         "apps/web/messages/*.json": "node apps/web/scripts/i18n-parity.mjs",
         "apps/extension/_locales/**/messages.json": "node scripts/i18n-parity-ext.mjs",
-        "packages/design-tokens/src/**": "node scripts/tokens-drift.mjs",
+        "packages/design-tokens/src/**": [
+            "node scripts/tokens-drift.mjs",
+            "node scripts/brand-drift.mjs --staged"
+        ],
+        "brand/**": "node scripts/brand-drift.mjs --staged",
         "{server/src/**/*.ts,server/openapi.yaml,server/package.json}": "node server/scripts/openapi-check.mjs",
         "{packages/ui/src,apps/mixai/src,server/ui/src,apps/tv-tizen/src}/**/*.{ts,tsx,css}": "node scripts/hex-gate.mjs --staged",
         "apps/tv-android/**/*.kt": "node scripts/hex-gate.mjs --staged",

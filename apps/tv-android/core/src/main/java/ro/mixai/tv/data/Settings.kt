@@ -3,6 +3,7 @@ package ro.mixai.tv.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -61,6 +62,7 @@ class Settings(private val context: Context) {
     private val keyProfileId = stringPreferencesKey("active_profile_id")
     private val keyProfileToken = stringPreferencesKey("active_profile_token")
     private val keyProfileTokenExp = stringPreferencesKey("active_profile_token_exp")
+    private val keyStartupSound = booleanPreferencesKey("startup_sound")
     private val json = Json { ignoreUnknownKeys = true }
     private val queueSerializer = ListSerializer(ProgressInput.serializer())
 
@@ -80,6 +82,13 @@ class Settings(private val context: Context) {
 
     suspend fun setScreenFormat(key: String) {
         context.dataStore.edit { p -> p[keyScreenFormat] = key }
+    }
+
+    /** Brand sound when the TV app opens (ADR-0016). On until the user turns it off; kept per device. */
+    val startupSound: Flow<Boolean> = context.dataStore.data.map { p -> p[keyStartupSound] ?: true }
+
+    suspend fun setStartupSound(on: Boolean) {
+        context.dataStore.edit { p -> p[keyStartupSound] = on }
     }
 
     // ─── WP16: app shell, hub identity, active profile ──────────────────────

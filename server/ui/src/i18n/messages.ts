@@ -6,14 +6,13 @@ import { uiMessages, type UiLocale } from "@mmo/ui";
  */
 const companionMessages = {
     en: {
-        "app.name": "MixAI Companion",
-        "app.server": "MMO Server",
+        "app.name": "MixAI Server",
         "app.tagline": "Low-latency audio bridge",
         "nav.audioSetup": "Audio Setup",
         "nav.audioSetup.tooltip": "Manage virtual and physical audio devices",
         "nav.back": "Back",
 
-        "auth.title": "Connect to MixAI Companion",
+        "auth.title": "Connect to MixAI Server",
         "auth.subtitle": "Sign in with your Google account to link this computer to {host}.",
         "auth.google": "Sign in with Google",
         "auth.waiting": "Waiting for browser… (click to cancel)",
@@ -76,7 +75,7 @@ const companionMessages = {
         "version.installing": "Installing…",
 
         "va.title": "Virtual Audio Devices",
-        "va.intro": "The companion ships with a bundled virtual audio driver so the web app's low-latency engine can route per-deck audio through dedicated, named endpoints. The default set is created on first run: Master, Cue, Aux1, Aux2 (independent stereo pairs) + Loopback (for recording / streaming).",
+        "va.intro": "MixAI Server ships with a bundled virtual audio driver so the web app's low-latency engine can route per-deck audio through dedicated, named endpoints. The default set is created on first run: Master, Cue, Aux1, Aux2 (independent stereo pairs) + Loopback (for recording / streaming).",
         "va.driver.checking": "Checking driver…",
         "va.driver.ready": "Driver ready",
         "va.driver.missing": "Driver not installed",
@@ -163,14 +162,13 @@ const companionMessages = {
         "drivers.note": "Drivers: Linux uses PipeWire/PulseAudio (built-in). macOS uses BlackHole 16ch (GPL-3, by Existential Audio) — admin password required to install. Windows uses Virtual-Audio-Driver (MIT) — UAC consent required to install.",
     },
     ro: {
-        "app.name": "MixAI Companion",
-        "app.server": "MMO Server",
+        "app.name": "MixAI Server",
         "app.tagline": "Punte audio cu latență mică",
         "nav.audioSetup": "Configurare audio",
         "nav.audioSetup.tooltip": "Gestionează dispozitivele audio virtuale și fizice",
         "nav.back": "Înapoi",
 
-        "auth.title": "Conectează-te la MixAI Companion",
+        "auth.title": "Conectează-te la MixAI Server",
         "auth.subtitle": "Autentifică-te cu contul Google pentru a lega acest calculator de {host}.",
         "auth.google": "Autentificare cu Google",
         "auth.waiting": "Se așteaptă browserul… (apasă pentru a anula)",
@@ -233,7 +231,7 @@ const companionMessages = {
         "version.installing": "Se instalează…",
 
         "va.title": "Dispozitive audio virtuale",
-        "va.intro": "Companion include un driver audio virtual, astfel încât motorul cu latență mică al aplicației web să poată ruta audio pe fiecare deck prin endpoint-uri dedicate. Setul implicit se creează la prima pornire: Master, Cue, Aux1, Aux2 (perechi stereo independente) + Loopback (pentru înregistrare / streaming).",
+        "va.intro": "MixAI Server include un driver audio virtual, astfel încât motorul cu latență mică al aplicației web să poată ruta audio pe fiecare deck prin endpoint-uri dedicate. Setul implicit se creează la prima pornire: Master, Cue, Aux1, Aux2 (perechi stereo independente) + Loopback (pentru înregistrare / streaming).",
         "va.driver.checking": "Se verifică driverul…",
         "va.driver.ready": "Driver pregătit",
         "va.driver.missing": "Driverul nu este instalat",

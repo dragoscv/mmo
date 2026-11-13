@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Shared MSIX packager for the MixAI Tauri desktop apps (WP17-25 / 50 / 51): TV, Studio, DJ.
+  Shared MSIX packager for the MixAI Tauri desktop apps (WP17-25 / 50 / 51): TV, Studio, Decks.
 .DESCRIPTION
   Tauri 2 bundles NSIS/WiX only, so the MSIX is assembled from the release exe:
     1. stage <exe> + Store icons (src-tauri/icons) into <out>\layout
@@ -49,7 +49,7 @@ Copy-Item $exePath $layout
 $icons = Join-Path $appDir 'src-tauri\icons'
 foreach ($n in 'StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png', 'Square310x310Logo.png') {
     $src = Join-Path $icons $n
-    if (-not (Test-Path $src)) { throw "missing icon $src - run 'pnpm tauri icon <png>'" }
+    if (-not (Test-Path $src)) { throw "missing icon $src - regenerate with 'node brand/scripts/build.mjs' (repo root)" }
     Copy-Item $src (Join-Path $layout "Assets\$n")
 }
 $lan = if ($LanServer) { '        <Capability Name="privateNetworkClientServer" />' } else { '' }

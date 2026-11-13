@@ -1,15 +1,15 @@
-# 🧩 MixAI Browser Extension — Setup pentru dezvoltatori
+# 🧩 MixAI Connector — Setup pentru dezvoltatori
 
-> **MixAI - Music Downloader** — extensie Chrome / Firefox (Manifest V3, vanilla JS) care adaugă un buton
-> **„MixAI”** pe paginile de streaming și deschide pagina `/download` din aplicația web MixAI cu URL-ul
-> media precompletat. Versiune curentă: **3.0.3**.
+> **MixAI Connector** — extensie Chrome / Firefox (Manifest V3, vanilla JS) care leagă browserul de MixAI Server:
+> adaugă un buton **„MixAI”** pe paginile de streaming și deschide pagina `/download` din aplicația web MixAI cu URL-ul
+> media precompletat. Versiune curentă: **3.1.0** (WP22-10: numele „MixAI Connector” în ambele ediții, iconițe noi).
 
 ## Două ediții (WP17-53)
 
 | Ediție | Unde | Ce face |
 |---|---|---|
-| **MixAI - Music Downloader** (`manifest.json`) | doar GitHub Releases (`mmo-extension-vX.zip`) | butonul de descărcare pe platformele de streaming |
-| **MixAI Connector** (`store/build.mjs`) | Chrome Web Store, Edge Add-ons, AMO (`mixai-connector-store-vX.zip`) | fără permisiuni de host și fără content scripts: caută titlul tabului activ în biblioteca MixAI (`/library?search=`) |
+| **MixAI Connector** — ediția GitHub (`manifest.json`, id `mixai-downloader@mixai.ro`, neschimbat) | doar GitHub Releases (`mmo-extension-vX.zip`) | butonul de descărcare pe platformele de streaming |
+| **MixAI Connector** — ediția de magazin (`store/build.mjs`, id `mixai-connector@mixai.ro`) | Chrome Web Store, Edge Add-ons, AMO (`mixai-connector-store-vX.zip`) | fără permisiuni de host și fără content scripts: caută titlul tabului activ în biblioteca MixAI (`/library?search=`) |
 
 Magazinele interzic descărcătoarele de YouTube/Spotify, iar o sancțiune ar lovi același cont de developer ca
 aplicațiile MixAI; de aceea workflow-ul publică în magazine **numai** ediția Connector. Build local:
@@ -39,8 +39,11 @@ Test: `apps/web/e2e/connector-store.spec.ts` (copiază `build/store` în `apps/w
 7. **Design tokens**: `tokens.css` este **generat** din `packages/design-tokens` (`pnpm tokens:build` la root) —
    nu se editează manual. Popup/options folosesc doar `var(--…)` și urmează `prefers-color-scheme`
    (`data-mode` setat dintr-un script inline). `content.css` nu poate încărca `tokens.css` în pagini străine, așa
-   că definește aceleași valori OKLCH scoped pe `#mixai-download-btn`. Iconițele `icons/*.svg` folosesc
-   gradientul brand violet → magenta.
+   că definește aceleași valori OKLCH scoped pe `#mixai-download-btn`.
+8. **Iconițe** (ADR-0016): `icons/icon{16,32,48,128}.png` (manifest, popup, options) și `.svg` (docs) sunt **generate**
+   de `node brand/scripts/build.mjs` din `brand/src` (glyph-ul Connector pe tile) — nu se editează manual;
+   `node brand/scripts/build.mjs --check` detectează drift-ul. Vechiul `scripts/icons-png.mjs` e arhivat în
+   `brand/archive/2026-11-12/`.
 
 Extensia **nu** descarcă nimic singură și nu trimite metadate: tot fluxul de descărcare (yt-dlp, companion,
 bibliotecă) e în aplicația web.
@@ -73,7 +76,8 @@ apps/extension/
 ├── i18n.js                  Helper t() / applyI18n() pentru popup & options
 ├── beacon.js                Rulează doar pe mixai.ro
 ├── tokens.css               GENERAT (packages/design-tokens) — nu edita
-├── icons/                   icon16/32/48/128.svg (gradient brand)
+├── icons/                   icon16/32/48/128.{png,svg} GENERATE (brand/scripts/build.mjs) — nu edita
+├── store/                   build.mjs + popup/options ale ediției de magazin, graphics/ (GENERATE)
 ├── vendor/                  webextension-polyfill
 └── scripts/check-version.mjs Guard de versiune (husky + CI)
 ```
@@ -126,5 +130,5 @@ intrare în `PLATFORM_CONFIGS` (`match`, `isMediaPage`, `buttonTarget` sau `floa
 - Extragerea metadatelor (titlu, artist, durată, thumbnail) în content script și trimiterea lor la
   `/api/download/info`.
 - Coadă offline în `storage.local` când aplicația web nu e disponibilă.
-- Trimitere directă către MixAI Companion (`http://127.0.0.1:17899`) fără a deschide web app-ul.
+- Trimitere directă către MixAI Server (`http://127.0.0.1:17899`) fără a deschide web app-ul.
 - Publicare în Chrome Web Store / AMO.

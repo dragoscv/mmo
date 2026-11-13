@@ -30,7 +30,7 @@ struct TVServerPicker: View {
     var body: some View {
         HStack(alignment: .top, spacing: 80) {
             VStack(alignment: .leading, spacing: 28) {
-                Image("BrandMark").resizable().scaledToFit().frame(width: 140).accessibilityLabel("MixAI TV")
+                BrandMarkView(.tv, animation: .intro).frame(width: 140, height: 140)
                 Text("welcome.title").font(TVTheme.heading(64))
                 Text("welcome.subtitle").font(TVTheme.body(30)).foregroundStyle(TVTheme.mutedForeground)
                 Text("servers.hint").font(TVTheme.body(24)).foregroundStyle(TVTheme.mutedForeground)

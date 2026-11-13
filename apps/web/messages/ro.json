@@ -343,7 +343,7 @@
             },
             "tokens": {
                 "title": "Tokenuri",
-                "description": "Tokenuri de dispozitiv pentru companionii perechi și tokenuri de acces personal pentru agenți.",
+                "description": "Tokenuri de dispozitiv pentru serverele pereche și tokenuri de acces personal pentru agenți.",
                 "devices": "{count, plural, =0 {Niciun dispozitiv pereche} one {# dispozitiv pereche} few {# dispozitive pereche} other {# de dispozitive pereche}}",
                 "manageDevices": "Gestionează dispozitivele",
                 "patsEmpty": "Niciun token de acces pentru agenți.",
@@ -369,12 +369,12 @@
         },
         "devices": {
             "title": "Dispozitive și remote",
-            "description": "Companioni perechi, Quick Connect și calitatea streamingului remote.",
+            "description": "Servere pereche, Quick Connect și calitatea streamingului remote.",
             "list": {
                 "title": "Dispozitive pereche",
-                "description": "Companioni și TV-uri autentificate în acest cont.",
+                "description": "Servere și TV-uri autentificate în acest cont.",
                 "empty": "Niciun dispozitiv pereche",
-                "emptyDetail": "Instalează companionul sau folosește Quick Connect de pe un TV pentru a împerechea unul."
+                "emptyDetail": "Instalează MixAI Server sau folosește Quick Connect de pe un TV pentru a împerechea unul."
             },
             "columns": {
                 "name": "Nume",
@@ -493,9 +493,9 @@
         "successBody": "{server} a acceptat dispozitivul — poți lăsa telefonul jos.",
         "errors": {
             "not_found": "Nu există nicio cerere în așteptare cu acest cod. Verifică codul de pe TV și încearcă din nou.",
-            "unauthorized": "MMO Server a respins cererea. Asigură-te că este asociat cu acest cont.",
+            "unauthorized": "MixAI Server a respins cererea. Asigură-te că este asociat cu acest cont.",
             "expired": "Codul a expirat. Cere TV-ului un cod nou.",
-            "unreachable": "Nu am putut contacta MMO Server. Este pornit și în aceeași rețea?",
+            "unreachable": "Nu am putut contacta MixAI Server. Este pornit și în aceeași rețea?",
             "failed": "Ceva nu a mers. Încearcă din nou.",
             "unauthenticated": "Trebuie să te autentifici mai întâi.",
             "invalid": "Codul trebuie să aibă exact 6 cifre."
@@ -511,8 +511,8 @@
         "browserCast": "Chromecast (acest browser)",
         "noCastDevices": "niciun dispozitiv",
         "searching": "Caut în rețea…",
-        "noDevices": "Nu am găsit niciun dispozitiv. Verifică dacă TV-ul / boxa e în aceeași rețea cu companion-ul.",
-        "haNotConfigured": "Home Assistant nu e configurat (HA_URL / HA_TOKEN pe companion).",
+        "noDevices": "Nu am găsit niciun dispozitiv. Verifică dacă TV-ul / boxa e în aceeași rețea cu serverul tău.",
+        "haNotConfigured": "Home Assistant nu e configurat (HA_URL / HA_TOKEN pe server).",
         "refresh": "Caută din nou",
         "playingOn": "Redare pe {name}",
         "castFailed": "Nu am putut trimite redarea: {error}",
@@ -565,7 +565,7 @@
         "home": {
             "upNext": "Urmează",
             "watchlist": "Lista de vizionare",
-            "noLocal": "Configurează un companion și rulează un scan pentru a-ți vedea filmele locale.",
+            "noLocal": "Configurează MixAI Server și rulează un scan pentru a-ți vedea filmele locale.",
             "settings": "Setări →"
         },
         "import": {
@@ -604,9 +604,9 @@
             "topGenres": "Top genuri"
         },
         "play": {
-            "companionOffline": "Companion deconectat",
-            "companionOfflineHint": "Pornește aplicația MixAI Companion pentru a reda fișierele locale.",
-            "fileMissing": "Fișier negăsit în companion",
+            "companionOffline": "Server deconectat",
+            "companionOfflineHint": "Pornește MixAI Server pentru a reda fișierele locale.",
+            "fileMissing": "Fișier negăsit pe server",
             "fileMissingHint": "Rulează din nou un scan din /watch pentru a re-înregistra fișierele."
         },
         "actions": {
@@ -651,7 +651,7 @@
             "mute": "Dezactivează sunetul"
         },
         "subtitles": {
-            "noResults": "Niciun rezultat. Verifică OPENSUBTITLES_API_KEY pe companion."
+            "noResults": "Niciun rezultat. Verifică OPENSUBTITLES_API_KEY pe server."
         },
         "player": {
             "noHls": "Browserul nu suportă HLS."
@@ -692,8 +692,8 @@
             "cta": "Autentificare"
         },
         "noCompanion": {
-            "title": "Conectează o aplicație companion pentru a vedea {feature}",
-            "description": "{feature} este stocat acum în aplicația companion locală. Instaleaz-o și conecteaz-o la acest cont pentru a începe.",
+            "title": "Conectează MixAI Server pentru a vedea {feature}",
+            "description": "{feature} este stocat acum pe serverul tău. Instalează MixAI Server și conectează-l la acest cont pentru a începe.",
             "cta": "Gestionează dispozitive"
         }
     },
@@ -702,11 +702,11 @@
         "title": "Biblioteca ta muzicală, organizată de AI",
         "subtitle": "Scanează, analizează și etichetează colecția, construiește playlist-uri inteligente și mixează pe orice ecran — desktop, web, mobil sau TV.",
         "ctaPrimary": "Autentificare",
-        "ctaSecondary": "Descarcă companion-ul",
+        "ctaSecondary": "Descarcă MixAI Server",
         "features": {
             "library": {
                 "title": "O bibliotecă, toate dispozitivele",
-                "description": "Companion-ul local îți indexează fișierele; cloud-ul sincronizează etichetele, cue-urile și playlist-urile peste tot."
+                "description": "MixAI Server îți indexează fișierele locale; cloud-ul sincronizează etichetele, cue-urile și playlist-urile peste tot."
             },
             "ai": {
                 "title": "Analiză AI și AutoMix",
@@ -768,7 +768,7 @@
         "settings-daw": "DAW",
         "settings-editor": "Editor sunet",
         "settings-live": "Live",
-        "settings-companions": "Companions",
+        "settings-companions": "Servere",
         "settings-devices": "Dispozitive și remote",
         "settings-notifications": "Notificări",
         "settings-appearance": "Aspect și limbă",
@@ -851,7 +851,7 @@
         "formTitle": "Autentifică-te la MixAI",
         "formSubtitle": "Setările și preferințele tale vor fi sincronizate între sesiuni",
         "formFooter": "Continuând, ești de acord să-ți stocăm preferințele în siguranță în baza de date a aplicației.",
-        "skipNoteLine1": "Nu ai cont? Conectează acest browser direct la serverul tău MMO.",
+        "skipNoteLine1": "Nu ai cont? Conectează acest browser direct la serverul tău MixAI.",
         "skipNoteLine2": "Conectare fără cont",
         "desktopTitle": "Autentificare din browser",
         "desktopBody": "Google nu permite autentificarea în aplicațiile desktop. MixAI Music deschide browserul, apoi continuă singură aici.",
@@ -1010,7 +1010,7 @@
         "copying": "Se copiază…",
         "cancel": "Anulează",
         "close": "Închide",
-        "noCompanion": "Companion ne-asociat. Deschide Setări → Companion pentru a împerechea un dispozitiv.",
+        "noCompanion": "MixAI Server neconectat. Deschide Setări → Servere pentru a împerechea un dispozitiv.",
         "destinationRequired": "Alege întâi un drive destinație.",
         "doneTitle": "Copiere finalizată",
         "doneSummary": "Copiate {copied}, sărite {skipped}, erori {errors} (din {total}).",
@@ -1043,7 +1043,7 @@
         "exporting": "Se exportă…",
         "cancel": "Anulează",
         "close": "Închide",
-        "noCompanion": "Companion neconectat. Deschide Setări → Companion pentru a asocia un dispozitiv.",
+        "noCompanion": "MixAI Server neconectat. Deschide Setări → Servere pentru a asocia un dispozitiv.",
         "destinationRequired": "Alege întâi un drive destinație.",
         "doneTitle": "Export finalizat",
         "doneSummary": "S-au scris {tracks} piese în {playlists} playlisturi.",
@@ -1072,7 +1072,7 @@
             },
             "docs": {
                 "title": "Documentație",
-                "desc": "Ghiduri pe module, parcurs de la începător la profesionist, companion și extensie."
+                "desc": "Ghiduri pe module, parcurs de la începător la profesionist, MixAI Server și extensie."
             },
             "organizare": {
                 "title": "Organizare",
@@ -1101,7 +1101,7 @@
         "signIn": "Autentificare",
         "stepLang": "Limbă",
         "stepAuth": "Autentificare",
-        "stepCompanion": "Companion",
+        "stepCompanion": "Server",
         "stepScan": "Scanare",
         "langTitle": "Alege limba",
         "langDesc": "Poți schimba mai târziu din Setări.",
@@ -1109,10 +1109,10 @@
         "authDesc": "Biblioteca, playlisturile și setările se sincronizează între dispozitive.",
         "authSignedIn": "Ești autentificat.",
         "authNotSignedIn": "Apasă mai jos ca să te autentifici. Te aducem înapoi în acest ghid imediat.",
-        "companionTitle": "Instalează companion-ul",
+        "companionTitle": "Instalează MixAI Server",
         "companionDesc": "O aplicație desktop mică care îți scanează fișierele locale.",
-        "companionLinked": "Companion conectat.",
-        "companionInstall": "Descarcă MixAI Companion pentru OS-ul tău, rulează-l o dată și conectează-l la acest cont.",
+        "companionLinked": "Server conectat.",
+        "companionInstall": "Descarcă MixAI Server pentru OS-ul tău, rulează-l o dată și conectează-l la acest cont.",
         "companionOpenDownloads": "Deschide pagina de descărcări",
         "companionLater": "O fac mai târziu",
         "scanTitle": "Rulează prima scanare",
@@ -1338,8 +1338,8 @@
             "justNow": "chiar acum"
         },
         "companions": {
-            "title": "Companions",
-            "description": "Aplicații desktop companion pereche cu acest cont.",
+            "title": "Servere",
+            "description": "Calculatoare cu MixAI Server, pereche cu acest cont.",
             "name": "Nume",
             "platform": "Platformă",
             "version": "Versiune",
@@ -1349,8 +1349,8 @@
             "online": "Online",
             "offline": "Offline",
             "empty": "Niciun dispozitiv pereche",
-            "emptyDetail": "Instalează companion-ul desktop și împerechează-l cu acest cont pentru a-l vedea aici.",
-            "configTitle": "Configurări companion",
+            "emptyDetail": "Instalează MixAI Server și împerechează-l cu acest cont pentru a-l vedea aici.",
+            "configTitle": "Configurări server",
             "configPlatform": "Platformă",
             "configStatus": "Stare",
             "configUpdated": "Actualizat"

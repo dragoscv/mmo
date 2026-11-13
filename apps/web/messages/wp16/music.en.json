@@ -43,14 +43,14 @@
     "state": {
         "loading": "Loading music…",
         "error": "Could not load music",
-        "errorBody": "The MMO Server did not answer. Check that it is running, then try again.",
+        "errorBody": "The MixAI Server did not answer. Check that it is running, then try again.",
         "retry": "Retry",
         "emptyLibrary": "Your music library is empty",
         "emptyLibraryBody": "Add a music folder on the server and scan it. Albums and artists show up here right away.",
         "notFound": "Not found",
         "notFoundBody": "This item is no longer in the library. It may have been moved or removed.",
         "backToMusic": "Back to Music",
-        "serverTooOld": "The song list needs MMO Server 3.10 or newer. Update the server to see every song here."
+        "serverTooOld": "The song list needs MixAI Server 3.10 or newer. Update the server to see every song here."
     },
     "track": {
         "playLabel": "Play {title}, {duration}",
@@ -124,7 +124,7 @@
         "fromSong": "Start radio from {title}",
         "empty": "Not enough music for a radio yet.",
         "error": "Could not start the radio. Try again.",
-        "unsupported": "Radio needs MMO Server 3.10 or newer. Update the server, then try again."
+        "unsupported": "Radio needs MixAI Server 3.10 or newer. Update the server, then try again."
     },
     "download": {
         "all": "Download all",

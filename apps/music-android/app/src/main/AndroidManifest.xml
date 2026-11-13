@@ -97,6 +97,6 @@
             android:resource="@xml/automotive_app_desc" />
         <meta-data
             android:name="com.google.android.gms.car.notification.SmallIcon"
-            android:resource="@drawable/ic_launcher_foreground" />
+            android:resource="@drawable/ic_stat_mixai" />
     </application>
 </manifest>

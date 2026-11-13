@@ -4,7 +4,7 @@
     <!-- Acasă -->
     <string name="wp16_home_error">Pagina Acasă nu s-a putut încărca</string>
     <string name="wp16_home_empty_title">Încă nu ai nimic de văzut</string>
-    <string name="wp16_home_empty_message">Adaugă dosare cu filme și seriale pe MMO Server, apoi scanează biblioteca.</string>
+    <string name="wp16_home_empty_message">Adaugă dosare cu filme și seriale pe MixAI Server, apoi scanează biblioteca.</string>
     <string name="wp16_home_open_settings">Deschide setările</string>
     <string name="wp16_home_play_failed">Redarea nu a putut porni: %1$s</string>
     <string name="wp16_home_more_info">Mai multe detalii</string>
@@ -32,9 +32,9 @@
     <string name="wp16_lib_count">%1$d din %2$d titluri</string>
     <string name="wp16_lib_empty_movies">Nu ai filme în bibliotecă</string>
     <string name="wp16_lib_empty_tv">Nu ai seriale în bibliotecă</string>
-    <string name="wp16_lib_empty_hint">Adaugă un dosar pe MMO Server și scanează-l; titlurile apar aici după ce sunt potrivite cu TMDB.</string>
+    <string name="wp16_lib_empty_hint">Adaugă un dosar pe MixAI Server și scanează-l; titlurile apar aici după ce sunt potrivite cu TMDB.</string>
     <string name="wp16_lib_unmatched">%1$d fișiere nu sunt încă potrivite cu TMDB. Verifică numele fișierelor sau setările TMDB de pe server.</string>
-    <string name="wp16_lib_old_server">Acest MMO Server este prea vechi pentru bibliotecă. Actualizează-l la 3.4 sau mai nou.</string>
+    <string name="wp16_lib_old_server">Acest MixAI Server este prea vechi pentru bibliotecă. Actualizează-l la 3.4 sau mai nou.</string>
     <string name="wp16_lib_sort">Sortează după</string>
     <string name="wp16_lib_sort_label">Sortare: %1$s</string>
     <string name="wp16_lib_sort_added">Adăugate recent</string>

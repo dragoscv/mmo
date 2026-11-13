@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
 import { Loader2, Server, Sparkles, UserRound } from "lucide-react";
-import { Button, Card, Field, FieldDescription, FieldError, FieldLabel, Input } from "@mmo/ui";
+import { BrandMark, Button, Card, Field, FieldDescription, FieldError, FieldLabel, Input } from "@mmo/ui";
 import Link, { useRouter } from "@/components/host/host-context";
 import { displayDeviceName } from "@/lib/mmo/hub";
 import {
@@ -114,7 +114,7 @@ export function ConnectClient({ home, loginHref, initialServer, autoDemo }: { ho
         <main className="flex min-h-dvh items-center justify-center px-4 py-10">
             <Card className="w-full max-w-md space-y-6 p-6 sm:p-8">
                 <header className="space-y-2 text-center">
-                    <Server aria-hidden className="mx-auto size-9 text-primary" />
+                    <BrandMark product="server" size={36} decorative className="mx-auto" />
                     <h1 className="text-2xl font-semibold tracking-tight">{phase.kind === "code" ? t("codeTitle") : t("title")}</h1>
                     <p className="text-sm text-muted-foreground">{phase.kind === "code" ? t("codeBody") : t("subtitle")}</p>
                 </header>

@@ -9,7 +9,6 @@
         "build:web": "node scripts/build-web.mjs",
         "tauri:dev": "tauri dev",
         "tauri:build": "tauri build",
-        "tauri:icon": "tauri icon ../web/public/icon-512.png",
         "cap:sync": "pnpm run build:web && cap sync",
         "cap:copy": "pnpm run build:web && cap copy",
         "cap:add:android": "pnpm run build:web && cap add android",

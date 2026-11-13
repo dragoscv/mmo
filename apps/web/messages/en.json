@@ -322,7 +322,7 @@
             },
             "tokens": {
                 "title": "Tokens",
-                "description": "Device tokens for paired companions and personal access tokens for agents.",
+                "description": "Device tokens for paired servers and personal access tokens for agents.",
                 "devices": "{count, plural, =0 {No paired devices} one {# paired device} other {# paired devices}}",
                 "manageDevices": "Manage devices",
                 "patsEmpty": "No agent access tokens.",
@@ -348,12 +348,12 @@
         },
         "devices": {
             "title": "Devices & remote",
-            "description": "Paired companions, Quick Connect and remote streaming quality.",
+            "description": "Paired servers, Quick Connect and remote streaming quality.",
             "list": {
                 "title": "Paired devices",
-                "description": "Companions and TVs signed in to this account.",
+                "description": "Servers and TVs signed in to this account.",
                 "empty": "No paired devices",
-                "emptyDetail": "Install the companion or use Quick Connect from a TV to pair one."
+                "emptyDetail": "Install MixAI Server or use Quick Connect from a TV to pair one."
             },
             "columns": {
                 "name": "Name",
@@ -492,9 +492,9 @@
         "successBody": "{server} accepted the device — you can put the phone down.",
         "errors": {
             "not_found": "No pending request with this code. Check the code on the TV and try again.",
-            "unauthorized": "Your MMO Server rejected the request. Make sure it is paired to this account.",
+            "unauthorized": "Your MixAI Server rejected the request. Make sure it is paired to this account.",
             "expired": "This code has expired. Ask the TV for a new one.",
-            "unreachable": "Could not reach your MMO Server. Is it online and on the same network?",
+            "unreachable": "Could not reach your MixAI Server. Is it online and on the same network?",
             "failed": "Something went wrong. Try again.",
             "unauthenticated": "You need to sign in first.",
             "invalid": "The code must be exactly 6 digits."
@@ -510,8 +510,8 @@
         "browserCast": "Chromecast (this browser)",
         "noCastDevices": "no devices",
         "searching": "Searching the network…",
-        "noDevices": "No renderers found. Make sure the TV / speaker is on the same network as your companion.",
-        "haNotConfigured": "Home Assistant is not configured (HA_URL / HA_TOKEN on the companion).",
+        "noDevices": "No renderers found. Make sure the TV / speaker is on the same network as your server.",
+        "haNotConfigured": "Home Assistant is not configured (HA_URL / HA_TOKEN on the server).",
         "refresh": "Search again",
         "playingOn": "Playing on {name}",
         "castFailed": "Could not cast: {error}",
@@ -564,7 +564,7 @@
         "home": {
             "upNext": "Up Next",
             "watchlist": "Watchlist",
-            "noLocal": "Set up a companion and run a scan to see your local movies.",
+            "noLocal": "Set up MixAI Server and run a scan to see your local movies.",
             "settings": "Settings →"
         },
         "import": {
@@ -603,9 +603,9 @@
             "topGenres": "Top genres"
         },
         "play": {
-            "companionOffline": "Companion offline",
-            "companionOfflineHint": "Start the MixAI Companion app to play local files.",
-            "fileMissing": "File not found on the companion",
+            "companionOffline": "Server offline",
+            "companionOfflineHint": "Start MixAI Server to play local files.",
+            "fileMissing": "File not found on the server",
             "fileMissingHint": "Run a scan again from /watch to re-register the files."
         },
         "actions": {
@@ -650,7 +650,7 @@
             "mute": "Mute"
         },
         "subtitles": {
-            "noResults": "No results. Check OPENSUBTITLES_API_KEY on the companion."
+            "noResults": "No results. Check OPENSUBTITLES_API_KEY on the server."
         },
         "player": {
             "noHls": "This browser does not support HLS."
@@ -692,8 +692,8 @@
             "cta": "Sign in"
         },
         "noCompanion": {
-            "title": "Connect a companion to see {feature}",
-            "description": "{feature} now lives on your local companion app. Install it and pair it with this account to get going.",
+            "title": "Connect MixAI Server to see {feature}",
+            "description": "{feature} now lives on your server. Install MixAI Server and pair it with this account to get going.",
             "cta": "Manage devices"
         }
     },
@@ -702,11 +702,11 @@
         "title": "Your music library, organized by AI",
         "subtitle": "Scan, analyze and tag your collection, build smarter playlists, and mix on any screen — desktop, web, mobile or TV.",
         "ctaPrimary": "Sign in",
-        "ctaSecondary": "Get the companion",
+        "ctaSecondary": "Get MixAI Server",
         "features": {
             "library": {
                 "title": "One library, every device",
-                "description": "Your local companion indexes your files; the cloud keeps tags, cues and playlists in sync everywhere."
+                "description": "MixAI Server indexes your local files; the cloud keeps tags, cues and playlists in sync everywhere."
             },
             "ai": {
                 "title": "AI analysis & AutoMix",
@@ -768,7 +768,7 @@
         "settings-daw": "DAW",
         "settings-editor": "Sound Editor",
         "settings-live": "Live",
-        "settings-companions": "Companions",
+        "settings-companions": "Servers",
         "settings-devices": "Devices & remote",
         "settings-notifications": "Notifications",
         "settings-appearance": "Appearance & language",
@@ -851,7 +851,7 @@
         "formTitle": "Sign in to MixAI",
         "formSubtitle": "Your settings and preferences will be synced across sessions",
         "formFooter": "By continuing, you agree to store your preferences securely in the app database.",
-        "skipNoteLine1": "No account? Connect this browser straight to your MMO Server.",
+        "skipNoteLine1": "No account? Connect this browser straight to your MixAI Server.",
         "skipNoteLine2": "Connect without an account",
         "desktopTitle": "Sign in from your browser",
         "desktopBody": "Google does not allow signing in inside desktop apps. MixAI Music opens your browser, then continues here by itself.",
@@ -1010,7 +1010,7 @@
         "copying": "Copying…",
         "cancel": "Cancel",
         "close": "Close",
-        "noCompanion": "Companion not linked. Open Settings → Companion to pair a device.",
+        "noCompanion": "MixAI Server not connected. Open Settings → Servers to pair a device.",
         "destinationRequired": "Pick a destination drive first.",
         "doneTitle": "Copy finished",
         "doneSummary": "Copied {copied}, skipped {skipped}, errors {errors} (of {total}).",
@@ -1043,7 +1043,7 @@
         "exporting": "Exporting…",
         "cancel": "Cancel",
         "close": "Close",
-        "noCompanion": "Companion not linked. Open Settings → Companion to pair a device.",
+        "noCompanion": "MixAI Server not connected. Open Settings → Servers to pair a device.",
         "destinationRequired": "Pick a destination drive first.",
         "doneTitle": "Export finished",
         "doneSummary": "Wrote {tracks} tracks across {playlists} playlists.",
@@ -1072,7 +1072,7 @@
             },
             "docs": {
                 "title": "Documentation",
-                "desc": "Module guides, beginner-to-pro tracks, companion app and extension."
+                "desc": "Module guides, beginner-to-pro tracks, MixAI Server and extension."
             },
             "organizare": {
                 "title": "Organisation",
@@ -1101,7 +1101,7 @@
         "signIn": "Sign in",
         "stepLang": "Language",
         "stepAuth": "Sign in",
-        "stepCompanion": "Companion",
+        "stepCompanion": "Server",
         "stepScan": "Scan",
         "langTitle": "Pick your language",
         "langDesc": "You can change this later in Settings.",
@@ -1109,10 +1109,10 @@
         "authDesc": "Your library, playlists, and settings sync across devices.",
         "authSignedIn": "You're signed in.",
         "authNotSignedIn": "Click below to sign in. We'll bring you right back to this wizard.",
-        "companionTitle": "Install the companion",
+        "companionTitle": "Install MixAI Server",
         "companionDesc": "A small desktop app that scans your local files.",
-        "companionLinked": "Companion linked.",
-        "companionInstall": "Download MixAI Companion for your OS, run it once, and link it to this account.",
+        "companionLinked": "Server connected.",
+        "companionInstall": "Download MixAI Server for your OS, run it once, and link it to this account.",
         "companionOpenDownloads": "Open downloads",
         "companionLater": "I'll do it later",
         "scanTitle": "Run your first scan",
@@ -1338,8 +1338,8 @@
             "justNow": "just now"
         },
         "companions": {
-            "title": "Companions",
-            "description": "Desktop companion apps paired with this account.",
+            "title": "Servers",
+            "description": "Computers running MixAI Server, paired with this account.",
             "name": "Name",
             "platform": "Platform",
             "version": "Version",
@@ -1349,8 +1349,8 @@
             "online": "Online",
             "offline": "Offline",
             "empty": "No paired devices",
-            "emptyDetail": "Install the desktop companion and pair it with this account to see it here.",
-            "configTitle": "Companion configurations",
+            "emptyDetail": "Install MixAI Server and pair it with this account to see it here.",
+            "configTitle": "Server configurations",
             "configPlatform": "Platform",
             "configStatus": "Status",
             "configUpdated": "Updated"

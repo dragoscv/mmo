@@ -54,6 +54,15 @@ test.describe("connector store edition", () => {
             await expect(popup.locator("#btn-search span")).toHaveText(/Find in my MixAI library|Caută în biblioteca mea MixAI/);
             await expect(popup.locator("#page-title")).toHaveText("Daft Punk - One More Time");
             await expect(popup.locator("#btn-search")).toBeEnabled();
+            // Store listing art: popup at its natural width, then centred on a 1280x800 canvas.
+            await popup.setViewportSize({ width: 360, height: 420 });
+            await popup.screenshot({ path: "test-results/connector-store/popup.png" });
+            const shot = await popup.screenshot({ type: "png" });
+            const canvas = await ctx.newPage();
+            await canvas.setViewportSize({ width: 1280, height: 800 });
+            await canvas.setContent(`<body style="margin:0;height:800px;display:grid;place-items:center;background:radial-gradient(circle at 30% 20%,#2a1f5c,#07060f 70%)"><img style="border-radius:14px;box-shadow:0 30px 80px #0009" src="data:image/png;base64,${shot.toString("base64")}"></body>`);
+            await canvas.screenshot({ path: "test-results/connector-store/listing-1280x800.png" });
+            await canvas.close();
 
             const opened = ctx.waitForEvent("page");
             await popup.locator("#btn-search").click();

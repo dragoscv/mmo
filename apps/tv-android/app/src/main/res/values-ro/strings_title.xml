@@ -25,7 +25,7 @@
     <string name="wp16_title_play_failed">Redarea nu a putut porni: %1$s</string>
     <string name="wp16_title_back">Înapoi</string>
     <string name="wp16_title_error">Titlul nu s-a putut încărca</string>
-    <string name="wp16_title_tmdb_missing">TMDB nu este configurat pe server. Adaugă o cheie TMDB în setările MMO Server.</string>
+    <string name="wp16_title_tmdb_missing">TMDB nu este configurat pe server. Adaugă o cheie TMDB în setările MixAI Server.</string>
     <string name="wp16_title_age_title">Acesta nu e pentru profilul tău</string>
     <string name="wp16_title_age_message">Este pentru spectatori mai mari. Alege altceva sau roagă un adult să schimbe profilul.</string>
     <string name="wp16_title_seasons">%1$d sezoane</string>

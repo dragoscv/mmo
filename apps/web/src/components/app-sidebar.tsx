@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link, { usePathname, useRouter } from "@/components/host/host-context";
 import { useTranslations } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -18,6 +17,8 @@ import {
     SidebarMenuButton,
     SidebarRail,
     Kbd,
+    BrandLockup,
+    BrandMark,
 } from "@mmo/ui";
 import { cn } from "@/lib/utils";
 import { UserCard } from "./user-card";
@@ -135,20 +136,19 @@ function SidebarBody({ onOpenSearch, onOpenLegend }: { onOpenSearch: () => void;
         <>
             <SidebarHeader className="h-16 gap-2.5 border-b border-sidebar-border px-4">
                 {/* WP17-11: the logo goes back to the suite launcher (mixai.ro). */}
-                <Link href="/" aria-label={t("suiteHome")} className="shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                    <Image
-                        src="/logo.svg"
-                        alt=""
-                        width={32}
-                        height={32}
-                        className="rounded-lg shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_30%,transparent)]"
+                <Link href="/" aria-label={t("suiteHome")} className="mixai-logo-press shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                    <BrandMark
+                        product="studio"
+                        size={32}
+                        tile
+                        decorative
+                        className="rounded-[22.5%]"
                     />
                 </Link>
                 {!collapsed && (
                     <div className="flex min-w-0 flex-col leading-tight">
-                        <span className="overflow-hidden font-heading text-[15px] font-bold tracking-tight whitespace-nowrap text-sidebar-foreground">
-                            Mix<span className="text-gradient-accent">AI</span> <span className="font-medium text-muted-foreground">Studio</span>
-                        </span>
+                        {/* Outlined lettering "MixAI Studio"; 21 px box = the cap height of the 15 px text it replaces. */}
+                        <BrandLockup product="studio" wordmarkOnly height={21} />
                         <span className="text-[10px] whitespace-nowrap text-muted-foreground">
                             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
                         </span>

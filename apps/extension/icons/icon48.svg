@@ -1,11 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7c5cff"/>
-      <stop offset="1" stop-color="#e84ff0"/>
-    </linearGradient>
-  </defs>
-  <rect width="128" height="128" rx="30" fill="url(#g)"/>
-  <path d="M64 28v48M45 60l19 19 19-19" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M35 96h58" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img" aria-label="MixAI Connector"><rect width="48" height="48" rx="10.8" fill="#11101a"/><g transform="translate(4.8 4.8) scale(0.8)"><path d="M19 7V15" fill="none" stroke="#40d9c1" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M29 7V15" fill="none" stroke="#40d9c1" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 15H35V22A11 11 0 0 1 13 22Z" fill="none" stroke="#40d9c1" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 33V41" fill="none" stroke="#40d9c1" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="22.5" r="3.975" fill="#f5f1ea"/></g></svg>

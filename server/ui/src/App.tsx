@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger } from "@mmo/ui";
+import { BrandLockup, Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger } from "@mmo/ui";
 import { ArrowLeft, AudioLines } from "lucide-react";
 import { useT } from "./i18n";
 import { isMac } from "./lib/ipc";
@@ -54,15 +54,9 @@ export function App() {
         <div className="flex h-full flex-col bg-background text-foreground">
             {isMac && <TitleBar />}
 
-            {/* Toolbar: app name + Audio Setup / Back */}
+            {/* Toolbar: brand lockup (mark + name) + Audio Setup / Back */}
             <header className="flex h-11 shrink-0 items-center justify-between border-b px-3">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-heading font-semibold text-foreground">
-                        Mix<span className="text-brand-accent">AI</span> Companion
-                    </span>
-                    <span aria-hidden>·</span>
-                    <span>{t("app.server")}</span>
-                </div>
+                <BrandLockup product="server" height={22} label={t("app.name")} />
                 {route === "home" ? (
                     <Tooltip>
                         <TooltipTrigger

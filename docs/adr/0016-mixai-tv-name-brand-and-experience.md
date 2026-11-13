@@ -48,11 +48,15 @@ Audit of 2026-11-11 (five read-only research passes; full reports in the local s
 3. **Rebrand depth (D73).** New mark, new icon family, logo motion and a fixed accent colour per product
    (TV, Music, Decks, Live, Studio, Key & BPM, Server, Connector). Neutrals, the base palette and the fonts
    (Space Grotesk, Inter, JetBrains Mono) stay.
-4. **Family structure (D74).** Open until the comparison sheet: both structures are drawn (one parent mark with a
-   glyph and colour per product; one mark with colour only) and the owner picks on rendered images.
-5. **Brand pack.** `brand/brand.json` + `brand/BRAND.md` + master SVGs in `brand/logo/` become the source of
-   truth. One generator produces every platform export; per-app icon scripts and hand-made copies are retired.
-   A drift gate fails when a committed export differs from the generated one.
+4. **Family structure (D74).** Decided 2026-11-12 on the rendered comparison sheet: one parent mark for the family
+  plus a glyph and a colour per product. The idea is "many sources, one signal": lines are the sources, one dot is
+  the signal. One mark with colour only was rejected (eight identical icons wherever the system recolours icons;
+  colour-blind collisions), and so was a badge on the parent mark (unreadable at 24 px).
+5. **Brand pack.** `brand/brand.json` + `brand/BRAND.md` + the drawing source in `brand/src/` (marks, motion,
+  sound, outlined lettering) are the source of truth; colours come from `packages/design-tokens`. One generator
+  (`node brand/scripts/build.mjs`) produces every platform export, master SVGs included (`brand/dist/logo/`);
+  per-app icon scripts and hand-made copies are retired. A drift gate fails when a committed export differs
+  from the generated one. Gate answers: tracker D78.
 6. **Logo motion (D75).** One parametric source (mark geometry + motion tokens) generates the native form on each
    platform: `AnimatedVectorDrawable` (Android splash and in-app), CSS / animated SVG (web, Tizen, webOS, Tauri),
    SwiftUI (iOS, tvOS, watchOS), Lottie only for store video. Set: intro, loading, success, error, press, morph

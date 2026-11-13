@@ -61,7 +61,6 @@ export PATH="$PNPM_PIN/bin:$PATH" npm_config_manage_package_manager_versions=fal
 (cd "$APPDIR/../tv-tizen" && pnpm install --frozen-lockfile >/dev/null)
 cd "$APPDIR"
 pnpm install --frozen-lockfile >/dev/null
-[ -d src-tauri/icons ] || pnpm tauri icon ../web/public/icon-512.png >/dev/null
 (
   unset APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE
   pnpm tauri build --target universal-apple-darwin --bundles app --config "$VERCONF"

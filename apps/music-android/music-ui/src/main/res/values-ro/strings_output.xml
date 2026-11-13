@@ -14,7 +14,7 @@
     <string name="output_group_dlna">Boxe și televizoare DLNA</string>
     <string name="output_group_ha">Home Assistant</string>
     <string name="output_none">Nu am găsit boxe sau televizoare în această rețea.</string>
-    <string name="output_note">Crossfade-ul și normalizarea volumului funcționează pe acest dispozitiv și pe televizoarele MixAI. Celelalte ieșiri redau fișierul original, convertit de MMO Server când nu îl pot reda.</string>
+    <string name="output_note">Crossfade-ul și normalizarea volumului funcționează pe acest dispozitiv și pe televizoarele MixAI. Celelalte ieșiri redau fișierul original, convertit de MixAI Server când nu îl pot reda.</string>
     <string name="output_selected">Selectat</string>
     <string name="output_volume">Volum</string>
     <string name="output_playing_on">Se redă pe %1$s</string>

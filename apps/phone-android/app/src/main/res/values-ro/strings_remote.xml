@@ -3,7 +3,7 @@
     <string name="remote_title">Telecomandă</string>
     <string name="remote_back">Înapoi</string>
     <string name="remote_empty_title">Niciun televizor conectat</string>
-    <string name="remote_empty_hint">Deschide MixAI TV pe televizor și asociază-l cu același MMO Server ca acest telefon.</string>
+    <string name="remote_empty_hint">Deschide MixAI TV pe televizor și asociază-l cu același MixAI Server ca acest telefon.</string>
     <string name="remote_hub_status">Legătură cu serverul: %1$s</string>
     <string name="remote_hub_connected">conectat</string>
     <string name="remote_hub_connecting">se conectează</string>

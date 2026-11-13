@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Card, CardContent, EmptyState, useToast } from "@mmo/ui";
-import { Loader2, Music2 } from "lucide-react";
+import { BrandMark, Button, Card, CardContent, EmptyState, useToast } from "@mmo/ui";
+import { Loader2 } from "lucide-react";
 import { useT } from "../i18n";
 import { errorMessage, ipc } from "../lib/ipc";
 
@@ -63,11 +63,8 @@ export function AuthView({
                 <CardContent className="pt-6">
                     <EmptyState
                         variant="inline"
-                        icon={
-                            <span className="flex size-14 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-lg">
-                                <Music2 className="size-7" aria-hidden />
-                            </span>
-                        }
+                        // `size-14!`: EmptyState sizes any svg in its icon slot to 28 px; the tile fills the 56 px slot.
+                        icon={<BrandMark product="server" size={56} tile decorative className="size-14! drop-shadow-lg" />}
                         title={t("auth.title")}
                         description={t("auth.subtitle", { host: "mixai.ro" })}
                         actions={

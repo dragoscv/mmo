@@ -12,6 +12,6 @@
     <string name="home_empty_title">Nothing here yet</string>
     <string name="home_empty_hint">Add movies and series to the server library, or pull down to refresh.</string>
     <string name="home_not_configured_title">Media Home is not set up</string>
-    <string name="home_not_configured_hint">Configure a TMDB key on the MMO Server (Settings, Media) to see recommendations and your library here.</string>
+    <string name="home_not_configured_hint">Configure a TMDB key on MixAI Server (Settings, Media) to see recommendations and your library here.</string>
     <string name="home_refresh">Refresh</string>
 </resources>

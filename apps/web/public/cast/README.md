@@ -5,7 +5,7 @@ Static files served by `apps/web` (Next 16, `public/`) at `https://mixai.ro/cast
 | File | Purpose | Public URL |
 |---|---|---|
 | `receiver.html` / `receiver.js` / `receiver.css` | Branded **Custom Web Receiver** (CAF v3, audio only) | https://mixai.ro/cast/receiver.html |
-| `tokens.css` | Copy of `packages/design-tokens/dist/tokens.plain.css` (generated — refresh after `pnpm tokens:build`) | https://mixai.ro/cast/tokens.css |
+| `tokens.css` | Byte copy of `packages/design-tokens/dist/tokens.plain.css` (generated — refresh after `pnpm tokens:build`; last refreshed 2026-11-12 with the product and mark colours) | https://mixai.ro/cast/tokens.css |
 | `styled.css` | Stylesheet for a **Styled Media Receiver** registration (fallback / quick start) | https://mixai.ro/cast/styled.css |
 
 `/cast` has no app route (`src/app/api/cast/*` lives under `/api/cast`, no collision) and `src/proxy.ts` skips
@@ -14,11 +14,15 @@ paths with a file extension, so host routing never rewrites these files. `next.c
 Styled Media Receiver (Google's origin) can load the stylesheet and logos. The global CSP already allows the CAF
 SDK from `https://www.gstatic.com`.
 
+Logos are generated files (`brand/scripts/build.mjs`, never edit them here): the custom receiver shows the
+MixAI Music app icon `/icon-music-512.png` (same origin) and the family wordmark `/wordmark-dark.svg`; the styled
+receiver can only load the two cross-origin files above, so it shows the family mark `/logo.svg`.
+
 ## What the receiver does
 
 - Plays the standard CAF `LOAD` / `QUEUE_LOAD` / `QUEUE_*` messages sent by the Android sender (Media3
   `CastPlayer` + `DefaultMediaItemConverter`): title, artist, album, first artwork image.
-- Idle: MixAI logo, "MixAI Music", "Ready to cast". Playing: blurred album-art backdrop, cover with crossfade,
+- Idle: MixAI Music icon, "MixAI Music", "Ready to cast". Playing: blurred album-art backdrop, cover with crossfade,
   title/artist/album, progress with elapsed/total, "Next: title — artist" from the queue, paused and buffering
   overlays. 1920×1080 TVs and 1024×600 Nest Hub (sizes scale with `vmin`).
 - Optional: `customData.accent` on LOAD (`violet|magenta|cyan|emerald|amber|rose`, anything else ignored).

@@ -14,7 +14,7 @@
     <string name="output_group_dlna">DLNA speakers and TVs</string>
     <string name="output_group_ha">Home Assistant</string>
     <string name="output_none">No speakers or TVs found on this network.</string>
-    <string name="output_note">Crossfade and volume normalisation work on this device and on MixAI TVs. Other outputs play the original file, converted by MMO Server when they cannot play it.</string>
+    <string name="output_note">Crossfade and volume normalisation work on this device and on MixAI TVs. Other outputs play the original file, converted by MixAI Server when they cannot play it.</string>
     <string name="output_selected">Selected</string>
     <string name="output_volume">Volume</string>
     <string name="output_playing_on">Playing on %1$s</string>

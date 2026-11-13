@@ -38,12 +38,7 @@
         .header .logo {
             width: 28px;
             height: 28px;
-            background: var(--brand-gradient);
-            border-radius: var(--radius);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
+            display: block;
         }
 
         .header h1 {
@@ -176,8 +171,8 @@
 
 <body>
     <div class="header">
-        <div class="logo">🎧</div>
-        <h1 data-i18n="popupTitle">MixAI Downloader</h1>
+        <img class="logo" src="icons/icon48.png" width="28" height="28" alt="">
+        <h1 data-i18n="popupTitle">MixAI Connector</h1>
         <span class="version" id="version"></span>
     </div>
 
