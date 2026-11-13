@@ -14,7 +14,7 @@
         "orbit": "MixAI products orbiting your server"
     },
     "products": {
-        "tv": { "name": "MixAI TV", "tagline": "Watch", "body": "Movies, series, Live TV with catch-up and Watch Together. Cinematic on Android TV, Samsung, LG, Apple TV, Fire TV, phones and desktop." },
+        "tv": { "name": "MixAI TV", "tagline": "Watch", "body": "Movies, series, Live TV with catch-up and Watch Together. Cinematic on Android TV, Samsung, LG, Apple TV, Fire TV, phones and desktop.", "shotAlt": "The MixAI TV home screen on a TV: the hero title, its artwork and a row of posters." },
         "music": { "name": "MixAI Music", "tagline": "Listen", "body": "Albums, artists, playlists, radio and synced lyrics. Offline downloads, beat-matched automix, CarPlay and Android Auto." },
         "studio": { "name": "MixAI Studio", "tagline": "Organize", "body": "AI tagging, BPM and key analysis, smart playlists, downloads and server admin with a live dashboard." },
         "dj": { "name": "MixAI Decks", "tagline": "Perform", "body": "Pro DJ software with a Rust audio engine, AI stems, beat sync and controller support." },
@@ -76,6 +76,7 @@
         "title": "MixAI Decks",
         "subtitle": "Pro DJ software with a Rust audio engine, AI stems and beat-matched automix. Free for Windows, macOS and Linux.",
         "cta": "Download MixAI Decks",
+        "shotAlt": "The MixAI Decks screen: two tracks loaded, waveforms, mixer and library.",
         "features": {
             "engine": { "title": "Low-latency engine", "body": "Native Rust audio with sub-10 ms latency, key lock and time-stretching." },
             "stems": { "title": "AI stems", "body": "Split vocals, drums, bass and melody live, on your own machine." },

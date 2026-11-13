@@ -10,6 +10,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## The pages show the product, and the hero scene moves (WP22-17, web 3.6.2, 2026-11-13)
+
+Both MixAI landing pages now carry a picture of the real thing. **MixAI Decks** (`decks.mixai.ro`) shows the
+actual application screen beside its pitch, and the tall first card of the suite landing shows the **MixAI TV**
+home screen. The Decks frame comes from the app's own screenshot test — a headless Compose render of the whole
+screen with both decks loaded (A playing with a hot cue, a 4-beat loop on B), at 1366x768 and 1920x1080, in every
+skin; the TV frame was captured on the Google TV itself, paired to a local MixAI Server with the TMDB key, so the
+hero, its artwork and a row of real posters are on screen. Web copies live in
+`apps/web/public/brand/products/` (1600 px WebP); full-size PNGs are committed under
+`apps/tv-android/store/screenshots/tv/` and `apps/decks-android/store/screenshots/desktop/`.
+
+The scene was reworked with them, from the design-critic prescription list: each background wash gained a second,
+smaller radial so an edge travels instead of only a tint shifting, the drift grew and quickened, and the stars
+moved to a page-level sky in two depths (360 px tiles twinkling at 6.5 s and drifting at 120 s; 520 px at 11 s and
+180 s, drifting the other way). The two orbit rings now lie in different planes (62deg / -16deg and 74deg / +24deg,
+where both were one 68deg plane), the hero entrance is a three-act arc — the Server mark draws its `intro`, the
+rings arrive from 200 ms, the planets from 350 ms, the copy from 780 ms, everything settled by 1.6 s — the core is
+larger and lit (rim plus inner highlight), every card brightens its product-colour glow and border on hover while
+only a card that is a link lifts, and the section after the hero starts 50 px in so the next heading is inside the
+1440x900 fold.
+
+A separate read-only reviewer scored both pages on this rubric twice. The suite landing went **46/60 -> 51/60**
+(the entrance moved 3 -> 5, artistry 3 -> 4) and MixAI Decks **42/60 -> 46/60** (tactility 1 -> 3, artistry
+3 -> 4; the page previously showed no product at all). Both are still under the 52 target: route morphing between
+the landing and a product host, the Decks page's open middle zone, pointer parallax on the orbit and the globally
+fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
+leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
+
 ## MixAI Live — the latency budget, declared against measured (2026-11-13)
 
 The setup step now shows a **latency budget**: every stage the engine can account for — the input period, the

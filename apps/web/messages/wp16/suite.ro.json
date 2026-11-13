@@ -14,7 +14,7 @@
         "orbit": "Produsele MixAI în jurul serverului tău"
     },
     "products": {
-        "tv": { "name": "MixAI TV", "tagline": "Privește", "body": "Filme, seriale, Live TV cu reluare și Watch Together. Cinematic pe Android TV, Samsung, LG, Apple TV, Fire TV, telefoane și desktop." },
+        "tv": { "name": "MixAI TV", "tagline": "Privește", "body": "Filme, seriale, Live TV cu reluare și Watch Together. Cinematic pe Android TV, Samsung, LG, Apple TV, Fire TV, telefoane și desktop.", "shotAlt": "Ecranul principal MixAI TV pe un televizor: titlul principal, imaginea lui și un rând de postere." },
         "music": { "name": "MixAI Music", "tagline": "Ascultă", "body": "Albume, artiști, playlisturi, radio și versuri sincronizate. Descărcări offline, automix pe ritm, CarPlay și Android Auto." },
         "studio": { "name": "MixAI Studio", "tagline": "Organizează", "body": "Etichetare cu AI, analiză BPM și tonalitate, playlisturi inteligente, descărcări și administrarea serverului cu un panou live." },
         "dj": { "name": "MixAI Decks", "tagline": "Mixează", "body": "Software profesional de DJ, cu motor audio în Rust, stem-uri AI, sincronizare pe ritm și suport pentru controllere." },
@@ -76,6 +76,7 @@
         "title": "MixAI Decks",
         "subtitle": "Software profesional de DJ cu motor audio în Rust, stem-uri AI și automix pe ritm. Gratuit pentru Windows, macOS și Linux.",
         "cta": "Descarcă MixAI Decks",
+        "shotAlt": "Ecranul MixAI Decks: două piese încărcate, forme de undă, mixer și bibliotecă.",
         "features": {
             "engine": { "title": "Motor cu latență mică", "body": "Audio nativ în Rust, latență sub 10 ms, blocarea tonalității și time-stretch." },
             "stems": { "title": "Stem-uri AI", "body": "Separă vocea, tobele, basul și melodia live, pe propriul calculator." },

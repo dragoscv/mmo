@@ -17,10 +17,13 @@ export async function SuiteLanding() {
     const t = await getTranslations("mx.suite");
     return (
         <div className="sx">
+            {/* Page-level sky: two star depths (WP22-17). Decorative, fixed, behind everything (suite.css). */}
+            <div className="sx-sky" aria-hidden />
             <SuiteTopBar end={<SignInButton label={t("hero.ctaStart")} />} />
             <main>
                 <section className="sx-wrap sx-hero" aria-labelledby="sx-title">
-                    <div>
+                    {/* The copy waits for the core's mark intro and the planets (`--t0`); each line keeps its `--i`. */}
+                    <div style={{ ["--t0" as string]: "620ms" }}>
                         <p className="sx-eyebrow sx-rise" style={{ ["--i" as string]: 0 }}>{t("hero.eyebrow")}</p>
                         <h1 id="sx-title" className="sx-title text-gradient-brand sx-rise" style={{ ["--i" as string]: 1 }}>
                             {/* One sentence per line on desktop ("Media ta." / "Pe orice ecran." / "De pe serverul tău."); breaks no longer fall mid-phrase. */}
@@ -51,7 +54,8 @@ export async function SuiteLanding() {
                                     <span className="sx-tag">{t(`products.${p.key}.tagline`)}</span>
                                     <h3 id={`sx-p-${p.key}`}>{t(`products.${p.key}.name`)}</h3>
                                     <p>{t(`products.${p.key}.body`)}</p>
-                                    {i === 0 ? <BrandMark product={p.brand} size={160} decorative className="sx-card-art" /> : null}
+                                    {/* The picture of the product (WP22-17): the MixAI TV home, captured on a TV. */}
+                                    {i === 0 ? <img src="/brand/products/mixai-tv.webp" alt={t(`products.${p.key}.shotAlt`)} width={1920} height={1080} className="sx-card-art" /> : null}
                                     <Link id={`sx-more-${p.key}`} aria-labelledby={`sx-more-${p.key} sx-p-${p.key}`} href={p.key === "dj" ? "/dj" : p.key === "server" ? "/get" : p.internal} className="sx-card-link">
                                         {t("sections.learnMore")} <ArrowRight aria-hidden className="size-4" />
                                     </Link>

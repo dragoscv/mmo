@@ -13,6 +13,11 @@ and the scene brief of the suite landing in [`wp17-suite.md`](wp17-suite.md).
 | MixAI Server start screen | 39 of 50 | **40 of 50** applicable points | not re-scored | 80 % |
 | Comparison sheet (decision document) | 24 of 30 | not re-scored (a record of gate B) | | 80 % |
 
+**WP22-17 (product imagery), 2026-11-13 — a later independent pair of passes on the same rubric, after the Decks
+interface settled:** suite landing **46 -> 51 of 60**, MixAI Decks **42 -> 46 of 60** (both still under the 52
+target; the details, the measurements and what is left are in "WP22-17" at the end of this file). The numbers in
+the table above are from the earlier passes on the pages as they were before that round.
+
 The scores are from an independent reviewer (a separate agent, read-only, told that the target must not influence
 the numbers), not from the author of the changes. One change to the suite landing was made after the third pass
 and is **not scored**: see "After the third pass".
@@ -143,3 +148,89 @@ Decks: text cards no longer react to hover at all (measured: transform and glow 
    book. Same colour, two shapes.
 9. Keyboard focus on a card gets the lift, the border and the ring, but not the stronger glow that hover gets.
 10. Outside the brand work: the Maestro button sits on the orbit at 390 px and on the third Decks card.
+
+## WP22-17 — product imagery, and the second pass (2026-11-13)
+
+This round carried out items 1 to 4 of the list above and turned item 10 into a measurement. An independent
+reviewer (a separate read-only agent, told that neither the previous score nor the target may influence it) scored
+both pages twice: once on the build as this session found it, once after the fixes. The numbers below are its
+numbers; the last change was made after its second pass and is therefore **not scored** (see the end of this
+section).
+
+| Surface | Independent, before | Independent, after | Target |
+|---|---|---|---|
+| Suite landing `mixai.ro/` | 46/60 | **51/60** | 52 (1 point short) |
+| MixAI Decks `decks.mixai.ro/` | 42/60 | **46/60** | 52 (6 points short) |
+| MixAI Server start screen | 40 of 50 (unchanged this round) | not re-scored | — |
+
+### What was built
+
+- **A still of the real product on the Decks page.** The renderer is the app's own screenshot test
+  (`apps/decks-android/ui/src/desktopTest/.../ScreenshotTest.kt`), driven through the repo's serialised Gradle
+  wrapper: a headless Compose render of the whole Decks screen, both decks loaded (deck A playing, a hot cue, a
+  4-beat loop on B), every skin, at 1366x768 and 1920x1080. The frame shipped is
+  `decks-pro-signature-1920x1080.png`. The second candidate — the Tauri preview at 1920x1080, driven through the
+  app's own dev handles — was captured too and rejected: a plain browser has no audio engine, so the library panel
+  is an empty "server not connected" state and the waveforms are synthetic.
+- **A still of MixAI TV in the tall first card of the suite**, captured on the Google TV itself (adb `screencap`,
+  1920x1080, the TV paired to a local MixAI Server with the TMDB key, so the hero, its artwork and a row of real
+  posters are on screen). The rail and the poster row are in frame.
+- Files: web copies at `apps/web/public/brand/products/{mixai-tv,mixai-decks}.webp` (1600 px wide, quality 82),
+  full-size PNG copies at `apps/tv-android/store/screenshots/tv/01-mixai-tv-home.png` and
+  `apps/decks-android/store/screenshots/desktop/01-mixai-decks.png`.
+
+### The other prescriptions, and what they measured
+
+| Prescription | Change | Measured after |
+|---|---|---|
+| Living background (4) | each wash layer gained a second, smaller radial (an edge that travels), the drift grew from +-5/4 % to +-9/6 % and the period from 34/46 s to 26/38 s; the stars left the orbit for a page-level `.sx-sky` in two depths (360 px tiles, 6.5 s twinkle, 120 s drift; 520 px, 11 s, 180 s, drifting the other way) | wash travel 11 px x 5 px in 1.6 s at rest; 13 x 6 during the entrance; **0** animations under reduced motion |
+| Orbit geometry (3) | the two rings now lie in different planes: `--rx` 62deg / 74deg with `--tilt` -16deg / +24deg (before: one 68deg plane for both) | both rings' matrices differ; the icons stay clear of the core and of each other |
+| Hero entrance (4) | the core's mark plays its `intro` (brand/BRAND.md), then the rings (from 200 ms), then the planets (350 ms + 90 ms each), then the copy (`--t0` 620 ms) | rings 0 -> 0.28 at 700 ms, planets 0 -> 0.98 at 1250 ms, copy 0 -> 0.62 at 1250 ms -> 1.0 at 1600 ms. The reviewer moved this criterion **3 -> 5** |
+| Empty lower quarter (5) | hero block padding 112/80 px -> 72/56 px, and the section after the hero starts 50 px in instead of 96 px | at 1440x900 the orbit ends at 674 px and the next heading sits at 770-838 px, inside the fold |
+| Decks card tactility | every card now brightens its product-colour glow and takes the product-coloured border on hover; only a card that IS a link also lifts, so the text cards do not promise a click | Decks feature card: glow 0.55 -> 0.9, border -> the Decks cyan; transform stays `none`. The reviewer moved Decks tactility **1 -> 3** |
+| Subject artistry (10) | the core is bigger (inset 36 % -> 33 %, so 190 px on a 537 px orbit) and is now a lit object: a rim ring plus an inner highlight at the upper left | sampled on the renders: dark highlight rgb(123,177,246) / body rgb(54,102,167) / edge rgb(46,86,142); light rgb(83,138,209) / rgb(7,85,166) / rgb(9,82,159). Suite artistry **3 -> 4**, Decks **3 -> 4** |
+
+### The rectangle question, answered with a difference image
+
+The brief warned that headless captures invent glows and rectangles around elements in a shared 3D space. This
+was tested properly this time: **default headless Chromium here rasterises in software (SwiftShader)**; the
+captures are taken with `--use-angle=d3d11 --enable-gpu --ignore-gpu-blocklist`, which reports
+`NVIDIA GeForce RTX 3060 Ti`, and the renderer name is recorded next to the facts.
+
+The test that decides it: pause the whole cascade, screenshot the orbit, hide the four tiles, screenshot again,
+and diff. A painted rectangle would show as changed pixels outside a tile's own box on all four sides.
+
+| Renderer | Tiles with changed pixels outside their own box |
+|---|---|
+| NVIDIA RTX 3060 Ti (GPU), animations paused | **0 of 4** (threshold 8 luminance levels, 24 px observation band) |
+| SwiftShader (software), same test | **0 of 4** |
+
+The independent reviewer ran its own variant of the same test and reported 37 to 99 changed pixels just outside
+each box, which it flagged as a failure. Both readings are honest and they are measuring different things: its
+boxes come from `getBoundingClientRect()` rounded to whole pixels while the tiles sit at fractional offsets, so
+its "outside" band is about one pixel wide — 37 to 99 pixels over a ~240 px perimeter is the antialiasing of the
+edge itself, not a rectangle (a rectangle shows as thousands of pixels on all four sides at once, which is what
+the software renderer did in the previous round). The page is not claimed to be pixel-exact: the finding stands
+as "the strictest per-pixel reading still sees edge antialiasing".
+
+### Still open, and why the pages are not at 52
+
+Not reached: the suite is 1 point short, the Decks page 6. What the reviewer's two passes name as the remaining
+gap, with what it costs to close:
+
+1. **Route morphing (2-3 of 5 on both pages).** Landing -> product host is a full navigation; only the signed-in
+  launcher morphs (FLIP). A real shared-element morph across hosts is a router-level change, not a scene change.
+2. **The Decks page's middle zone** ("large open middle zone", composition 3 of 5): the feature cards sit far
+  below the hero. The reviewer's own remedy is a compact proof strip under the still.
+3. **The Maestro button** (a defect, outside this work): the globally fixed button sits over the product cards at
+  390 px on both pages.
+4. Both pages: the background moves, but it does not react to the subject (no pointer parallax on the orbit —
+  prescription 3 of the second pass).
+5. The suite's `.sx-shot`/plate treatment exists only on the Decks page; the suite's tall card still uses
+  `.sx-card-art`.
+
+### Changed after the second pass (not scored)
+
+`.sx-hero + .sx-section` starts 50 px in instead of 96 px, so the next scene's heading is clearly inside the
+1440x900 fold: measured `firstSection.top = 730`, heading `770-838` of a 900 px viewport, orbit ends at 674.
+This is prescription 1 (composition) of the second pass. No reviewer has scored it.
