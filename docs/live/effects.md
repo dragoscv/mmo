@@ -190,6 +190,7 @@ every 128 samples (2.7 ms at 48 kHz).
 | 6 | `mix` | 0 … 1 | 1 | 0–1 | linear |
 | 7 | `transpose` | -12 … 12 | 0 | st | linear |
 | 8 | `sticky` | 0 … 100 | 60 | cents | linear |
+| 9 | `fast` | 0 / 1 | off | on/off | — |
 
 <!-- params:autotune:end -->
 

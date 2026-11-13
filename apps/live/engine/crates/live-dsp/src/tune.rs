@@ -3,6 +3,7 @@
 use crate::param::{ParamSpec, Smoothed, Unit, one_pole_coef, pan_gains};
 use crate::pitch::{KEY_NAMES, PitchInfo, SCALE_NAMES, Scale, Shifter, Yin};
 use crate::processor::{Processor, defaults, store};
+use crate::psola::PsolaShifter;
 
 /// Control quantum: detection + ratio update every 128 samples (2.67 ms at 48 kHz).
 const QUANTUM: usize = 128;
@@ -25,6 +26,11 @@ const TUNE_SPECS: &[ParamSpec] = &[
     ParamSpec::new("mix", 0.0, 1.0, 1.0, Unit::Percent),
     ParamSpec::new("transpose", -12.0, 12.0, 0.0, Unit::Semitones),
     ParamSpec::new("sticky", 0.0, 100.0, 60.0, Unit::Cents),
+    // "Fast pitch": the period-synchronous shifter (`psola`) instead of the grain shifter. 1 sample
+    // of delay at rest instead of 256 (5.3 ms), but during a correction on a LOW note its delay
+    // runs up to one period (82 Hz: 12.2 ms), more than the classic shifter's fixed 5.3 ms. Off by
+    // default: the classic shifter is the one measured on the owner's rig so far.
+    ParamSpec::toggle("fast", false),
 ];
 
 /// Snapshot of what the corrector is doing (telemetry for the tuner UI).
@@ -39,9 +45,14 @@ pub struct TuneStatus {
 
 pub struct Autotune {
     sr: f32,
-    v: [f32; 9],
+    v: [f32; 10],
     yin: Yin,
     shifter: Shifter,
+    /// Period-synchronous shifter of the fast mode; only ticked while the mode is on or fading in.
+    psola: PsolaShifter,
+    /// Weight of the fast shifter on the wet path, 0 = classic. Ramped over 10 ms so the switch
+    /// between two paths with a very different delay does not click.
+    mode: Smoothed,
     scale: Scale,
     stable: Option<i32>,
     semis: f32,
@@ -55,12 +66,14 @@ pub struct Autotune {
 
 impl Autotune {
     pub fn new(sample_rate: f32) -> Self {
-        let v: [f32; 9] = defaults(TUNE_SPECS);
+        let v: [f32; 10] = defaults(TUNE_SPECS);
         Self {
             sr: sample_rate,
             v,
             yin: Yin::new(sample_rate),
             shifter: Shifter::new(v[5] > 0.5),
+            psola: PsolaShifter::new(sample_rate),
+            mode: Smoothed::with_ms(if v[9] > 0.5 { 1.0 } else { 0.0 }, 10.0, sample_rate),
             scale: Scale::new(v[0] as usize, v[1] as usize),
             stable: None,
             semis: 0.0,
@@ -81,9 +94,19 @@ impl Autotune {
         self.status
     }
 
+    /// The fast (period-synchronous) shifter is selected.
+    fn fast(&self) -> bool {
+        self.v[9] > 0.5
+    }
+
     /// Times the formant guard fell back since the last reset (0 when formant is off).
     pub fn guard_trips(&self) -> u32 {
-        self.shifter.guard_trips()
+        // The fast shifter has no formant guard: it does not filter the output.
+        if self.fast() {
+            0
+        } else {
+            self.shifter.guard_trips()
+        }
     }
 
     fn control(&mut self) {
@@ -128,8 +151,18 @@ impl Autotune {
             self.semis += a * (goal - self.semis);
         }
         self.status.correction_cents = self.semis * 100.0;
-        self.shifter.set_ratio(2f32.powf(self.semis / 12.0));
+        let ratio = 2f32.powf(self.semis / 12.0);
+        self.shifter.set_ratio(ratio);
         self.shifter.control(QUANTUM);
+        self.psola.set_ratio(ratio);
+        // The fast shifter wants the period in samples; unvoiced (0) lets it fall back to its
+        // one-sample delay instead of holding a stale period.
+        self.psola
+            .set_period(if info.voiced() && info.frequency > 0.0 {
+                self.sr / info.frequency
+            } else {
+                0.0
+            });
     }
 }
 
@@ -143,6 +176,9 @@ impl Processor for Autotune {
                 0 | 1 => self.scale = Scale::new(self.v[0] as usize, self.v[1] as usize),
                 5 => self.shifter.set_formant(v > 0.5),
                 6 => self.mix.set(v),
+                // Not on the audio thread: `Command::SetParam` is applied in `Core::apply`, inside
+                // the callback, and `Smoothed` only writes fields.
+                9 => self.mode.set(if v > 0.5 { 1.0 } else { 0.0 }),
                 _ => {}
             }
         }
@@ -159,8 +195,25 @@ impl Processor for Autotune {
             self.q_pos = (self.q_pos + 1) % QUANTUM;
             let x = 0.5 * (*a + *b);
             self.yin.push(x);
-            let wet = self.shifter.tick(x);
-            let dry = self.dry[(self.dry_w + 1) % dlen];
+            let mode = self.mode.next();
+            let wet = if mode > 0.0 {
+                // Both paths run while the crossfade is moving (and only then when the mode is
+                // off), so switching does not step: the classic shifter is 255 samples later.
+                let old = self.shifter.tick(x);
+                let fast = self.psola.tick(x);
+                old + mode * (fast - old)
+            } else {
+                self.shifter.tick(x)
+            };
+            // The dry tap follows the active shifter's delay, crossfaded the same way, so the mix
+            // knob never combs. `dlen - 1` back = the classic 256 samples, one back = the fast one.
+            let dry = if mode > 0.0 {
+                let old = self.dry[(self.dry_w + 1) % dlen];
+                let fast = self.dry[(self.dry_w + dlen - 1) % dlen];
+                old + mode * (fast - old)
+            } else {
+                self.dry[(self.dry_w + 1) % dlen]
+            };
             self.dry[self.dry_w] = x;
             self.dry_w = (self.dry_w + 1) % dlen;
             let m = self.mix.next();
@@ -172,12 +225,17 @@ impl Processor for Autotune {
     fn reset(&mut self) {
         self.yin.reset();
         self.shifter.reset();
+        self.psola.reset();
         self.dry.fill(0.0);
         self.stable = None;
         self.semis = self.v[7];
     }
     fn latency(&self) -> usize {
-        Shifter::latency()
+        if self.fast() {
+            self.psola.latency()
+        } else {
+            Shifter::latency()
+        }
     }
     fn tune_status(&self) -> Option<TuneStatus> {
         Some(self.status)
@@ -467,6 +525,98 @@ mod tests {
         let t = Autotune::new(48000.0);
         assert_eq!(t.param(1), 0.0, "scale must default to chromatic");
         assert_eq!(t.param(5), 0.0, "formant must default to off");
+        assert_eq!(t.param(9), 0.0, "the fast shifter must default to off");
+        assert_eq!(t.latency(), 256, "the classic shifter is the default");
+    }
+
+    /// The fast mode must actually be fast: an impulse comes out 1 sample later instead of 256.
+    #[test]
+    fn fast_mode_moves_the_voice_a_hundred_times_closer() {
+        let delay = |fast: bool| {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(9, if fast { 1.0 } else { 0.0 });
+            // Warm up so the 10 ms crossfade between the two paths has settled, then one impulse.
+            let (mut l, mut r) = (vec![0.0f32; 2048], vec![0.0f32; 2048]);
+            t.process(&mut l, &mut r);
+            l[0] = 1.0;
+            r[0] = 1.0;
+            t.process(&mut l, &mut r);
+            let (mut best, mut at) = (0.0f32, 0usize);
+            for (i, v) in l.iter().enumerate() {
+                if v.abs() > best {
+                    best = v.abs();
+                    at = i;
+                }
+            }
+            (at, best)
+        };
+        let (fast, fast_peak) = delay(true);
+        let (classic, classic_peak) = delay(false);
+        assert!(fast <= 4, "fast mode delayed the voice by {fast} samples");
+        assert!(
+            classic >= 200,
+            "the classic shifter should still delay by ~256, got {classic}"
+        );
+        assert!(
+            fast_peak > 0.05 && classic_peak > 0.05,
+            "no output: {fast_peak} / {classic_peak}"
+        );
+    }
+
+    /// The defect the classic shifter has and the fast one must not: a small correction on a low
+    /// note is LOST (its ignored test `shifter_applies_small_corrections_at_110_hz`).
+    #[test]
+    fn fast_mode_applies_a_small_correction_at_110_hz() {
+        let error_cents = |fast: bool| {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(2, 0.0); // amount: no scale correction, only the transpose below
+            t.set_param(3, 0.5); // retune 40 ms
+            t.set_param(7, 0.25); // +25 cents
+            t.set_param(9, if fast { 1.0 } else { 0.0 });
+            let mut l = sine(110.0, 48000.0, 96000, 0.4);
+            let mut r = l.clone();
+            t.process(&mut l, &mut r);
+            let got = detect(&l);
+            let want = 110.0 * 2f32.powf(0.25 / 12.0);
+            1200.0 * (got / want).log2()
+        };
+        let fast = error_cents(true);
+        let classic = error_cents(false);
+        println!("110 Hz +25 cents: fast {fast:.2} cents off, classic {classic:.2} cents off");
+        assert!(
+            fast.abs() < 8.0,
+            "the fast shifter must land within 8 cents at 110 Hz, got {fast:.2}"
+        );
+    }
+
+    /// Switching the mode while a note is sung must not step: both paths run during the 10 ms
+    /// crossfade, so the output moves by no more than a sine of that frequency does.
+    #[test]
+    fn switching_fast_mode_does_not_click() {
+        let mut t = Autotune::new(48000.0);
+        // One continuous sine, sliced: a sine restarted per block would step at every boundary.
+        let block = 480; // 10 ms
+        let long = sine(440.0, 48000.0, block * 40, 0.4);
+        let mut out: Vec<f32> = Vec::new();
+        for (k, chunk) in long.chunks(block).enumerate() {
+            let mut l = chunk.to_vec();
+            let mut r = l.clone();
+            // Off for 10 blocks, then on while the sine is running.
+            if k == 10 {
+                t.set_param(9, 1.0);
+            }
+            t.process(&mut l, &mut r);
+            out.extend_from_slice(&l);
+        }
+        let worst = out
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max);
+        let input_step = 2.0 * std::f32::consts::PI * 440.0 / 48000.0 * 0.4;
+        assert!(
+            worst < 4.0 * input_step,
+            "switch stepped by {worst:.4}, the sine itself by {input_step:.4}"
+        );
     }
 
     /// Hard correction of a voice-like signal with vibrato: never much louder than the input,

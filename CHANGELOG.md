@@ -10,6 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — fast pitch mode wired into the corrector (WP21-26, 2026-11-13)
+
+`autotune` has a **`fast`** switch (off by default): the period-synchronous shifter of
+`live-dsp/src/psola.rs` replaces the grain shifter, so the wet path sits 1 sample behind the voice
+instead of 256 (5.3 ms). Measured on a 110 Hz tone asked to move +25 cents: the fast mode lands
+**0.01 cents** off, the classic shifter leaves the note where it was (**−25.16 cents**) — the defect
+its ignored test `shifter_applies_small_corrections_at_110_hz` pinned. The switch crossfades both
+paths over 10 ms (the dry tap follows the same fade), so flipping it while singing does not click;
+while the mode is off the fast shifter is not ticked at all.
+
+Honest caveat, measured by its author: the fast shifter's delay during a *correction* runs through
+one whole period, so on low notes it can be longer than the classic one (82 Hz: up to 12.2 ms,
+6.1 ms mean, against a fixed 5.3 ms), and its level drops below 1 dB under ratio 0.75. It is
+therefore an option, not the default, until the owner hears both on his rig.
+
 ## MixAI Live — latency slice: Voicemeeter insert, adaptive cushion, untuned monitor, fast shifter (WP21-25/26, 2026-11-13)
 
 Five of the six things the owner asked for on 2026-11-12, all of them in the engine and all gated
