@@ -204,10 +204,16 @@ this app shell" for keep awake, power and disk), then on a shell that has them (
   more lock/unlock rounds), power and disk numbers against the system's own, ten path cases and a dead UNC share
   through the real command, and six real close requests from Windows while locked (same process id throughout,
   one question, the focus on "Keep playing").
-- **"Close anyway"** and **closing while unlocked** were never pressed live (both end the app). The rule is
-  unit-tested in Rust **and in TypeScript** (`closeAnyway` in `gig-core.test.ts`); the path from the button to
-  `window.destroy()` is not exercised by any test. `live/n5-close-anyway.mjs` is written and syntax-checked, to be
-  run by the lead after the next shell build; it ends the instance and re-seeds it.
+- **"Close anyway" during a real recording** (measured 2026-11-14 on `'@aux'`, script `live/n5-close-anyway.mjs`):
+  a recording was started through `start_recording` to a file on the laptop's temp folder and the page's own
+  recording flag was deliberately left unset - the exact state the original defect lived in (after a page reload
+  the REC button says "not recording" while the engine writes). A real close request from Windows was held, the
+  question said that a recording runs and that closing saves the file, "Close anyway" was pressed and the window
+  went. The file on the laptop: **5 267 524 bytes, RIFF size 5 267 516 (= file - 8), data size 5 267 456
+  (= file - 44), 48 kHz / 32-bit / stereo, 13.72 s** - a writer killed before the stop would have left 0 in both
+  length fields. The instance was closed on purpose and its supervisor restarted it (new pid, same tree).
+- **Closing while unlocked** was not pressed live (it ends the app). The rule is unit-tested in Rust **and in
+  TypeScript** (`closeAnyway` in `gig-core.test.ts`).
 - **A page that does not answer** (the 1.5 s way out of the close question) is unit-tested as a rule only; no
   hung page was produced.
 - **macOS and Linux**: the platform part of `gig.rs` (free space through `statvfs`, the Linux battery reader,
