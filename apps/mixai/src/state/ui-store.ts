@@ -10,6 +10,7 @@
  */
 
 import { create } from "zustand";
+import { gigAllows } from "@/gig/gig-store";
 
 const STORAGE_KEY = "mixai-ui";
 
@@ -88,8 +89,16 @@ export const useUiStore = create<UiStore>((set, get) => ({
         set({ deckCount });
         persist({ deckCount });
     },
-    setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
-    openSettings: (tab) => set((s) => ({ settingsOpen: true, settingsTab: tab ?? s.settingsTab })),
+    // Gig lock: every way of opening Settings ends here. Refused while locked (the gate says
+    // why in the status region); closing is always allowed.
+    setSettingsOpen: (settingsOpen) => {
+        if (settingsOpen && !gigAllows("openSettings")) return;
+        set({ settingsOpen });
+    },
+    openSettings: (tab) => {
+        if (!gigAllows("openSettings")) return;
+        set((s) => ({ settingsOpen: true, settingsTab: tab ?? s.settingsTab }));
+    },
     setSettingsTab: (settingsTab) => set({ settingsTab }),
     setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
     setCommandOpen: (commandOpen) => set({ commandOpen }),

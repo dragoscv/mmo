@@ -1,12 +1,25 @@
 import { useEffect, useMemo } from "react";
-import { Circle, Keyboard, LayoutGrid, Layers, ListMusic, Moon, Settings, Square, Sun } from "lucide-react";
+import { Circle, Keyboard, LayoutGrid, Layers, ListMusic, Lock, LockOpen, Moon, Settings, Square, Sun } from "lucide-react";
 import { CommandDialog, useCommandPalette, type CommandItemDef } from "@mmo/ui";
 import { useThemePrefs } from "@mmo/ui/theme";
 import { useUiStore } from "@/state/ui-store";
 import { useMixerStore } from "@/state/mixer-store";
 import { useRecordingStore } from "@/state/recording-store";
 import { useSetlogStore } from "@/setlog/setlog-store";
+import { gigAllows, useGigStore } from "@/gig/gig-store";
 import { useT } from "@/i18n";
+
+/**
+ * A palette item that changes a setting (deck count, theme mode, surface). Gig lock: the
+ * palette is a door to settings beside the Settings modal, so these ask the same gate; while
+ * locked nothing changes and the gate says why in the status region.
+ */
+function change(run: () => void): () => void {
+    return () => {
+        if (!gigAllows("changeSettings")) return;
+        run();
+    };
+}
 
 /**
  * Global command palette (Ctrl/⌘ K). Navigation + actions + theme quick
@@ -25,6 +38,7 @@ export function CommandPalette() {
     const native = useMixerStore((s) => s.native);
     const recording = useRecordingStore((s) => s.recording);
     const toggleRecording = useRecordingStore((s) => s.toggle);
+    const gigLocked = useGigStore((s) => s.locked);
     const { prefs, setPrefs, resolvedMode } = useThemePrefs();
 
     // title bar button → palette
@@ -43,13 +57,14 @@ export function CommandPalette() {
                 label: deckCount === 4 ? t("command.toggleDecks2") : t("command.toggleDecks4"),
                 icon: deckCount === 4 ? <Layers aria-hidden /> : <LayoutGrid aria-hidden />,
                 keywords: ["deck", "layout", "2", "4"],
-                onSelect: () => setDeckCount(deckCount === 4 ? 2 : 4),
+                onSelect: change(() => setDeckCount(deckCount === 4 ? 2 : 4)),
             },
             {
                 id: "settings",
                 group: "navigate",
-                label: t("command.openSettings"),
-                icon: <Settings aria-hidden />,
+                // Gig lock: the item stays selectable; selecting it says why Settings stay closed (ui-store asks the gate).
+                label: gigLocked ? t("gig.commandLocked") : t("command.openSettings"),
+                icon: gigLocked ? <Lock aria-hidden /> : <Settings aria-hidden />,
                 keywords: ["settings", "setari", "preferences"],
                 onSelect: () => setSettingsOpen(true),
             },
@@ -81,36 +96,47 @@ export function CommandPalette() {
                 onSelect: () => window.setTimeout(() => useSetlogStore.getState().setOpen(true), 0),
             },
             {
+                id: "gig",
+                group: "actions",
+                label: t("gig.command"),
+                icon: gigLocked ? <Lock aria-hidden /> : <LockOpen aria-hidden />,
+                keywords: ["gig", "lock", "unlock", "set", "checklist", "blocare", "deblocare", "verificari", "concert"],
+                shortcut: ["mod+shift+g"],
+                // Opens the popover (never toggles: unlocking stays the two-step in there). After the
+                // palette has closed and handed the focus back: the popover then takes it.
+                onSelect: () => window.setTimeout(() => useGigStore.getState().setOpen(true), 0),
+            },
+            {
                 id: "mode",
                 group: "theme",
                 label: t("command.toggleMode"),
                 icon: resolvedMode === "dark" ? <Sun aria-hidden /> : <Moon aria-hidden />,
                 keywords: ["light", "dark", "theme", "luminos", "intunecat"],
-                onSelect: () => setPrefs({ mode: resolvedMode === "dark" ? "light" : "dark" }),
+                onSelect: change(() => setPrefs({ mode: resolvedMode === "dark" ? "light" : "dark" })),
             },
             {
                 id: "surface-glass",
                 group: "theme",
                 label: t("command.surfaceGlass"),
                 disabled: prefs.surface === "glass",
-                onSelect: () => setPrefs({ surface: "glass" }),
+                onSelect: change(() => setPrefs({ surface: "glass" })),
             },
             {
                 id: "surface-solid",
                 group: "theme",
                 label: t("command.surfaceSolid"),
                 disabled: prefs.surface === "solid",
-                onSelect: () => setPrefs({ surface: "solid" }),
+                onSelect: change(() => setPrefs({ surface: "solid" })),
             },
             {
                 id: "surface-flat",
                 group: "theme",
                 label: t("command.surfaceFlat"),
                 disabled: prefs.surface === "flat",
-                onSelect: () => setPrefs({ surface: "flat" }),
+                onSelect: change(() => setPrefs({ surface: "flat" })),
             },
         ],
-        [deckCount, native, prefs.surface, recording, resolvedMode, setDeckCount, setPrefs, setSettingsOpen, setShortcutsOpen, t, toggleRecording],
+        [deckCount, gigLocked, native, prefs.surface, recording, resolvedMode, setDeckCount, setPrefs, setSettingsOpen, setShortcutsOpen, t, toggleRecording],
     );
 
     return <CommandDialog open={open} onOpenChange={setOpen} items={items} placeholder={t("command.placeholder")} />;

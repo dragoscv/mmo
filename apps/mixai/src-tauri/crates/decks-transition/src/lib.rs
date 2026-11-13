@@ -5,6 +5,8 @@
 //!
 //! * [`rank_next`] — next-track suggestions from key (Camelot wheel), tempo (incl. half / double
 //!   time), energy direction and repetition, each with human-readable reasons.
+//!   [`rank_next_with`] adds, for callers that ask ([`RankExtras`]), a key-shift proposal for a
+//!   clashing track that one or two semitones make fit ([`propose_key_shift`]).
 //! * [`plan_transition`] — picks a style (bass swap, filter sweep, echo out, stem swap, cut) and a
 //!   phrase-aligned start, and writes it as editable [`Automation`] lanes (volume, EQ, filter, stem
 //!   gains, beat FX, play events) keyed in beats.
@@ -29,10 +31,16 @@ mod safety;
 pub use automation::{
     AutoCmd, Automation, Curve, Event, Keyframe, Lane, Target, TimedEvent, TransitionRunner,
 };
-pub use camelot::{Camelot, key_score, root_pitch_class};
+pub use camelot::{
+    Camelot, KEY_CLASH_BELOW, KEY_FITS_FROM, KeyShift, WHEEL_STEPS_PER_SEMITONE, key_score,
+    propose_key_shift, root_pitch_class,
+};
 pub use intent::{Intent, IntentAction, LLM_INTENT_SCHEMA, parse_intent, parse_llm_intent};
 pub use plan::{PlanRequest, Style, TransitionPlan, plan_transition};
-pub use rank::{Candidate, EnergyDirection, RankOptions, Ranked, rank_next, tempo_score};
+pub use rank::{
+    Candidate, EnergyDirection, KEY_SHIFT_ONE, KEY_SHIFT_TWO, KEY_SHIFTABLE, RankExtras,
+    RankOptions, Ranked, rank_next, rank_next_with, tempo_score,
+};
 pub use riser::{RiserSpec, render_riser, riser_root_hz};
 pub use safety::{SafetyInput, Warning, check_safety};
 

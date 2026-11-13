@@ -17,6 +17,7 @@ import { practiceMessages } from "./messages-practice.ts";
 import { remoteMessages } from "./messages-remote.ts";
 import { copilotMessages } from "./messages-copilot.ts";
 import { setlogMessages } from "./messages-setlog.ts";
+import { gigMessages } from "./messages-gig.ts";
 
 const all = {
     appMessages,
@@ -35,6 +36,7 @@ const all = {
     remoteMessages,
     copilotMessages,
     setlogMessages,
+    gigMessages,
 };
 
 test("every catalogue has the same keys in en and ro, and no empty strings", () => {

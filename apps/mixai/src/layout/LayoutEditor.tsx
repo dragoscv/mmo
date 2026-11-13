@@ -7,6 +7,10 @@
  * - Save refuses invalid layouts (validator) and shows the minimum window size.
  * Keyboard: every placed panel is a button; arrows move it, Shift+arrows resize,
  * Delete removes it; palette chips place at the first free cell on Enter.
+ *
+ * Gig lock: the editor is a door to a settings change beside the Settings modal. Opening it
+ * and Save ask the gate (refused while locked, with the sentence), and an editor that is open
+ * when the lock goes on closes the way Cancel does (the draft is dropped, nothing is saved).
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
@@ -20,6 +24,7 @@ import { PANEL_IDS, type LayoutArea, type LayoutDoc, type PanelId } from "./type
 import { placeArea, resizeArea, setTrackCount } from "./editor-ops";
 import { localLayoutId } from "@/packs/pack-layouts";
 import { useMotionOK } from "@/shell/motion";
+import { gigAllows, useGigLocked } from "@/gig/gig-store";
 import { useT } from "@/i18n";
 
 function slugify(name: string): string {
@@ -42,9 +47,11 @@ export function LayoutEditor() {
     const [selected, setSelected] = useState<PanelId | null>(null);
     const [drag, setDrag] = useState<PanelId | null>(null);
     const motionOK = useMotionOK();
+    const gigLocked = useGigLocked();
 
     useEffect(() => {
         layoutEditorBridge.open = () => {
+            if (!gigAllows("changeSettings")) return;
             const active = useLayoutStore.getState().active();
             const builtin = !useLayoutStore.getState().user.some((u) => u.id === active.id);
             // Pack layouts carry `<packId>/<id>`; a fork gets a plain slug from the local part.
@@ -57,6 +64,11 @@ export function LayoutEditor() {
             layoutEditorBridge.open = () => {};
         };
     }, [t]);
+
+    // The lock went on with the editor open: closed like Cancel.
+    useEffect(() => {
+        if (gigLocked) setOpen(false);
+    }, [gigLocked]);
 
     const preview = useMemo(() => {
         if (!draft) return null;
@@ -78,6 +90,7 @@ export function LayoutEditor() {
         return null;
     };
     const save = () => {
+        if (!gigAllows("changeSettings")) return;
         const errs = validateLayout(draft, PANEL_IDS);
         if (errs.length) return setErrors(errs);
         const res = useLayoutStore.getState().saveUser(draft);

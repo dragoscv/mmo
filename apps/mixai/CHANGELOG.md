@@ -18,6 +18,56 @@
 - The last recorded set (date, length, WAV file name, tracks) is kept on this computer until a
   later recording lists its first track or you press Clear, so a set can be uploaded the next day
   and a sound check does not erase it. During a recording the list is also saved once a minute.
+- **"Now playing" page for OBS** (Connect in the status bar, tab Stream): a page that shows the
+  title and artist of the track on air, made for an OBS Browser source. Press Copy and paste the
+  address as the URL of the source (1200 × 240 is a good size; the background is transparent). A
+  track is on air once it has been the loudest one in the mix for 8 seconds, and the page clears
+  after 8 seconds of silence. Options in the address: `align`, `scale`, `plate`, `label`, `lang`.
+  The address has its own code that can only read that title; it cannot control anything.
+- **Gig lock** (GIG chip in the status bar, left of Practice; also "Gig lock" in the command
+  palette and Ctrl+Shift+G): lock the app before a set so nothing changes or interrupts by itself.
+  While locked, Settings stay closed whichever way you try to open them, settings profiles and the
+  cloud profile sync wait, a controller that connects does not switch the layout, skin tries end
+  and the skin and layout editors close, plugin notifications are hidden (the chip counts them and
+  the popover keeps their texts), closing the window asks first, and on Windows the computer and
+  the display stay awake. The decks, the mixer, layout hotkeys, stage mode and the phone remote are
+  not locked. Locking is one click; unlocking takes two steps (Unlock, then Confirm within five
+  seconds, or the hotkey twice), so it cannot happen by accident. A crash or a restart during a set
+  comes back locked (a lock older than 12 hours is dropped when the app starts, and says so).
+- **Checklist before a set** (GIG chip → Checklist): audio device, buffer and sample rate, mains or
+  battery, room on the recording drive in hours of recording, dropouts measured over ten seconds,
+  the music server, the controller. Each row shows OK, Warning, Problem or Unknown in words, when it
+  was checked, and what to do about a warning. You can lock with warnings; the DJ decides.
+- **Key-shift suggestions in the co-pilot** (copilot button in the Library toolbar): a track whose
+  key clashes with the playing one is no longer buried at the bottom of the list. When shifting it
+  by one or two semitones would make it fit, the row says so ("Key +1 → 9A fits") and one extra
+  small button (`B+1`) loads that track on the other deck and sets the shift for you. The pitch
+  changes only once the engine really has the track, never under a deck that is already playing,
+  and a copilot shift goes back to 0 when that deck receives another track, unless you changed it
+  yourself. A track a shift would fix never ranks above a track that already fits, "Mix next" never
+  picks such a track by itself, an "in key" set request lists the tracks that fit untouched first,
+  and the row's key chip always agrees with the reason next to it. Desktop only: the ranking the
+  Android and iOS apps get is unchanged.
+
+### Changed
+
+- **Connect always starts on its usual port** (47831). If that port is busy it uses another one for
+  that run only, says so on the Stream tab, and tries the usual port again at the next start.
+- The Connect server answers only requests that name it by an IP address or `localhost`; anything
+  else gets 403. The stream address keeps its code between starts, so OBS keeps working after a
+  restart; "New code" revokes the old address at once and disconnects it, while phones stay
+  connected.
+- The "Now playing" page names a fallback font stack: it uses the fonts of the computer it runs on.
+
+### Fixed
+
+- A device that was let in a moment before a pairing code was changed stayed connected with the
+  revoked code (the phone / second-screen codes since 1.6.0, and the stream overlay). The code and
+  its revision are now read together.
+- `remote_set` applies or refuses its whole batch (deck labels, party switch, a new overlay code)
+  as one.
+- **Close anyway** in the gig lock question stops a running recording and waits for the file to be
+  finalised before the window closes, so the WAV is not left with a zero length.
 
 ## 1.6.0 — 2026-11-12
 

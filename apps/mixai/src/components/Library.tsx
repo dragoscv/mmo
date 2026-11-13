@@ -4,6 +4,7 @@ import { engine } from "@/bridge/engine";
 import type { DeckId, LibraryTrack } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
 import { useUiStore } from "@/state/ui-store";
+import { useGigLocked } from "@/gig/gig-store";
 import { useAutoMixStore } from "@/state/auto-mix-store";
 import { playedTonight, useHistoryStore } from "@/state/history-store";
 import { usePerfStore } from "@/state/perf-store";
@@ -118,6 +119,8 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
     const locale = useLocale();
     const touch = useTouchMode();
     const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+    // Gig lock: the buttons stay focusable; pressing one says why Settings stay closed (ui-store asks the gate).
+    const gigLocked = useGigLocked();
     // One string for all the library needs from the decks: it changes when a deck loads, starts /
     // stops or changes tempo, not on every engine snapshot (idle and playback stay free).
     const deckKey = useMixerStore((s) => encodeDecks(s.decks));
@@ -130,6 +133,8 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
     const [query, setQuery] = useState("");
     const [tracks, setTracks] = useState<LibraryTrack[]>([]);
     const [total, setTotal] = useState(0);
+    // The companion has answered a track query at least once (an empty list before that is not "an empty library").
+    const [answered, setAnswered] = useState(false);
     const [status, setStatus] = useState<Status>("checking");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -183,6 +188,7 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
             const first = await engine.companionTracks(opts);
             if (req !== reqRef.current) return;
             if (first) {
+                setAnswered(true);
                 const seen = new Set<number>();
                 let acc = first.tracks.filter((x) => !seen.has(x.id) && seen.add(x.id));
                 if (progressive) setTracks(acc);
@@ -224,9 +230,9 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
     }, [tracks, setPool]);
     // The same pool for everything else that works on "the library" (co-pilot, song requests).
     useEffect(() => {
-        useLibraryPool.getState().set(tracks, fetched.current?.query ?? "", total);
-    }, [tracks, total]);
-    useEffect(() => () => useLibraryPool.getState().set([], "", 0), []);
+        useLibraryPool.getState().set(tracks, fetched.current?.query ?? "", total, answered);
+    }, [tracks, total, answered]);
+    useEffect(() => () => useLibraryPool.getState().set([], "", 0, false), []);
 
     const load = useCallback((deck: DeckId, tr: LibraryTrack) => {
         const mixer = useMixerStore.getState();
@@ -430,11 +436,11 @@ function CompanionLibrary({ tier, source, setSource }: SourceProps) {
                             action={
                                 icon ? (
                                     // Icon tier (200 px): the text button would squeeze the title to "Neas…".
-                                    <button type="button" className="dk-btn dk-btn-xs" aria-label={t("library.openSettings")} title={t("library.openSettings")} onClick={() => setSettingsOpen(true)}>
+                                    <button type="button" className="dk-btn dk-btn-xs" aria-label={t("library.openSettings")} aria-disabled={gigLocked || undefined} title={gigLocked ? t("gig.lockedShort") : t("library.openSettings")} onClick={() => setSettingsOpen(true)}>
                                         <Settings size={12} aria-hidden />
                                     </button>
                                 ) : (
-                                    <button type="button" className="dk-btn" onClick={() => setSettingsOpen(true)}>
+                                    <button type="button" className="dk-btn" aria-disabled={gigLocked || undefined} title={gigLocked ? t("gig.lockedShort") : undefined} onClick={() => setSettingsOpen(true)}>
                                         {t("library.openSettings")}
                                     </button>
                                 )

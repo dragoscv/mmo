@@ -43,6 +43,13 @@ export interface Ranked {
     /** Reason tags: `key_same`, `tempo_close`, `energy_up`, `recently_played`, … (translated by the UI). */
     reasons: string[];
     tempoRatio: number | null;
+    /**
+     * Proposed key shift of this track in semitones (+1, -1, +2, -2) that makes it fit the
+     * reference key; null = none. Absent on a shell that predates proposals (WP19-61).
+     */
+    keyShift?: number | null;
+    /** The track's key after the proposed shift (Camelot); null / absent without a proposal. */
+    keyAfter?: string | null;
 }
 
 export type TransitionStyle = "bass_swap" | "filter_sweep" | "echo_out" | "stem_swap" | "cut";
@@ -143,9 +150,14 @@ export function isUnknownCommand(err: unknown): boolean {
 }
 
 export const copilot = {
-    /** Top `limit` next tracks after `playing` (default 8), with reason tags. */
-    rank(playing: TrackFeat, candidates: Candidate[], energy: EnergyDirection = "hold", limit = 8): Promise<Ranked[] | null> {
-        return call<Ranked[]>("copilot_rank", { playing, candidates, energy, limit });
+    /**
+     * Top `limit` next tracks after `playing` (default 8), with reason tags. `keyShift` (default
+     * on) asks for key-shift proposals: a clashing track that one or two semitones make fit
+     * carries `keyShift` / `keyAfter` and ranks between a clash and an adjacent key. A shell
+     * that predates the option ignores it and answers as before.
+     */
+    rank(playing: TrackFeat, candidates: Candidate[], energy: EnergyDirection = "hold", limit = 8, keyShift = true): Promise<Ranked[] | null> {
+        return call<Ranked[]>("copilot_rank", { playing, candidates, energy, limit, keyShift });
     },
 
     /** Plan a transition from `from` (on `fromDeck`, playhead at `fromPosSec`) to `to` (on `toDeck`). */

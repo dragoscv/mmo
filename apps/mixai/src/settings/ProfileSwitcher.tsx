@@ -15,6 +15,7 @@ import {
     cn,
 } from "@mmo/ui";
 import { useT } from "@/i18n";
+import { gigAllows, useGigLocked } from "@/gig/gig-store";
 import { useUiStore } from "@/state/ui-store";
 import { useProfilesStore } from "./profiles-store";
 import { isEmptyProfile } from "./profiles-core";
@@ -32,10 +33,13 @@ export function ProfileSwitcher({ className }: ProfileSwitcherProps) {
     const switchTo = useProfilesStore((s) => s.switchTo);
     const setStatus = useUndoStore((s) => s.setStatus);
     const current = profiles.find((p) => p.id === active);
+    const locked = useGigLocked();
 
     const onPick = async (id: string) => {
         const p = profiles.find((x) => x.id === id);
         if (!p) return;
+        // Gig lock: profiles do not change during a set (the gate says why in the status region).
+        if (!gigAllows("switchProfile")) return;
         if (isEmptyProfile(p)) {
             useUiStore.getState().openSettings("profiles");
             return;
@@ -48,7 +52,13 @@ export function ProfileSwitcher({ className }: ProfileSwitcherProps) {
         <DropdownMenu>
             <DropdownMenuTrigger
                 render={
-                    <Button variant="ghost" size="sm" className={cn("gap-1.5", className)} aria-label={t("settings.profileSwitcher", { name: current?.name ?? t("settings.profileNone") })} />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn("gap-1.5", className)}
+                        data-gig-locked={locked || undefined}
+                        aria-label={`${t("settings.profileSwitcher", { name: current?.name ?? t("settings.profileNone") })}${locked ? `. ${t("gig.lockedShort")}` : ""}`}
+                    />
                 }
             >
                 {current ? <ProfileGlyph icon={current.icon} className="size-4" /> : null}

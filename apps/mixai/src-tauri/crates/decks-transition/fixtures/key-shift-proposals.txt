@@ -1,0 +1,579 @@
+# Key-shift proposals of the co-pilot for every pair of the 24 Camelot keys (WP19-61).
+# <reference key> <candidate key> <shift in semitones> <candidate key after the shift> <relation>, or '-' = none.
+# Checked by decks-transition (camelot.rs) and by apps/mixai/src/copilot/key-shift.test.ts: edit both rules together.
+1A 1A -
+1A 1B -
+1A 2A -
+1A 2B -
+1A 3A -
+1A 3B -2 1B relative
+1A 4A -2 2A adjacent
+1A 4B -
+1A 5A +1 12A adjacent
+1A 5B -
+1A 6A +1 1A same
+1A 6B +1 1B relative
+1A 7A +1 2A adjacent
+1A 7B -
+1A 8A -1 1A same
+1A 8B -1 1B relative
+1A 9A -1 2A adjacent
+1A 9B -
+1A 10A +2 12A adjacent
+1A 10B -
+1A 11A -
+1A 11B +2 1B relative
+1A 12A -
+1A 12B -
+1B 1A -
+1B 1B -
+1B 2A -
+1B 2B -
+1B 3A -2 1A relative
+1B 3B -
+1B 4A -
+1B 4B -2 2B adjacent
+1B 5A -
+1B 5B +1 12B adjacent
+1B 6A +1 1A relative
+1B 6B +1 1B same
+1B 7A -
+1B 7B +1 2B adjacent
+1B 8A -1 1A relative
+1B 8B -1 1B same
+1B 9A -
+1B 9B -1 2B adjacent
+1B 10A -
+1B 10B +2 12B adjacent
+1B 11A +2 1A relative
+1B 11B -
+1B 12A -
+1B 12B -
+2A 1A -
+2A 1B -
+2A 2A -
+2A 2B -
+2A 3A -
+2A 3B -
+2A 4A -
+2A 4B -2 2B relative
+2A 5A -2 3A adjacent
+2A 5B -
+2A 6A +1 1A adjacent
+2A 6B -
+2A 7A +1 2A same
+2A 7B +1 2B relative
+2A 8A +1 3A adjacent
+2A 8B -
+2A 9A -1 2A same
+2A 9B -1 2B relative
+2A 10A -1 3A adjacent
+2A 10B -
+2A 11A +2 1A adjacent
+2A 11B -
+2A 12A -
+2A 12B +2 2B relative
+2B 1A -
+2B 1B -
+2B 2A -
+2B 2B -
+2B 3A -
+2B 3B -
+2B 4A -2 2A relative
+2B 4B -
+2B 5A -
+2B 5B -2 3B adjacent
+2B 6A -
+2B 6B +1 1B adjacent
+2B 7A +1 2A relative
+2B 7B +1 2B same
+2B 8A -
+2B 8B +1 3B adjacent
+2B 9A -1 2A relative
+2B 9B -1 2B same
+2B 10A -
+2B 10B -1 3B adjacent
+2B 11A -
+2B 11B +2 1B adjacent
+2B 12A +2 2A relative
+2B 12B -
+3A 1A -
+3A 1B +2 3B relative
+3A 2A -
+3A 2B -
+3A 3A -
+3A 3B -
+3A 4A -
+3A 4B -
+3A 5A -
+3A 5B -2 3B relative
+3A 6A -2 4A adjacent
+3A 6B -
+3A 7A +1 2A adjacent
+3A 7B -
+3A 8A +1 3A same
+3A 8B +1 3B relative
+3A 9A +1 4A adjacent
+3A 9B -
+3A 10A -1 3A same
+3A 10B -1 3B relative
+3A 11A -1 4A adjacent
+3A 11B -
+3A 12A +2 2A adjacent
+3A 12B -
+3B 1A +2 3A relative
+3B 1B -
+3B 2A -
+3B 2B -
+3B 3A -
+3B 3B -
+3B 4A -
+3B 4B -
+3B 5A -2 3A relative
+3B 5B -
+3B 6A -
+3B 6B -2 4B adjacent
+3B 7A -
+3B 7B +1 2B adjacent
+3B 8A +1 3A relative
+3B 8B +1 3B same
+3B 9A -
+3B 9B +1 4B adjacent
+3B 10A -1 3A relative
+3B 10B -1 3B same
+3B 11A -
+3B 11B -1 4B adjacent
+3B 12A -
+3B 12B +2 2B adjacent
+4A 1A +2 3A adjacent
+4A 1B -
+4A 2A -
+4A 2B +2 4B relative
+4A 3A -
+4A 3B -
+4A 4A -
+4A 4B -
+4A 5A -
+4A 5B -
+4A 6A -
+4A 6B -2 4B relative
+4A 7A -2 5A adjacent
+4A 7B -
+4A 8A +1 3A adjacent
+4A 8B -
+4A 9A +1 4A same
+4A 9B +1 4B relative
+4A 10A +1 5A adjacent
+4A 10B -
+4A 11A -1 4A same
+4A 11B -1 4B relative
+4A 12A -1 5A adjacent
+4A 12B -
+4B 1A -
+4B 1B +2 3B adjacent
+4B 2A +2 4A relative
+4B 2B -
+4B 3A -
+4B 3B -
+4B 4A -
+4B 4B -
+4B 5A -
+4B 5B -
+4B 6A -2 4A relative
+4B 6B -
+4B 7A -
+4B 7B -2 5B adjacent
+4B 8A -
+4B 8B +1 3B adjacent
+4B 9A +1 4A relative
+4B 9B +1 4B same
+4B 10A -
+4B 10B +1 5B adjacent
+4B 11A -1 4A relative
+4B 11B -1 4B same
+4B 12A -
+4B 12B -1 5B adjacent
+5A 1A -1 6A adjacent
+5A 1B -
+5A 2A +2 4A adjacent
+5A 2B -
+5A 3A -
+5A 3B +2 5B relative
+5A 4A -
+5A 4B -
+5A 5A -
+5A 5B -
+5A 6A -
+5A 6B -
+5A 7A -
+5A 7B -2 5B relative
+5A 8A -2 6A adjacent
+5A 8B -
+5A 9A +1 4A adjacent
+5A 9B -
+5A 10A +1 5A same
+5A 10B +1 5B relative
+5A 11A +1 6A adjacent
+5A 11B -
+5A 12A -1 5A same
+5A 12B -1 5B relative
+5B 1A -
+5B 1B -1 6B adjacent
+5B 2A -
+5B 2B +2 4B adjacent
+5B 3A +2 5A relative
+5B 3B -
+5B 4A -
+5B 4B -
+5B 5A -
+5B 5B -
+5B 6A -
+5B 6B -
+5B 7A -2 5A relative
+5B 7B -
+5B 8A -
+5B 8B -2 6B adjacent
+5B 9A -
+5B 9B +1 4B adjacent
+5B 10A +1 5A relative
+5B 10B +1 5B same
+5B 11A -
+5B 11B +1 6B adjacent
+5B 12A -1 5A relative
+5B 12B -1 5B same
+6A 1A -1 6A same
+6A 1B -1 6B relative
+6A 2A -1 7A adjacent
+6A 2B -
+6A 3A +2 5A adjacent
+6A 3B -
+6A 4A -
+6A 4B +2 6B relative
+6A 5A -
+6A 5B -
+6A 6A -
+6A 6B -
+6A 7A -
+6A 7B -
+6A 8A -
+6A 8B -2 6B relative
+6A 9A -2 7A adjacent
+6A 9B -
+6A 10A +1 5A adjacent
+6A 10B -
+6A 11A +1 6A same
+6A 11B +1 6B relative
+6A 12A +1 7A adjacent
+6A 12B -
+6B 1A -1 6A relative
+6B 1B -1 6B same
+6B 2A -
+6B 2B -1 7B adjacent
+6B 3A -
+6B 3B +2 5B adjacent
+6B 4A +2 6A relative
+6B 4B -
+6B 5A -
+6B 5B -
+6B 6A -
+6B 6B -
+6B 7A -
+6B 7B -
+6B 8A -2 6A relative
+6B 8B -
+6B 9A -
+6B 9B -2 7B adjacent
+6B 10A -
+6B 10B +1 5B adjacent
+6B 11A +1 6A relative
+6B 11B +1 6B same
+6B 12A -
+6B 12B +1 7B adjacent
+7A 1A +1 8A adjacent
+7A 1B -
+7A 2A -1 7A same
+7A 2B -1 7B relative
+7A 3A -1 8A adjacent
+7A 3B -
+7A 4A +2 6A adjacent
+7A 4B -
+7A 5A -
+7A 5B +2 7B relative
+7A 6A -
+7A 6B -
+7A 7A -
+7A 7B -
+7A 8A -
+7A 8B -
+7A 9A -
+7A 9B -2 7B relative
+7A 10A -2 8A adjacent
+7A 10B -
+7A 11A +1 6A adjacent
+7A 11B -
+7A 12A +1 7A same
+7A 12B +1 7B relative
+7B 1A -
+7B 1B +1 8B adjacent
+7B 2A -1 7A relative
+7B 2B -1 7B same
+7B 3A -
+7B 3B -1 8B adjacent
+7B 4A -
+7B 4B +2 6B adjacent
+7B 5A +2 7A relative
+7B 5B -
+7B 6A -
+7B 6B -
+7B 7A -
+7B 7B -
+7B 8A -
+7B 8B -
+7B 9A -2 7A relative
+7B 9B -
+7B 10A -
+7B 10B -2 8B adjacent
+7B 11A -
+7B 11B +1 6B adjacent
+7B 12A +1 7A relative
+7B 12B +1 7B same
+8A 1A +1 8A same
+8A 1B +1 8B relative
+8A 2A +1 9A adjacent
+8A 2B -
+8A 3A -1 8A same
+8A 3B -1 8B relative
+8A 4A -1 9A adjacent
+8A 4B -
+8A 5A +2 7A adjacent
+8A 5B -
+8A 6A -
+8A 6B +2 8B relative
+8A 7A -
+8A 7B -
+8A 8A -
+8A 8B -
+8A 9A -
+8A 9B -
+8A 10A -
+8A 10B -2 8B relative
+8A 11A -2 9A adjacent
+8A 11B -
+8A 12A +1 7A adjacent
+8A 12B -
+8B 1A +1 8A relative
+8B 1B +1 8B same
+8B 2A -
+8B 2B +1 9B adjacent
+8B 3A -1 8A relative
+8B 3B -1 8B same
+8B 4A -
+8B 4B -1 9B adjacent
+8B 5A -
+8B 5B +2 7B adjacent
+8B 6A +2 8A relative
+8B 6B -
+8B 7A -
+8B 7B -
+8B 8A -
+8B 8B -
+8B 9A -
+8B 9B -
+8B 10A -2 8A relative
+8B 10B -
+8B 11A -
+8B 11B -2 9B adjacent
+8B 12A -
+8B 12B +1 7B adjacent
+9A 1A +1 8A adjacent
+9A 1B -
+9A 2A +1 9A same
+9A 2B +1 9B relative
+9A 3A +1 10A adjacent
+9A 3B -
+9A 4A -1 9A same
+9A 4B -1 9B relative
+9A 5A -1 10A adjacent
+9A 5B -
+9A 6A +2 8A adjacent
+9A 6B -
+9A 7A -
+9A 7B +2 9B relative
+9A 8A -
+9A 8B -
+9A 9A -
+9A 9B -
+9A 10A -
+9A 10B -
+9A 11A -
+9A 11B -2 9B relative
+9A 12A -2 10A adjacent
+9A 12B -
+9B 1A -
+9B 1B +1 8B adjacent
+9B 2A +1 9A relative
+9B 2B +1 9B same
+9B 3A -
+9B 3B +1 10B adjacent
+9B 4A -1 9A relative
+9B 4B -1 9B same
+9B 5A -
+9B 5B -1 10B adjacent
+9B 6A -
+9B 6B +2 8B adjacent
+9B 7A +2 9A relative
+9B 7B -
+9B 8A -
+9B 8B -
+9B 9A -
+9B 9B -
+9B 10A -
+9B 10B -
+9B 11A -2 9A relative
+9B 11B -
+9B 12A -
+9B 12B -2 10B adjacent
+10A 1A -2 11A adjacent
+10A 1B -
+10A 2A +1 9A adjacent
+10A 2B -
+10A 3A +1 10A same
+10A 3B +1 10B relative
+10A 4A +1 11A adjacent
+10A 4B -
+10A 5A -1 10A same
+10A 5B -1 10B relative
+10A 6A -1 11A adjacent
+10A 6B -
+10A 7A +2 9A adjacent
+10A 7B -
+10A 8A -
+10A 8B +2 10B relative
+10A 9A -
+10A 9B -
+10A 10A -
+10A 10B -
+10A 11A -
+10A 11B -
+10A 12A -
+10A 12B -2 10B relative
+10B 1A -
+10B 1B -2 11B adjacent
+10B 2A -
+10B 2B +1 9B adjacent
+10B 3A +1 10A relative
+10B 3B +1 10B same
+10B 4A -
+10B 4B +1 11B adjacent
+10B 5A -1 10A relative
+10B 5B -1 10B same
+10B 6A -
+10B 6B -1 11B adjacent
+10B 7A -
+10B 7B +2 9B adjacent
+10B 8A +2 10A relative
+10B 8B -
+10B 9A -
+10B 9B -
+10B 10A -
+10B 10B -
+10B 11A -
+10B 11B -
+10B 12A -2 10A relative
+10B 12B -
+11A 1A -
+11A 1B -2 11B relative
+11A 2A -2 12A adjacent
+11A 2B -
+11A 3A +1 10A adjacent
+11A 3B -
+11A 4A +1 11A same
+11A 4B +1 11B relative
+11A 5A +1 12A adjacent
+11A 5B -
+11A 6A -1 11A same
+11A 6B -1 11B relative
+11A 7A -1 12A adjacent
+11A 7B -
+11A 8A +2 10A adjacent
+11A 8B -
+11A 9A -
+11A 9B +2 11B relative
+11A 10A -
+11A 10B -
+11A 11A -
+11A 11B -
+11A 12A -
+11A 12B -
+11B 1A -2 11A relative
+11B 1B -
+11B 2A -
+11B 2B -2 12B adjacent
+11B 3A -
+11B 3B +1 10B adjacent
+11B 4A +1 11A relative
+11B 4B +1 11B same
+11B 5A -
+11B 5B +1 12B adjacent
+11B 6A -1 11A relative
+11B 6B -1 11B same
+11B 7A -
+11B 7B -1 12B adjacent
+11B 8A -
+11B 8B +2 10B adjacent
+11B 9A +2 11A relative
+11B 9B -
+11B 10A -
+11B 10B -
+11B 11A -
+11B 11B -
+11B 12A -
+11B 12B -
+12A 1A -
+12A 1B -
+12A 2A -
+12A 2B -2 12B relative
+12A 3A -2 1A adjacent
+12A 3B -
+12A 4A +1 11A adjacent
+12A 4B -
+12A 5A +1 12A same
+12A 5B +1 12B relative
+12A 6A +1 1A adjacent
+12A 6B -
+12A 7A -1 12A same
+12A 7B -1 12B relative
+12A 8A -1 1A adjacent
+12A 8B -
+12A 9A +2 11A adjacent
+12A 9B -
+12A 10A -
+12A 10B +2 12B relative
+12A 11A -
+12A 11B -
+12A 12A -
+12A 12B -
+12B 1A -
+12B 1B -
+12B 2A -2 12A relative
+12B 2B -
+12B 3A -
+12B 3B -2 1B adjacent
+12B 4A -
+12B 4B +1 11B adjacent
+12B 5A +1 12A relative
+12B 5B +1 12B same
+12B 6A -
+12B 6B +1 1B adjacent
+12B 7A -1 12A relative
+12B 7B -1 12B same
+12B 8A -
+12B 8B -1 1B adjacent
+12B 9A -
+12B 9B +2 11B adjacent
+12B 10A +2 12A relative
+12B 10B -
+12B 11A -
+12B 11B -
+12B 12A -
+12B 12B -

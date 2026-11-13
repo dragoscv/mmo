@@ -6,6 +6,7 @@ import { normalizePrefs } from "@mmo/design-tokens";
 import { applyPrefs, emitPrefsChanged, loadPrefs, savePrefs } from "@mmo/ui/theme";
 import { engine } from "@/bridge/engine";
 import type { MidiPreset, RoutingConfig } from "@/bridge/types";
+import { gigAllows } from "@/gig/gig-store";
 import { useUiStore, type SettingsTab } from "@/state/ui-store";
 import { useCompanionStore } from "@/state/companion-store";
 import { useHidStore } from "@/state/hid-store";
@@ -130,8 +131,15 @@ function applyLibrary(v: JsonValue): void {
     });
 }
 
-/** Apply the given sections (absent sections stay untouched). */
-export async function apply(sections: Sections): Promise<void> {
+/** What `applySections` did: "locked" = nothing was changed, the gig lock is on. */
+export type ApplyOutcome = "applied" | "locked";
+
+/**
+ * Apply the given sections (absent sections stay untouched). While the gig lock is on nothing
+ * is changed and the answer is "locked" (import, reset, profile switch and undo all end here).
+ */
+export async function applySections(sections: Sections): Promise<ApplyOutcome> {
+    if (!gigAllows("applySettings")) return "locked";
     for (const id of SECTION_IDS) {
         const v = sections[id];
         if (v === undefined) continue;
@@ -162,6 +170,12 @@ export async function apply(sections: Sections): Promise<void> {
                 break;
         }
     }
+    return "applied";
+}
+
+/** `applySections` for callers that do not need the outcome. */
+export async function apply(sections: Sections): Promise<void> {
+    await applySections(sections);
 }
 
 /** Default values per section (reset). */

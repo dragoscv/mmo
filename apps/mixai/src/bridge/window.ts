@@ -3,6 +3,7 @@
  * Windows/Linux; macOS keeps its traffic lights via titleBarStyle Overlay).
  * Every call is a no-op in the plain browser preview.
  */
+import { gigGate, useGigStore } from "@/gig/gig-store";
 
 export type Platform = "windows" | "macos" | "linux" | "browser";
 
@@ -33,7 +34,19 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 export const windowCtl = {
     minimize: async () => (await win())?.minimize(),
     toggleMaximize: async () => (await win())?.toggleMaximize(),
-    close: async () => (await win())?.close(),
+    /**
+     * Close this window. While the gig lock is on, the main window asks first (the question is
+     * shown by gig/GigCloseDialog); pop-out windows and an unlocked app close at once.
+     */
+    close: async () => {
+        if (gigGate("closeWindow") === "confirm") {
+            useGigStore.getState().setCloseAsk(true);
+            return;
+        }
+        await (await win())?.close();
+    },
+    /** Close without the gig question (the DJ already answered it). */
+    closeUnasked: async () => (await win())?.close(),
     startDragging: async () => (await win())?.startDragging(),
     isMaximized: async () => (await (await win())?.isMaximized()) ?? false,
     setFullscreen: async (on: boolean) => (await win())?.setFullscreen(on),

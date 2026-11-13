@@ -19,6 +19,9 @@ import { BUILTIN_SKINS } from "@/packs/builtin-skins";
 import { skinName } from "@/packs/skin-text";
 import { usePackStore } from "@/packs/pack-store";
 import { useT, type MessageKey } from "@/i18n";
+import { GigChip } from "@/gig/GigChip";
+import { lockedTip } from "@/gig/gig-core";
+import { useGigLocked } from "@/gig/gig-store";
 import { LinkChip } from "@/link/LinkChip";
 import { PracticeChip } from "@/practice/PracticeChip";
 import { RemoteChip } from "@/remote/RemoteChip";
@@ -57,8 +60,13 @@ function useFit(ref: RefObject<HTMLElement | null>): void {
 }
 
 function SettingsItem({ tab, prio, label, title, className, children, ...data }: { tab: SettingsTab; prio?: number; label?: string; title: string; className?: string; children: ReactNode; "data-level"?: string; "data-state"?: string }) {
+    // Gig lock: the item stays focusable and readable; pressing it says why Settings stay closed (ui-store asks the gate).
+    const locked = useGigLocked();
+    const t = useT();
+    // ...and its tooltip must not promise "Click for the ... settings" while that door is locked.
+    const tip = locked ? lockedTip(title, t("gig.lockedShort")) : title;
     return (
-        <button type="button" className={"sb-item " + (className ?? "")} data-prio={prio} aria-label={label} title={title} onClick={() => useUiStore.getState().openSettings(tab)} {...data}>
+        <button type="button" className={"sb-item " + (className ?? "")} data-prio={prio} aria-label={label} aria-disabled={locked || undefined} title={tip} onClick={() => useUiStore.getState().openSettings(tab)} {...data}>
             {children}
         </button>
     );
@@ -218,6 +226,7 @@ export function StatusBar() {
             {native && <AudioLoad />}
             {native && <AudioInfo />}
             <span className="sb-spacer" />
+            <GigChip />
             <PracticeChip />
             <LinkChip />
             <RemoteChip />

@@ -308,6 +308,72 @@
     color: var(--foreground);
 }
 
+/* ── stream overlay (the "Stream" tab): the address of the page for OBS, Copy, a new code ── */
+.rm-ov-list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+/* Whose address it is over the address itself; Copy on the right, as high as the two lines. */
+.rm-ov-addr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "where copy"
+        "url copy";
+    align-items: center;
+    column-gap: 8px;
+    min-width: 0;
+}
+.rm-ov-addr > .dk-label {
+    grid-area: where;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rm-ov-addr > .rm-ov-url {
+    grid-area: url;
+    color: var(--foreground);
+}
+.rm-ov-addr > .dk-btn {
+    grid-area: copy;
+}
+.rm-ov-code {
+    justify-content: flex-start;
+}
+/* What Copy / New code did. Always there, two lines high: no button moves when it speaks. */
+.rm-ov-note {
+    margin: 0;
+    min-width: 0;
+    min-height: 2.7em;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--foreground);
+}
+.rm-ov-note[data-ok="false"] {
+    padding-left: 8px;
+    border-left: 2px solid var(--alert, var(--destructive));
+}
+/* What the page shows right now: two lines at most, the whole text in the title. */
+.rm-ov-onair {
+    min-height: 2.7em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    color: var(--foreground);
+}
+/* The address changed (the usual port was taken): a sign on the tab, named for screen readers. */
+.rm-tab-flag {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--alert, var(--destructive));
+}
+
 /* ── touch mode (styles.css: every button is at least 44 x 44 px) ──
    Rows grow with their buttons, so the column is tightened elsewhere to keep the popover
    inside the smallest window: smaller gaps here, two requests per page (RemotePopover). */

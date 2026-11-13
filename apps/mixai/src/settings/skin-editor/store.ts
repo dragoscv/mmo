@@ -11,10 +11,16 @@
  * pack store does not render over it; applying or trying a skin closes the editor first
  * (`setSkinPreviewOwner`). Closing keeps unsaved edits: opening the editor again on the same
  * active skin continues the draft (Reset returns to the skin).
+ *
+ * Gig lock: the editor is a door to a settings change beside the Settings modal. Opening it
+ * and "Save as my skin" ask the gate (refused while locked, with the sentence), and an editor
+ * that is open when the lock goes on closes the way its own close button does (the preview is
+ * undone, the unsaved draft stays a draft for later).
  */
 import { create } from "zustand";
 import { applyPrefs, emitPrefsChanged, loadPrefs } from "@mmo/ui/theme";
 import { packs, type PackExportRequest, type PackInfo, type PackTokens } from "@/bridge/packs";
+import { gigAllows, useGigStore } from "@/gig/gig-store";
 import { useLayoutStore } from "@/layout/layout-store";
 import { BUILTIN_SKINS } from "@/packs/builtin-skins";
 import { renderSkin, setSkinPreviewOwner, skinLayoutId, usePackStore } from "@/packs/pack-store";
@@ -162,6 +168,7 @@ export const useSkinEditor = create<SkinEditorState>((set, get) => ({
             restore();
             return;
         }
+        if (!gigAllows("changeSettings")) return;
         // One preview at a time: a running try ends (back to the active skin) before ours starts.
         if (usePackStore.getState().trying) usePackStore.getState().endTry();
         const active = usePackStore.getState().activeSkin;
@@ -200,6 +207,7 @@ export const useSkinEditor = create<SkinEditorState>((set, get) => ({
     save: async (meta) => {
         const s = get();
         if (s.busy) return false;
+        if (!gigAllows("changeSettings")) return false;
         const id = buildRequest(s.draft, { name: s.name, author: meta.author, version: "1.0.0" })?.id;
         const req = id ? buildRequest(s.draft, { name: s.name, ...meta, version: nextVersion(skinById(id)?.manifest.version) }) : null;
         if (!req) {
@@ -261,3 +269,8 @@ export const useSkinEditor = create<SkinEditorState>((set, get) => ({
         }
     },
 }));
+
+// Gig lock on: an open editor closes like its own close button (preview undone, draft kept).
+useGigStore.subscribe((s, prev) => {
+    if (s.locked && !prev.locked && useSkinEditor.getState().open) useSkinEditor.getState().setOpen(false);
+});

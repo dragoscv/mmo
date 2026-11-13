@@ -16,6 +16,10 @@
  * Auto-sync is intentionally last-write-wins on a single blob — simple and
  * predictable for a single-user-many-devices model. A real merge/marketplace
  * backend is a later milestone.
+ *
+ * The automatic path itself (order of pull and push, what the gig lock holds back and what
+ * wins afterwards) is `createCloudSync` in gig/held-sync.ts; this file gives it the engine,
+ * the stores and the gig gate.
  */
 
 import { engine } from "@/bridge/engine";
@@ -27,6 +31,8 @@ import { usePluginStore } from "@/plugins/plugin-store";
 import { exportProfile, importProfile } from "@/lib/profile";
 import { useLayoutStore } from "@/layout/layout-store";
 import { useProfilesStore } from "@/settings/profiles-store";
+import { createCloudSync, type ApplyResult, type KeyValue } from "@/gig/held-sync";
+import { gigAllows, useGigStore } from "@/gig/gig-store";
 import { PREFS_CHANGED_EVENT, applyPrefs, emitPrefsChanged, loadPrefs, savePrefs } from "@mmo/ui/theme";
 
 /** Serialize the live app state into a portable profile JSON string. */
@@ -52,20 +58,19 @@ export async function buildProfileJson(): Promise<string> {
 }
 
 /**
- * Apply a profile backup string to the live app. Returns false when the blob
- * is unparseable. Individual missing sections are simply skipped.
+ * Apply a profile backup string to the live app and say what happened: "unreadable" when the
+ * blob is not a profile, "locked" while the gig lock is on (nothing is applied). Individual
+ * missing sections are simply skipped.
  *
  * NOTE: the companion connection (`companion`) is intentionally NOT applied
  * here — auto-sync runs *because* we are already connected, and overwriting the
  * device token with a stale one from another machine could break the link. The
  * manual "Load from cloud" path (in SettingsPanel) still restores it.
  */
-export async function applyProfileJson(
-    raw: string,
-    opts: { includeCompanion?: boolean } = {},
-): Promise<boolean> {
+export async function applyProfile(raw: string, opts: { includeCompanion?: boolean } = {}): Promise<ApplyResult> {
+    if (!gigAllows("applySettings")) return "locked";
     const parsed = importProfile(raw.trim());
-    if (!parsed) return false;
+    if (!parsed) return "unreadable";
     useUiStore.getState().restoreProfile({ deckCount: parsed.deckCount });
     if (parsed.prefs) {
         // Persist + apply + notify the ThemeProvider (it listens for this event).
@@ -86,7 +91,29 @@ export async function applyProfileJson(
     if (parsed.keybinds) useKeybindStore.getState().setOverrides(parsed.keybinds);
     if (parsed.layout) useLayoutStore.getState().restore(parsed.layout);
     if (parsed.settingsProfiles) useProfilesStore.getState().restore(parsed.settingsProfiles);
-    return true;
+    return "applied";
+}
+
+/** {@link applyProfile} as a yes / no: false when the blob is unparseable or the gig lock is on. */
+export async function applyProfileJson(
+    raw: string,
+    opts: { includeCompanion?: boolean } = {},
+): Promise<boolean> {
+    return (await applyProfile(raw, opts)) === "applied";
+}
+
+/**
+ * Apply only the part of a profile that lives nowhere on this computer: the MIDI mapping (it
+ * is kept by the engine, so after an app restart the engine holds the default one). Used when
+ * the local profile wins over the account copy (gig/held-sync.ts), so that the upload does
+ * not replace the account's mapping with the default.
+ */
+export async function applyProfileEngineOnly(raw: string): Promise<ApplyResult> {
+    if (!gigAllows("applySettings")) return "locked";
+    const parsed = importProfile(raw.trim());
+    if (!parsed) return "unreadable";
+    if (parsed.midiPreset) await engine.midiSetPreset(parsed.midiPreset);
+    return "applied";
 }
 
 /** True when the companion is configured enough to reach the cloud. */
@@ -95,63 +122,51 @@ function signedIn(): boolean {
     return Boolean(c.deviceToken && c.userId);
 }
 
-const PUSH_DEBOUNCE_MS = 4000;
+function storageOf(pick: () => Storage): KeyValue | null {
+    try {
+        return pick();
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Start automatic cloud sync. Returns a cleanup function that stops it.
  *
- * Lifecycle:
+ * Lifecycle (the machine is gig/held-sync.ts, where the rules are written down and tested):
  *   1. If signed in, pull the cloud profile once and apply it (skipping the
  *      companion section). While applying, pushes are suppressed so the
  *      incoming snapshot doesn't immediately bounce back.
  *   2. Subscribe to every profile-bearing store. Any change schedules a
  *      debounced push of the full profile. Sign-in transitions also trigger an
  *      initial pull-then-push.
+ *
+ * Gig lock (gig/gig-store): while it is on, no pull is made or applied and no push goes out.
+ * A local change the lock kept from being uploaded is owed to the account: it is written down
+ * and wins over the account's older copy at the unlock or at the next start.
  */
 export function startCloudAutoSync(): () => void {
-    let disposed = false;
-    let suppressUntil = 0; // ignore changes while applying a pulled profile
-    let pushTimer: ReturnType<typeof setTimeout> | null = null;
     let wasSignedIn = false;
-    let pulledForSession = false;
 
-    const schedulePush = () => {
-        if (disposed || !signedIn()) return;
-        if (Date.now() < suppressUntil) return;
-        if (pushTimer) clearTimeout(pushTimer);
-        pushTimer = setTimeout(() => {
-            pushTimer = null;
-            void (async () => {
-                if (disposed || !signedIn()) return;
-                try {
-                    const json = await buildProfileJson();
-                    await engine.companionPutProfile(json);
-                } catch {
-                    // Offline / companion down — auto-sync is best-effort. The
-                    // next local change (or manual save) will retry.
-                }
-            })();
-        }, PUSH_DEBOUNCE_MS);
-    };
-
-    const pull = async () => {
-        if (disposed || !signedIn() || pulledForSession) return;
-        pulledForSession = true;
-        try {
-            const json = await engine.companionGetProfile();
-            if (!json) return; // nothing stored yet
-            // Suppress change-driven pushes during/just-after apply so the
-            // freshly-pulled state isn't immediately re-uploaded.
-            suppressUntil = Date.now() + PUSH_DEBOUNCE_MS;
-            await applyProfileJson(json);
-            suppressUntil = Date.now() + 1500;
-        } catch {
-            pulledForSession = false; // allow a later retry on next sign-in
-        }
-    };
+    const sync = createCloudSync({
+        signedIn,
+        account: () => useCompanionStore.getState().userId,
+        allowsPull: () => gigAllows("cloudPull"),
+        allowsPush: () => gigAllows("cloudPush"),
+        getProfile: () => engine.companionGetProfile(),
+        putProfile: (json) => engine.companionPutProfile(json),
+        build: buildProfileJson,
+        apply: (json) => applyProfile(json),
+        applyEngineOnly: applyProfileEngineOnly,
+        now: () => Date.now(),
+        setTimer: (fn, ms) => setTimeout(fn, ms),
+        clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+        local: storageOf(() => localStorage),
+        session: storageOf(() => sessionStorage),
+    });
 
     // 1) Initial pull (microtask so callers can finish mounting first).
-    void pull();
+    void sync.pull();
 
     // 2) Subscriptions. Companion sign-in transitions drive a pull; everything
     //    else just schedules a push.
@@ -160,29 +175,34 @@ export function startCloudAutoSync(): () => void {
     unsubs.push(
         useCompanionStore.subscribe(() => {
             const now = signedIn();
-            if (now && !wasSignedIn) {
-                pulledForSession = false;
-                void pull();
-            }
+            if (now && !wasSignedIn) void sync.signedIn();
             wasSignedIn = now;
-            schedulePush();
+            sync.changed();
         }),
     );
     wasSignedIn = signedIn();
 
-    unsubs.push(useUiStore.subscribe(schedulePush));
-    unsubs.push(useHidStore.subscribe(schedulePush));
-    unsubs.push(useKeybindStore.subscribe(schedulePush));
-    unsubs.push(usePluginStore.subscribe(schedulePush));
-    unsubs.push(useLayoutStore.subscribe(schedulePush));
-    unsubs.push(useProfilesStore.subscribe(schedulePush));
+    unsubs.push(useUiStore.subscribe(sync.changed));
+    unsubs.push(useHidStore.subscribe(sync.changed));
+    unsubs.push(useKeybindStore.subscribe(sync.changed));
+    unsubs.push(usePluginStore.subscribe(sync.changed));
+    unsubs.push(useLayoutStore.subscribe(sync.changed));
+    unsubs.push(useProfilesStore.subscribe(sync.changed));
     // Appearance prefs live outside zustand (shared ThemeProvider store).
-    window.addEventListener(PREFS_CHANGED_EVENT, schedulePush);
-    unsubs.push(() => window.removeEventListener(PREFS_CHANGED_EVENT, schedulePush));
+    window.addEventListener(PREFS_CHANGED_EVENT, sync.changed);
+    unsubs.push(() => window.removeEventListener(PREFS_CHANGED_EVENT, sync.changed));
+
+    // Gig lock. Going on: a push that was waiting for its 4 s is decided at once (owed or
+    // not). Released: `prev.skipped` still says what was held (the store clears it on unlock).
+    unsubs.push(
+        useGigStore.subscribe((s, prev) => {
+            if (!prev.locked && s.locked) void sync.lockedNow();
+            if (prev.locked && !s.locked) void sync.released({ pull: prev.skipped.cloudPull, push: prev.skipped.cloudPush });
+        }),
+    );
 
     return () => {
-        disposed = true;
-        if (pushTimer) clearTimeout(pushTimer);
+        sync.dispose();
         for (const u of unsubs) u();
     };
 }

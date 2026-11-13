@@ -4,15 +4,22 @@
  * the library title / artist of each loaded deck and the deck's cue point (the phone's CUE
  * button uses it; a cue point a phone moves comes back through `remote://cue`).
  *
+ * Stream overlay (WP19-59): with a shell that knows it, a start always asks for the fixed port
+ * (a fallback port is for that run only, it is never kept) and hands back the overlay code kept
+ * in localStorage (its own key, not part of the settings export or the cloud profile), so the
+ * address pasted into OBS survives a restart. With an older shell nothing of this is sent or
+ * shown.
+ *
  * Nothing here polls. While the server is off the only cost is one identity check per engine
  * snapshot.
  */
 import { create } from "zustand";
 import { devExpose } from "@/dev/expose";
-import { remote, subscribeRemote, type RemoteClient, type RemoteCueEvent, type RemoteEvent, type RemoteLabel, type RemotePairing, type RemoteRole, type RemoteStatus, type RequestDecision, type SongRequest } from "@/bridge/remote";
+import { remote, subscribeRemote, type RemoteClient, type RemoteCueEvent, type RemoteEvent, type RemoteLabel, type RemoteOnAir, type RemotePairing, type RemoteRole, type RemoteStatus, type RequestDecision, type SongRequest } from "@/bridge/remote";
 import type { DeckState } from "@/bridge/types";
 import { cuePointFor, useDeckUi } from "@/components/deck-ui-store";
 import { useMixerStore } from "@/state/mixer-store";
+import { copyText, loadOverlaySaved, overlaySupported, rememberOverlay, startArgs, type ClipboardLike, type CopyResult, type StorageLike } from "./overlay-core";
 import { LOCK_UNSUPPORTED, buildLabels, errorText, isMissingFeature, labelsKey, newPending } from "./remote-core";
 
 /** `preview` = not inside the desktop shell; `old` = a shell built before connected mode. */
@@ -36,6 +43,16 @@ export interface RemoteState {
     partyPref: boolean;
     /** The phone controls are locked (transport / mixer commands refused; requests work). */
     controlsLocked: boolean;
+    /** The shell knows the stream overlay (false with a shell built before it: nothing of it is shown). */
+    overlaySupported: boolean;
+    /** Stream overlay address for OBS on this computer; null while off or when only a LAN address answers. */
+    urlOverlay: string | null;
+    /** Stream overlay address for a second computer; null while off or when the server is on loopback only. */
+    urlOverlayLan: string | null;
+    /** The port asked for was taken: the server runs on another one (the addresses changed). */
+    portFallback: boolean;
+    /** The track the stream overlay shows right now. */
+    onAir: RemoteOnAir | null;
     /**
      * The latest request that arrived while the server runs, for ONE polite announcement
      * (`seq` grows with every arrival so the same song asked again is announced again).
@@ -46,18 +63,72 @@ export interface RemoteState {
     start: (opts?: { bind?: string; port?: number }) => Promise<void>;
     stop: () => Promise<void>;
     rotate: (role: RemoteRole) => Promise<void>;
+    /** New code for the stream overlay. True when the address changed (OBS needs the new one). */
+    rotateOverlay: () => Promise<boolean>;
+    /** Put a stream overlay address on the clipboard. Never throws. */
+    copyOverlay: (url: string) => Promise<CopyResult>;
     setPartyOpen: (open: boolean) => Promise<void>;
     setControlsLocked: (locked: boolean) => Promise<void>;
     decide: (id: number, decision: RequestDecision) => Promise<void>;
     clearDone: () => Promise<void>;
 }
 
-const OFF = { running: false, host: null, port: null, pairings: [] as RemotePairing[], clients: [] as RemoteClient[], requests: [] as SongRequest[], partyOpen: false, arrived: null };
+const OFF = {
+    running: false,
+    host: null,
+    port: null,
+    pairings: [] as RemotePairing[],
+    clients: [] as RemoteClient[],
+    requests: [] as SongRequest[],
+    partyOpen: false,
+    arrived: null,
+    urlOverlay: null,
+    urlOverlayLan: null,
+    portFallback: false,
+    onAir: null,
+};
+
+/** Development only: a stand-in clipboard for live tests (undefined = the system clipboard). */
+let clipboardOverride: ClipboardLike | null | undefined;
+
+function storage(): StorageLike | null {
+    try {
+        return typeof localStorage === "undefined" ? null : localStorage;
+    } catch {
+        return null;
+    }
+}
+
+/** Keep the overlay code of a running server for the next start (written only on a change; never a port). */
+function remember(s: RemoteStatus): void {
+    rememberOverlay(storage(), s);
+}
+
+/** The same object while the texts are the same, so nothing that shows it renders again. */
+function sameOnAir(prev: RemoteOnAir | null, next: RemoteOnAir | null | undefined): RemoteOnAir | null {
+    if (!next) return null;
+    return prev && prev.title === next.title && prev.artist === next.artist ? prev : { title: next.title ?? null, artist: next.artist ?? null };
+}
 
 function fromStatus(s: RemoteStatus): Partial<RemoteState> {
     const controlsLocked = s.controlsLocked ?? false;
-    if (!s.running) return { ...OFF, controlsLocked };
-    return { running: true, host: s.host, port: s.port, pairings: s.pairings, clients: s.clients, partyOpen: s.partyOpen, controlsLocked };
+    const supported = overlaySupported(s);
+    if (!s.running) return { ...OFF, controlsLocked, overlaySupported: supported };
+    remember(s);
+    return {
+        running: true,
+        host: s.host,
+        port: s.port,
+        pairings: s.pairings,
+        clients: s.clients,
+        partyOpen: s.partyOpen,
+        controlsLocked,
+        overlaySupported: supported,
+        urlOverlay: supported ? (s.urlOverlay ?? null) : null,
+        urlOverlayLan: supported ? (s.urlOverlayLan ?? null) : null,
+        portFallback: s.portFallback === true,
+        onAir: supported ? sameOnAir(useRemoteStore.getState().onAir, s.onAir) : null,
+    };
 }
 
 let arrivals = 0;
@@ -82,6 +153,7 @@ export const useRemoteStore = create<RemoteState>((set, get) => ({
     error: null,
     partyPref: true,
     controlsLocked: false,
+    overlaySupported: false,
     ...OFF,
 
     refresh: async () => {
@@ -107,7 +179,14 @@ export const useRemoteStore = create<RemoteState>((set, get) => ({
         if (get().busy) return;
         set({ busy: true, error: null });
         try {
-            const s = await remote.start({ partyOpen: get().partyPref, bind: opts?.bind, port: opts?.port });
+            // Whether the shell knows the stream overlay is read off a status answer: ask once
+            // when a start comes before the first one (the chip asks when it mounts).
+            if (get().availability === "unknown") {
+                const first = await remote.status();
+                if (first) set({ availability: "ready", overlaySupported: overlaySupported(first) });
+            }
+            const args = startArgs(opts, loadOverlaySaved(storage()), get().overlaySupported);
+            const s = await remote.start({ partyOpen: get().partyPref, ...args });
             if (s) {
                 set({ availability: "ready", ...fromStatus(s) });
                 syncLabels(true);
@@ -146,6 +225,25 @@ export const useRemoteStore = create<RemoteState>((set, get) => ({
             void get().refresh();
         }
     },
+
+    rotateOverlay: async () => {
+        set({ error: null });
+        try {
+            const before = get().urlOverlay ?? get().urlOverlayLan;
+            await remote.set({ overlayRotate: true });
+            // The new code comes back in the status (and is kept for the next start there).
+            const s = await remote.status();
+            if (!s) return false;
+            set(fromStatus(s));
+            const after = get().urlOverlay ?? get().urlOverlayLan;
+            return after !== null && after !== before;
+        } catch (e) {
+            set(failure(e));
+            return false;
+        }
+    },
+
+    copyOverlay: (url) => copyText(url, clipboardOverride),
 
     setPartyOpen: async (open) => {
         set({ error: null, partyPref: open });
@@ -206,7 +304,8 @@ function onEvent(e: RemoteEvent): void {
     // Only a request that arrives while the list is already known is news: the first list
     // after a start or a page reload is not announced.
     const requests = cur.running ? withRequests(e.requests) : { requests: e.requests };
-    useRemoteStore.setState({ availability: "ready", running: true, clients: e.clients, partyOpen: e.partyOpen, controlsLocked: e.controlsLocked ?? cur.controlsLocked, ...requests });
+    const onAir = cur.overlaySupported ? sameOnAir(cur.onAir, e.onAir) : null;
+    useRemoteStore.setState({ availability: "ready", running: true, clients: e.clients, partyOpen: e.partyOpen, controlsLocked: e.controlsLocked ?? cur.controlsLocked, onAir, ...requests });
     // Started somewhere else (another window): fetch the pairing codes.
     if (!cur.running || cur.pairings.length === 0) void cur.refresh();
 }
@@ -308,3 +407,9 @@ export function startRemote(): () => void {
 }
 
 devExpose("remote", useRemoteStore);
+devExpose("remoteDebug", {
+    /** Replace the clipboard Copy writes to (`undefined` puts the system clipboard back). */
+    clipboard: (c: ClipboardLike | null | undefined) => {
+        clipboardOverride = c;
+    },
+});

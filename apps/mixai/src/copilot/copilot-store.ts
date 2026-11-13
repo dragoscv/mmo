@@ -12,6 +12,17 @@
  * question is never asked twice (`rankKey`: playing track with its tempo on a half-BPM grid,
  * energy direction, pool, request, play history), triggers are debounced (`REFRESH_MS`), and
  * what is derived from a row (features, search text, tag words) is cached per row object.
+ *
+ * Key-shift proposals (WP19-61). The reference key of the ranking, the plan and the safety
+ * check is the key the deck SOUNDS in (`soundingFeat`: its whole key shift applied). A ranked
+ * row may carry a proposal ("shift this track by +1 and it fits"); `loadShifted` loads the
+ * track and sets that shift as soon as the engine holds the track (never under a deck that is
+ * already playing it). What was applied is kept by `key-shift.ts` (`createShiftKeeper`) and
+ * shown in `shifts`: it goes back to 0 when that deck gets another track, unless the DJ
+ * changed the shift by hand. The existing `load`, and a transition (plan, go, cancel, its
+ * end), never set or reset a key shift themselves. "Mix next" never loads a row that needs a
+ * shift by itself while a row that does not is on the list, and an "in key" request lists
+ * the rows that need a shift after the ones that do not. A pop-out window applies no shift.
  */
 import { create } from "zustand";
 import {
@@ -30,15 +41,27 @@ import { engine } from "@/bridge/engine";
 import type { DeckId, DeckState, LibraryTrack } from "@/bridge/types";
 import { devExpose } from "@/dev/expose";
 import type { MessageKey } from "@/i18n";
+import { formatSemitones } from "@/lib/perf";
 import { loadLibraryTrack, restoreDeckWave } from "@/lib/load-track";
 import { libraryNav } from "@/library/library-nav";
 import { useLibraryPool } from "@/library/pool-store";
 import { playedTonight, useHistoryStore } from "@/state/history-store";
 import { useMixerStore } from "@/state/mixer-store";
 import { usePerfStore } from "@/state/perf-store";
-import { candidates, deckFeat, errorKey, intentDeck, otherDeck, playingDeck, quantBpm, rankKey, referenceDeck, rowOf, trackChangedDeck } from "./features.ts";
-import { applySetFilters, bareStopMeans, clipText, fold, hasAnyFilter, isBareStop, isCommandText, parseSetRequest, tagTokens, type SetFilters } from "./set-builder.ts";
+import { candidates, errorKey, intentDeck, isPopoutPage, otherDeck, pickNext, playingDeck, quantBpm, rankInGroups, rankKey, referenceDeck, rowOf, soundingFeat, trackChangedDeck } from "./features.ts";
+import { MAX_PROPOSED_SHIFT, applyProposal, createShiftKeeper, encodeRecords, knowsProposals, parseRecords, proposalOf, watchShifts, type EngineDeck, type ShiftEvent, type ShiftRecord } from "./key-shift.ts";
+import { bareStopMeans, clipText, filterSet, fold, hasAnyFilter, isBareStop, isCommandText, parseSetRequest, tagTokens, type SetFilters } from "./set-builder.ts";
 import type { CountKind } from "./texts.ts";
+
+/**
+ * This page is a pop-out window (`index.html?popout=<panel>`: the test the app itself makes in
+ * shell/PopoutApp.tsx and gig/gig-store.ts). A pop-out is a separate page with its own
+ * instance of this store, of the keeper and of the session storage: a key shift applied from
+ * it would be known to no keeper in the main window, never go back to 0 on the next track,
+ * and be forgotten when the pop-out closes. So a pop-out applies none (`loadShifted` refuses,
+ * the popover shows no button there; the reason text of the row stays).
+ */
+export const IN_POPOUT = typeof location !== "undefined" && isPopoutPage(location.search);
 
 /** Whether the running shell has the co-pilot commands. */
 export type Availability = "unknown" | "yes" | "no";
@@ -98,6 +121,12 @@ interface CopilotStore {
     energy: EnergyDirection;
     /** Deck the list is ranked against (null = nothing loaded). */
     refDeck: DeckId | null;
+    /**
+     * Key the list on screen was ranked against: the reference deck's key AS IT SOUNDS (its
+     * whole key shift applied; null = unknown). The rows' key chips compare against this very
+     * value, so a chip never disagrees with the ranking next to it.
+     */
+    refKey: string | null;
     suggestions: Suggestion[];
     request: SetRequest | null;
     ranking: boolean;
@@ -107,6 +136,20 @@ interface CopilotStore {
     run: Progress | null;
     warnings: SafetyWarning[];
     note: Note | null;
+    /**
+     * Does the running shell propose key shifts? null = not asked yet. False on a shell that
+     * predates them: the popover then works exactly as before (no button, no extra text).
+     */
+    proposals: boolean | null;
+    /** Key shifts the co-pilot applied and still owns (one per deck at most). */
+    shifts: readonly ShiftRecord[];
+    /**
+     * "Load with key shift" presses in flight: deck → id of the track being loaded there. A
+     * deck is in it from the press until its LOAD has ended: the shift is decided earlier (as
+     * soon as the engine holds the track), the load itself may go on for seconds (stems), and
+     * a second load started on top of it would cross with it.
+     */
+    shifting: Readonly<Partial<Record<DeckId, string>>>;
 
     setOpen: (open: boolean) => void;
     /** Ask the shell whether it knows the co-pilot (and pick up a transition already running). */
@@ -119,7 +162,21 @@ interface CopilotStore {
     clearRequest: () => void;
     /** Load a library track onto a deck; false when the load failed. */
     load: (deck: DeckId, track: LibraryTrack) => Promise<boolean>;
-    /** Plan the transition from the playing deck to the other main deck (loads the top suggestion there when it is empty). */
+    /**
+     * Load a library track onto a deck AND shift its key by `shift` semitones (the proposal of
+      * its suggestion row). The shift is set as soon as the engine holds the track on that deck
+      * (not when the stems have arrived too); a failed or overtaken load shifts nothing, and
+      * neither does a deck that is already playing the track by then (the status line says
+      * so). A second press for a deck whose load is still in flight is answered with "still
+      * loading". A pop-out window applies no shift. False = no shift was applied.
+     */
+    loadShifted: (deck: DeckId, track: LibraryTrack, shift: number) => Promise<boolean>;
+     /**
+      * Plan the transition from the playing deck to the other main deck. When that deck is
+      * empty it loads a suggestion there first: the best one that needs NO key shift (a row
+      * with a proposal would be loaded unshifted, as a clash); only when every row needs one
+      * the first, and then the status line says it clashes and which button shifts it.
+      */
     planMix: (opts?: PlanOptions) => Promise<PlanInfo | null>;
     /** Run the current plan (plans first when there is none, plans again when it went stale). */
     go: () => Promise<boolean>;
@@ -198,6 +255,61 @@ function errorNote(err: unknown): Note {
     return { key: errorKey(detail), vars: { deck }, detail, tone: "error" };
 }
 
+/**
+ * What the ENGINE holds on a deck: the track id of the shell's own state (written when a load
+ * was decoded and accepted, never optimistic like the UI store), the deck's key shift and
+ * whether the engine is playing the deck. Null when the engine does not answer (no shell,
+ * engine stopped).
+ */
+async function engineDeck(deck: DeckId): Promise<EngineDeck | null> {
+    try {
+        const [snap, clock] = await Promise.all([engine.getState(), engine.clockState()]);
+        const d = snap?.decks.find((x) => x.id === deck);
+        const c = clock?.decks.find((x) => x.id === deck);
+        if (!d || !c) return null;
+        return { trackId: d.loaded ? (d.trackId ?? null) : null, keyShift: c.keyShift, playing: d.loaded && d.playing };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Where the applied key shifts are remembered across a page reload: session storage, which
+ * lives exactly as long as the app's engine does (an app restart starts with empty decks and
+ * no key shift, and with no record).
+ */
+export const SHIFT_STORE_KEY = "mixai-copilot-key-shifts";
+
+function readShifts(): ShiftRecord[] {
+    try {
+        return typeof sessionStorage === "undefined" ? [] : parseRecords(sessionStorage.getItem(SHIFT_STORE_KEY));
+    } catch {
+        return [];
+    }
+}
+
+function writeShifts(records: readonly ShiftRecord[]): void {
+    try {
+        if (typeof sessionStorage === "undefined") return;
+        if (records.length === 0) sessionStorage.removeItem(SHIFT_STORE_KEY);
+        else sessionStorage.setItem(SHIFT_STORE_KEY, encodeRecords(records));
+    } catch {
+        // Storage refused (private mode, quota): the record lives until the page reloads.
+    }
+}
+
+/** A tiny ranking (8A against 1A) that tells whether the shell proposes key shifts. */
+const PROBE_TRACK = { title: "", artist: "", bpm: 120, energy: null, durationSec: 0, firstBeatSec: 0, downbeatOffset: 0, lufs: null, hasStems: false } as const;
+
+async function shellProposes(): Promise<boolean> {
+    try {
+        const rows = await copilot.rank({ ...PROBE_TRACK, id: "probe-playing", key: "8A" }, [{ track: { ...PROBE_TRACK, id: "probe-next", key: "1A" }, playedMinutesAgo: null }], "hold", 1);
+        return knowsProposals(rows) === true;
+    } catch {
+        return false;
+    }
+}
+
 /** Deck states straight from the engine when it answers (after a load the store may lag one snapshot). */
 async function freshDecks(): Promise<readonly DeckState[]> {
     try {
@@ -208,6 +320,28 @@ async function freshDecks(): Promise<readonly DeckState[]> {
     }
     return useMixerStore.getState().decks;
 }
+
+/** What the keeper did by itself: only an undo is worth a sentence (the DJ did the other two). */
+function onShiftEvent(e: ShiftEvent): void {
+    if (e.kind !== "undone") return;
+    useCopilotStore.setState({ note: { key: "copilot.shiftUndone", vars: { deck: e.record.deck.toUpperCase() }, tone: "info" } });
+}
+
+/**
+ * The key shifts the co-pilot applied (see key-shift.ts for the rules). It decides on what the
+ * engine holds, sets a shift through the performance store (the same call the deck's key
+ * buttons make), and mirrors its records into this store (`shifts`) and session storage.
+ */
+const keeper = createShiftKeeper({
+    engineDeck,
+    storeShift: (deck) => usePerfStore.getState().decks[deck].keyShift,
+    setKeyShift: (deck, semitones) => usePerfStore.getState().setKeyShift(deck, semitones),
+    changed: (records) => {
+        writeShifts(records);
+        useCopilotStore.setState({ shifts: records });
+    },
+    notify: onShiftEvent,
+});
 
 export const useCopilotStore = create<CopilotStore>((set, get) => {
     const unavailable = (): void => {
@@ -261,6 +395,7 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
         open: false,
         energy: "hold",
         refDeck: null,
+        refKey: null,
         suggestions: [],
         request: null,
         ranking: false,
@@ -270,6 +405,9 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
         run: null,
         warnings: [],
         note: null,
+        proposals: null,
+        shifts: [],
+        shifting: {},
 
         setOpen: (open) => {
             set({ open });
@@ -293,6 +431,12 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                     const running = await copilot.status().catch(() => null);
                     if (running && !running.done) set({ run: running });
                 }
+                // Once per shell: does it propose key shifts? (An older one ranks as before.)
+                if (get().proposals === null) {
+                    set({ proposals: await shellProposes() });
+                    // A list ranked before the answer came did not know: rank once more.
+                    if (get().open && get().proposals) void get().refresh();
+                }
                 return "yes";
             } catch {
                 set({ available: "no" });
@@ -308,11 +452,16 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
             const ref = referenceDeck(mixer.decks, usePerfStore.getState().clock?.source);
             const deck = ref ? mixer.deck(ref) : null;
             const row = deck ? rowOf(pool, deck.trackId) : null;
-            const key = ref ? mixer.deckKeys[ref] : null;
+            // The reference deck as it SOUNDS: its key moved by its whole key shift. One value
+            // for the ranking, the request's key filter and the rows' key chips (`refKey`).
+            const feat = deck && ref ? soundingFeat(deck, mixer.deckKeys[ref], row, usePerfStore.getState().decks[ref].keyShift) : null;
+            const key = feat?.key ?? null;
+            const proposals = get().proposals === true;
             const request = get().request;
-            const matches = request
-                ? applySetFilters(pool, request.filters, { key, energy: row?.energy ?? null, trackId: deck?.trackId ?? null }, (id) => playedTonight(played[id], now))
-                : pool;
+            // A request's matches in two groups: the tracks that pass as they are, then (only an
+            // "in key" request on a shell that proposes has any) the ones whose key needs a shift.
+            const groups = request ? filterSet(pool, request.filters, { key, energy: row?.energy ?? null, trackId: deck?.trackId ?? null, shiftable: proposals }, (id) => playedTonight(played[id], now)) : null;
+            const matches = groups ? (groups.shift.length > 0 ? [...groups.natural, ...groups.shift] : groups.natural) : pool;
             const nextRequest = request ? (request.matched === matches.length ? request : { ...request, matched: matches.length }) : null;
             const unranked = (): void => {
                 // Without a deck (or a shell) there is nothing to rank against: a request still lists its matches.
@@ -321,20 +470,19 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                 rankSeq++;
                 rankedKey = null;
                 pendingKey = null;
-                set({ refDeck: ref, suggestions: list, request: nextRequest, ranking: false });
+                set({ refDeck: ref, refKey: key, suggestions: list, request: nextRequest, ranking: false });
             };
-            if (!deck || matches.length === 0 || get().available !== "yes") {
+            if (!deck || !feat || matches.length === 0 || get().available !== "yes") {
                 unranked();
                 return;
             }
             // Ranked against what the deck sounds like now: its tempo with the pitch fader
             // applied, on a half-BPM grid (a pitch ride is not a new question every 0.1 BPM).
-            const feat = deckFeat(deck, key, row);
             const live = feat.bpm !== null && deck.tempo > 0 ? quantBpm(feat.bpm * deck.tempo) : 0;
             const playing = { ...feat, bpm: live > 0 ? live : feat.bpm };
-            // Plus the deck's own key: a request's key filter is applied against it (the features
-            // fall back to the library row's key, which can hide a change of the deck's).
-            const question = `${rankKey(playing, get().energy, poolVersion(pool, request?.filters ?? null), historyVersion(played, now), MAX_SUGGESTIONS)}\u0001${key ?? ""}`;
+            // The key in the question is the sounding key (a key shift of the reference deck is a
+            // new question); plus whether the shell proposes shifts (the request's filter differs).
+            const question = `${rankKey(playing, get().energy, poolVersion(pool, request?.filters ?? null), historyVersion(played, now), MAX_SUGGESTIONS)}\u0001${proposals ? "p" : ""}`;
             if (question === rankedKey) {
                 // The list on screen already answers this; a ranking in flight is for another
                 // question (the pitch went there and back) and must not replace it.
@@ -343,7 +491,7 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                     pendingKey = null;
                 }
                 copilotStats.rankHits++;
-                if (get().refDeck !== ref || get().request !== nextRequest || get().ranking) set({ refDeck: ref, request: nextRequest, ranking: false });
+                if (get().refDeck !== ref || get().refKey !== key || get().request !== nextRequest || get().ranking) set({ refDeck: ref, refKey: key, request: nextRequest, ranking: false });
                 return;
             }
             if (question === pendingKey) {
@@ -355,8 +503,17 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
             pendingKey = question;
             set({ ranking: true });
             try {
-                copilotStats.ranks++;
-                const ranked = await copilot.rank(playing, candidates(matches, played, now), get().energy, MAX_SUGGESTIONS);
+                const energy = get().energy;
+                // An "in key" request lists the tracks that need a key shift AFTER the ones that
+                // do not, whatever they score: the two groups are ranked one after the other
+                // (ranked as one list, a one-semitone proposal outscores a natural "boost" at
+                // the same tempo, and past the cut it would push such rows off the list).
+                // Everything else is one ranking; there the crate keeps a proposal below every
+                // track that fits as it is.
+                const ranked = await rankInGroups(groups && groups.shift.length > 0 ? [groups.natural, groups.shift] : [matches], MAX_SUGGESTIONS, (rows, limit) => {
+                    copilotStats.ranks++;
+                    return copilot.rank(playing, candidates(rows, played, now), energy, limit);
+                });
                 if (seq !== rankSeq) return;
                 if (!ranked) {
                     unranked();
@@ -369,7 +526,7 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                 });
                 rankedKey = question;
                 pendingKey = null;
-                set({ refDeck: ref, suggestions, request: nextRequest, ranking: false });
+                set({ refDeck: ref, refKey: key, suggestions, request: nextRequest, ranking: false });
             } catch (err) {
                 if (seq !== rankSeq) return;
                 unranked();
@@ -470,6 +627,66 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
             }
         },
 
+        loadShifted: async (deck, track, shift) => {
+            // Only what a suggestion can propose, and never from a pop-out window (IN_POPOUT).
+            if (IN_POPOUT || !Number.isInteger(shift) || shift === 0 || Math.abs(shift) > MAX_PROPOSED_SHIFT) return false;
+            const name = deck.toUpperCase();
+            const id = String(track.id);
+            // One press at a time per deck, and the second one is answered: silence reads as
+            // a dead button while the first track is still being decoded.
+            if (get().shifting[deck] !== undefined) {
+                set({ note: { key: "copilot.shiftBusy", vars: { deck: name }, tone: "info" } });
+                return false;
+            }
+            // Nothing is loaded over a deck on air by a press that also changes pitch (the
+            // button is soft-disabled then; this is the same rule for a press that got through).
+            const held = useMixerStore.getState().deck(deck);
+            if (held.loaded && held.playing) {
+                set({ note: { key: "copilot.shiftDeckPlaying", vars: { deck: name }, tone: "info" } });
+                return false;
+            }
+            set((s) => ({ shifting: { ...s.shifting, [deck]: id } }));
+            // The load this press starts (none when the track is on the deck already).
+            let loading: Promise<boolean> | null = null;
+            try {
+                const result = await applyProposal(
+                    keeper,
+                    {
+                        engineDeck,
+                        // The existing load path, untouched: it reports a failure itself.
+                        load: (d) => (loading = get().load(d, track)),
+                        setKeyShift: (d, n) => usePerfStore.getState().setKeyShift(d, n),
+                    },
+                    deck,
+                    id,
+                    shift,
+                );
+                if (result === "applied") {
+                    // The status line (`shifts`) says what is on the deck now; a message about
+                    // the track that was there before (its shift went back to 0) is out of date.
+                    set({ note: null });
+                    return true;
+                }
+                // The DJ started the deck before the track was there to be shifted: the pitch
+                // is not changed under the audience, and the status line says so.
+                if (result === "playing") set({ note: { key: "copilot.shiftSkippedPlaying", vars: { deck: name, shift: formatSemitones(shift) }, tone: "info" } });
+                else if (result === "lost") set({ note: { key: "copilot.shiftLost", vars: { deck: name }, tone: "info" } });
+                else if (result === "no-engine") set({ note: { key: "copilot.err.noEngine", tone: "error" } });
+                return false;
+            } finally {
+                // The shift is decided; the deck stays "in flight" until the load has ended too
+                // (not awaited here: the answer above must not wait for the stems).
+                const landed = (): void =>
+                    set((s) => {
+                        const { [deck]: _done, ...rest } = s.shifting;
+                        return { shifting: rest };
+                    });
+                const pending = loading as Promise<boolean> | null;
+                if (pending) void pending.then(landed, landed);
+                else landed();
+            }
+        },
+
         planMix: async (opts) => {
             const planOpts = opts ?? get().planOpts;
             if (get().available !== "yes" && (await get().probe()) !== "yes") {
@@ -485,20 +702,35 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
             }
             const to = otherDeck(from, useMixerStore.getState().decks);
             set({ planning: true, planOpts, note: null });
+            // Set when the automatic pick below had to take a track that needs a key shift.
+            let clashNote: Note | null = null;
             try {
                 if (!useMixerStore.getState().deck(to).loaded) {
                     if (get().suggestions.every((s) => s.ranked === null)) await get().refresh();
                     const fromTrack = useMixerStore.getState().deck(from).trackId;
-                    const top = get().suggestions.find((s) => String(s.track.id) !== fromTrack);
-                    if (!top) {
+                    // Never a row that needs a key shift while one that does not is on the list:
+                    // this load does not shift (nothing changes the sound without a gesture), so
+                    // such a track would go on the deck as a clash and be planned as an echo-out.
+                    const pick = pickNext(
+                        get().suggestions,
+                        (s) => String(s.track.id) === fromTrack,
+                        (s) => proposalOf(s.ranked) !== null,
+                    );
+                    if (!pick) {
                         set({ plan: null, note: { key: "copilot.err.noNext", vars: { deck: to.toUpperCase() }, tone: "error" } });
                         return null;
                     }
+                    const top = pick.row;
                     const title = (top.track.title ?? "").trim() || top.track.filename;
                     set({ note: { key: "copilot.loadingNext", vars: { title, deck: to.toUpperCase() }, tone: "info" } });
                     if (!(await get().load(to, top.track))) return null;
                     if (seq !== planSeq) return null;
                     set({ note: null });
+                    // Every row needed a shift: say that this one clashes as loaded, and which
+                    // button of its row shifts it (the track is on the deck, so that button
+                    // shifts without loading again).
+                    const proposal = pick.clash ? proposalOf(top.ranked) : null;
+                    if (proposal) clashNote = { key: "copilot.nextClashes", vars: { title, deck: to.toUpperCase(), shift: formatSemitones(proposal.shift), key: proposal.key }, tone: "info" };
                 }
                 const decks = await freshDecks();
                 const f = decks.find((d) => d.id === from);
@@ -509,9 +741,12 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                 }
                 const pool = useLibraryPool.getState().tracks;
                 const keys = useMixerStore.getState().deckKeys;
+                // Both decks as they SOUND (key shift applied): a plan made after the DJ took a
+                // key-shift proposal sees the incoming track in the key it now plays in.
+                const shifts = usePerfStore.getState().decks;
                 const plan = await copilot.plan({
-                    from: deckFeat(f, keys[from], rowOf(pool, f.trackId)),
-                    to: deckFeat(t, keys[to], rowOf(pool, t.trackId)),
+                    from: soundingFeat(f, keys[from], rowOf(pool, f.trackId), shifts[from].keyShift),
+                    to: soundingFeat(t, keys[to], rowOf(pool, t.trackId), shifts[to].keyShift),
                     fromDeck: from,
                     toDeck: to,
                     fromPosSec: Math.max(0, f.position),
@@ -524,7 +759,9 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                     return null;
                 }
                 planTracks = [f.trackId, t.trackId];
-                set({ plan });
+                // The plan is on screen; with it, what the DJ must know about the track that
+                // was loaded for it (it clashes until its key is shifted).
+                set(clashNote ? { plan, note: clashNote } : { plan });
                 return plan;
             } catch (err) {
                 if (seq === planSeq) {
@@ -553,7 +790,9 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
                         return false;
                     }
                     // A run that ended already (a one-bar cut on a slow UI) is reported by its last event.
-                    set((s) => ({ run: started.done ? s.run : started, note: null }));
+                    // The note about a track "Mix next" loaded as a clash stays: the DJ can
+                    // still shift it until that deck starts.
+                    set((s) => ({ run: started.done ? s.run : started, note: s.note?.key === "copilot.nextClashes" ? s.note : null }));
                     return true;
                 } catch (err) {
                     // The phrase the plan aimed at has passed while it sat on screen: plan the next one.
@@ -617,11 +856,13 @@ export const useCopilotStore = create<CopilotStore>((set, get) => {
             // A track that already played tonight and sits paused on the other deck is not "next".
             const ready = n.loaded && n.trackId !== d.trackId && (n.playing || !playedTonight(n.trackId ? useHistoryStore.getState().played[n.trackId] : undefined, Date.now()));
             try {
+                // Keys as the decks sound (key shift applied), like the ranking and the plan.
+                const shifts = usePerfStore.getState().decks;
                 const warnings = await copilot.safety({
-                    playing: deckFeat(d, mixer.deckKeys[from], rowOf(pool, d.trackId)),
+                    playing: soundingFeat(d, mixer.deckKeys[from], rowOf(pool, d.trackId), shifts[from].keyShift),
                     positionSec: Math.max(0, d.position),
                     tempoRatio: Math.min(4, Math.max(0.25, d.tempo > 0 ? d.tempo : 1)),
-                    next: ready ? deckFeat(n, mixer.deckKeys[to], rowOf(pool, n.trackId)) : null,
+                    next: ready ? soundingFeat(n, mixer.deckKeys[to], rowOf(pool, n.trackId), shifts[to].keyShift) : null,
                     plannedBars: get().plan?.bars ?? null,
                 });
                 const next = warnings ?? [];
@@ -687,13 +928,36 @@ if (typeof window !== "undefined") {
         // One ranking after the last page of a progressive load, not one per page.
         scheduleRefresh();
     });
+
+    // Key shifts the co-pilot applied: look at a deck only while it carries one, and only when
+    // its track fields or its key shift change (`watchShifts`: a transition changes neither; an
+    // idle app and an app without such a shift do no work here beyond one length check per
+    // store update).
+    const unwatchShifts = watchShifts(keeper, useMixerStore, usePerfStore);
+    // After a page reload the engine still holds the tracks and their key shifts: take the
+    // records back and check each against the engine (another track meanwhile = undone, a
+    // shift changed by hand = forgotten).
+    const restored = readShifts();
+    if (restored.length > 0) {
+        keeper.restore(restored);
+        for (const r of restored) void keeper.check(r.deck);
+    }
+
     import.meta.hot?.dispose(() => {
         stopped = true;
         unlisten?.();
         unsubPool();
+        unwatchShifts();
         window.clearTimeout(refreshTimer);
     });
 }
 
 devExpose("copilot", useCopilotStore);
 devExpose("copilotStats", copilotStats);
+// What the engine holds on a deck, as the key-shift keeper sees it (live checks).
+devExpose("copilotEngineDeck", engineDeck);
+// The candidates a ranking is asked with: every pool track's features + minutes since played (live checks).
+devExpose("copilotCandidates", () => candidates(useLibraryPool.getState().tracks, useHistoryStore.getState().played, Date.now()));
+// The library rows the co-pilot ranks and filters, and the Library's search text (live checks
+// read id, key and tempo of each row, and that a request puts the search text back).
+devExpose("copilotPool", () => ({ tracks: useLibraryPool.getState().tracks, query: useLibraryPool.getState().query }));

@@ -8,6 +8,11 @@
  * the shared `CommandDialog` / other surfaces can list them. Dispatch stays in
  * `lib/use-shortcuts` (it matches on `KeyboardEvent.code`, layout-independent),
  * so the registry entries are list-only (`when: () => false`).
+ *
+ * Gig lock: the overlay still opens (it is the reference card of the keys), but nothing in it
+ * changes a binding. Starting a capture asks the gate here (so no key press is swallowed for a
+ * rebind that would be refused); rebind / reset / reset all ask it again in the keybind store.
+ * A capture that is under way when the lock goes on ends.
  */
 
 import { useEffect, useState } from "react";
@@ -26,6 +31,7 @@ import {
 import { useUiStore } from "@/state/ui-store";
 import { SHORTCUT_GROUPS, codeLabel, shortcutId } from "@/lib/shortcuts";
 import { useKeybindStore } from "@/state/keybind-store";
+import { gigAllows, useGigLocked } from "@/gig/gig-store";
 import { useT, type MessageKey } from "@/i18n";
 
 const GROUP_KEYS: Record<string, MessageKey> = {
@@ -64,6 +70,18 @@ export function ShortcutsOverlay() {
     const reset = useKeybindStore((s) => s.reset);
     const resetAll = useKeybindStore((s) => s.resetAll);
     const [capturing, setCapturing] = useState<string | null>(null);
+    const gigLocked = useGigLocked();
+
+    // The lock went on in the middle of a capture: the next key is the DJ's, not a new binding.
+    useEffect(() => {
+        if (gigLocked) setCapturing(null);
+    }, [gigLocked]);
+
+    /** Start (or end) capturing a key for `id`. Starting is a settings change: refused while locked, with the sentence. */
+    const toggleCapture = (id: string, on: boolean) => {
+        if (on && !gigAllows("changeSettings")) return;
+        setCapturing(on ? id : null);
+    };
 
     // Shared registry: install the single keydown dispatcher (mod+k etc.).
     useInstallShortcutListener();
@@ -132,9 +150,10 @@ export function ShortcutsOverlay() {
                                     <div key={id} className="flex h-8 items-center gap-2 rounded-md px-1 text-xs hover:bg-muted/60">
                                         <button
                                             type="button"
-                                            onClick={() => setCapturing(isCapturing ? null : id)}
+                                            onClick={() => toggleCapture(id, !isCapturing)}
                                             title={isCapturing ? t("shortcuts.pressKey") : t("shortcuts.rebind")}
                                             aria-pressed={isCapturing}
+                                            aria-disabled={gigLocked || undefined}
                                             className="focus-visible:ring-ring/40 rounded-md outline-none focus-visible:ring-3"
                                         >
                                             <Kbd

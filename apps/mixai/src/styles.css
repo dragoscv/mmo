@@ -24,6 +24,7 @@
 @import "./remote/remote.css";
 @import "./copilot/copilot.css";
 @import "./setlog/setlog.css";
+@import "./gig/gig.css";
 @source "../../../packages/ui/src";
 
 /*

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::automation::{Automation, Curve, Event, Keyframe, Lane, Target, TimedEvent};
-use crate::camelot::key_score;
+use crate::camelot::{KEY_CLASH_BELOW, KEY_FITS_FROM, key_score};
 use crate::{BEATS_PER_BAR, TrackFeatures};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,7 +86,7 @@ fn choose_style(req: &PlanRequest, reasons: &mut Vec<String>) -> Style {
         reasons.push("tempo_gap_echo".into());
         return Style::EchoOut;
     }
-    if k < 0.45 {
+    if k < KEY_CLASH_BELOW {
         reasons.push("key_clash_echo".into());
         return Style::EchoOut;
     }
@@ -94,7 +94,7 @@ fn choose_style(req: &PlanRequest, reasons: &mut Vec<String>) -> Style {
         reasons.push("stems_available".into());
         return Style::StemSwap;
     }
-    if k >= 0.85 {
+    if k >= KEY_FITS_FROM {
         reasons.push("harmonic_long_blend".into());
         return Style::BassSwap;
     }

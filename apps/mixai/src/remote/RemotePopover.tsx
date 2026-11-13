@@ -1,8 +1,9 @@
 /**
  * Body of the connected-mode popover (opened from RemoteChip): start / stop, the controls lock,
  * the pairing codes, the party switch, the request queue with moderation, the connected devices.
- * At most 380 px wide and nothing scrolls: the three parts (codes, requests, devices) are tabs,
- * so the popover also fits the smallest window (600 px high), and long lists are paged.
+ * At most 380 px wide and nothing scrolls: the parts (codes, requests, devices and, with a shell
+ * that has it, the stream overlay: StreamPanel) are tabs, so the popover also fits the smallest
+ * window (600 px high), and long lists are paged.
  *
  * Keyboard: the tabs are a real tablist (one tab stop, arrows / Home / End move), the pager
  * turns with left / right, and no bare arrow leaves the popover (RemoteChip puts
@@ -20,6 +21,7 @@ import { pluralCategory } from "@/library/track-view";
 import { useShellPrefs } from "@/shell/shell-prefs";
 import { countStatus, decisionsFor, errorDetail, errorKind, findQuery, focusRowAfter, hostOf, pageOf, pagerTarget, parseQrSvg, rovingTarget, type ErrorKind } from "./remote-core";
 import { useRemoteStore } from "./remote-store";
+import { StreamPanel } from "./StreamPanel";
 
 const ROLE_KEY: Record<RemoteRole, MessageKey> = { controller: "remote.role.controller", viewer: "remote.role.viewer", guest: "remote.role.guest" };
 const ROLE_HINT: Record<RemoteRole, MessageKey> = { controller: "remote.roleHint.controller", viewer: "remote.roleHint.viewer", guest: "remote.roleHint.guest" };
@@ -41,8 +43,10 @@ const REQUESTS_PER_PAGE = 3;
 const REQUESTS_PER_PAGE_TOUCH = 2;
 const CLIENTS_SHOWN = 8;
 
-type Tab = "codes" | "requests" | "clients";
+type Tab = "codes" | "requests" | "clients" | "stream";
 const TABS: readonly Tab[] = ["codes", "requests", "clients"];
+/** With a shell that serves the stream overlay (an older one never reports its address). */
+const TABS_STREAM: readonly Tab[] = [...TABS, "stream"];
 
 /** Focus was dropped (its element was removed or moved), not taken to another control. */
 function focusLost(): boolean {
@@ -303,7 +307,7 @@ function Clients() {
                 <ul className="rm-clients">
                     {clients.slice(0, CLIENTS_SHOWN).map((c) => (
                         <li key={`${c.id}@${c.addr}`}>
-                            <span className="dk-label">{t(ROLE_KEY[c.role])}</span>
+                            <span className="dk-label">{t(c.overlay === true ? "remote.role.overlay" : ROLE_KEY[c.role])}</span>
                             <span className="dk-num dk-num-sm rm-client-addr" title={c.id}>
                                 {hostOf(c.addr)}
                             </span>
@@ -336,23 +340,28 @@ function LockRow() {
     );
 }
 
-/** The running server: the lock and three tabs, opened on the requests when some are waiting. */
+/** The running server: the lock and its tabs, opened on the requests when some are waiting. */
 function Running() {
     const t = useT();
     const clients = useRemoteStore((s) => s.clients.length);
     const pending = useRemoteStore((s) => countStatus(s.requests, "pending"));
-    const [tab, setTab] = useState<Tab>(() => (countStatus(useRemoteStore.getState().requests, "pending") > 0 ? "requests" : "codes"));
-    const name: Record<Tab, string> = { codes: t("remote.tab.codes"), requests: t("remote.requests"), clients: t("remote.clients") };
-    const count: Record<Tab, number | null> = { codes: null, requests: pending, clients };
+    // The stream tab is there only when the shell reports an address for the page.
+    const stream = useRemoteStore((s) => s.overlaySupported && (s.urlOverlay !== null || s.urlOverlayLan !== null));
+    const moved = useRemoteStore((s) => s.portFallback);
+    const [picked, setTab] = useState<Tab>(() => (countStatus(useRemoteStore.getState().requests, "pending") > 0 ? "requests" : "codes"));
+    const tabs = stream ? TABS_STREAM : TABS;
+    const tab = tabs.includes(picked) ? picked : "codes";
+    const name: Record<Tab, string> = { codes: t("remote.tab.codes"), requests: t("remote.requests"), clients: t("remote.clients"), stream: t("remote.tab.stream") };
+    const count: Record<Tab, number | null> = { codes: null, requests: pending, clients, stream: null };
 
     // A real tablist: one tab stop, arrows / Home / End move and select. The key is used up
     // here, so a bare arrow on a tab never becomes "crossfader hard to A / B".
     const onTabsKey = (e: KeyboardEvent<HTMLDivElement>) => {
-        const next = rovingTarget(e, TABS.indexOf(tab), TABS.length);
+        const next = rovingTarget(e, tabs.indexOf(tab), tabs.length);
         if (next === null) return;
         e.preventDefault();
         e.stopPropagation();
-        const id = TABS[next];
+        const id = tabs[next];
         if (!id) return;
         setTab(id);
         e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
@@ -362,12 +371,18 @@ function Running() {
         <>
             <LockRow />
             <div className="rm-tabs" role="tablist" aria-label={t("remote.tabs")} aria-orientation="horizontal" onKeyDown={onTabsKey}>
-                {TABS.map((id) => (
+                {tabs.map((id) => (
                     <button key={id} id={`rm-tab-${id}`} type="button" role="tab" className="dk-tab" aria-selected={tab === id} aria-controls={tab === id ? `rm-panel-${id}` : undefined} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)}>
                         {name[id]}
                         {count[id] !== null && (
                             <span className="dk-num dk-num-sm" data-alert={id === "requests" && pending > 0 ? "true" : undefined}>
                                 {count[id]}
+                            </span>
+                        )}
+                        {/* The usual port was taken: the address in OBS is stale (a sign and its words, not colour alone). */}
+                        {id === "stream" && moved && (
+                            <span className="rm-tab-flag" role="img" aria-label={t("remote.tab.streamChanged")}>
+                                !
                             </span>
                         )}
                     </button>
@@ -380,6 +395,7 @@ function Running() {
             )}
             {tab === "requests" && <Requests />}
             {tab === "clients" && <Clients />}
+            {tab === "stream" && <StreamPanel />}
         </>
     );
 }

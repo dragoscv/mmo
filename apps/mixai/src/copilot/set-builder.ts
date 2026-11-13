@@ -15,7 +15,8 @@
  * to PARSE the whole module on one (`no-lookbehind.test.ts` keeps it that way).
  */
 import type { LibraryTrack } from "../bridge/types.ts";
-import { keyCompatibility, parseCamelot, type CamelotKey } from "../lib/harmonic.ts";
+import { parseCamelot, type CamelotKey } from "../lib/harmonic.ts";
+import { KEY_CLASH_BELOW, crateKeyScore, proposeKeyShift } from "./key-shift.ts";
 
 /** How the key must relate to the reference deck's key. */
 export type KeyRelation = "harmonic" | "same" | "relative";
@@ -258,20 +259,41 @@ export function hasAnyFilter(f: SetFilters): boolean {
 
 /** What the playing deck provides for the key / energy relations. */
 export interface SetReference {
+    /**
+     * Key of the reference deck AS IT SOUNDS (its key shift applied, see `soundingKey`): the
+     * same key the ranking and the row's key chip compare against.
+     */
     key: string | null;
     /** Energy 1..10 of the playing track (null = unknown). */
     energy: number | null;
     /** Track id on the playing deck: never suggested. */
     trackId: string | null;
+    /**
+     * The shell proposes key shifts (WP19-61): a "harmonic" request then keeps a clashing
+     * track that one or two semitones of key shift make compatible. Left out / false (a shell
+     * without proposals): such a track is filtered out, as before.
+     */
+    shiftable?: boolean;
 }
 
-function keyOk(rel: KeyRelation, ref: CamelotKey | null, track: string | null): boolean {
-    if (!ref) return true;
+/** `fits` = the relation holds as the track is; `shift` = only after a key shift the co-pilot can propose. */
+type KeyVerdict = "fits" | "shift" | "no";
+
+function keyVerdict(rel: KeyRelation, ref: CamelotKey | null, track: string | null, shiftable: boolean): KeyVerdict {
+    if (!ref) return "fits";
     const k = parseCamelot(track);
-    if (!k) return false;
-    if (rel === "same") return k.number === ref.number && k.letter === ref.letter;
-    if (rel === "relative") return k.number === ref.number && k.letter !== ref.letter;
-    return keyCompatibility(ref, k).score >= 0.45;
+    if (!k) return "no";
+    // "Same key" and "relative key" name one key: they stay strict, a shift is not offered.
+    if (rel === "same") return k.number === ref.number && k.letter === ref.letter ? "fits" : "no";
+    if (rel === "relative") return k.number === ref.number && k.letter !== ref.letter ? "fits" : "no";
+    // One key verdict inside the co-pilot: the score the ranking uses (the crate's `key_score`,
+    // mirrored by `crateKeyScore`), not the Library's own rule. They differ on one class: the
+    // same letter five wheel steps apart (8A against 1A or 3A, keys one semitone apart) is
+    // "workable" for the Library and a clash for the ranking. Here it is a clash, like on the
+    // row next to it: kept only when a key shift fixes it (it always does: one semitone).
+    if (crateKeyScore(ref, k).score >= KEY_CLASH_BELOW) return "fits";
+    // "Harmonic" / "in key": a clash the co-pilot can fix with one or two semitones stays in.
+    return shiftable && proposeKeyShift(`${ref.number}${ref.letter}`, `${k.number}${k.letter}`) !== null ? "shift" : "no";
 }
 
 /**
@@ -318,18 +340,28 @@ export function tagTokens(t: LibraryTrack): readonly string[] {
 }
 
 /**
- * Apply `f` to the pool. Text words are matched against title, artist, genre and album (every
- * token must appear in one of them; "hip-hop" matches "Hip Hop"). The energy direction keeps
- * tracks 1–3 steps up (or down) from the reference; without a reference energy every analysed
- * track passes.
+ * The tracks of the pool that pass `f`, in two groups, each in pool order: `natural` = pass as
+ * they are; `shift` = pass every filter, but their key fits only after a key shift of one or
+ * two semitones (only a "harmonic" request with `ref.shiftable` has such tracks). The store
+ * ranks the two groups apart (`rankInGroups` in features.ts), so a track that needs a shift is
+ * never listed above one that does not.
+ *
+ * Text words are matched against title, artist, genre and album (every token must appear in
+ * one of them; "hip-hop" matches "Hip Hop"). The energy direction keeps tracks 1–3 steps up
+ * (or down) from the reference; without a reference energy every analysed track passes. A
+ * clash that no shift within two semitones fixes stays out of a "harmonic" request.
  */
-export function applySetFilters(tracks: readonly LibraryTrack[], f: SetFilters, ref: SetReference, isPlayed: (trackId: string) => boolean): LibraryTrack[] {
+export function filterSet(tracks: readonly LibraryTrack[], f: SetFilters, ref: SetReference, isPlayed: (trackId: string) => boolean): { natural: LibraryTrack[]; shift: LibraryTrack[] } {
     const refKey = parseCamelot(ref.key);
     const words = f.words.flatMap(tokens);
-    return tracks.filter((t) => {
+    const shiftable = ref.shiftable === true;
+    /** Passed every filter, but its key needs a shift. */
+    const afterShift: LibraryTrack[] = [];
+    const natural = tracks.filter((t) => {
         if (ref.trackId !== null && String(t.id) === ref.trackId) return false;
         if (!bpmOk(t.bpm, f.bpmMin, f.bpmMax)) return false;
-        if (f.keyRelation && !keyOk(f.keyRelation, refKey, t.keyCamelot)) return false;
+        const key = f.keyRelation ? keyVerdict(f.keyRelation, refKey, t.keyCamelot, shiftable) : "fits";
+        if (key === "no") return false;
         if (f.yearMin !== null && f.yearMax !== null && !(typeof t.year === "number" && t.year >= f.yearMin && t.year <= f.yearMax)) return false;
         if (f.stems && t.stemsStatus !== "ready") return false;
         if (f.favorites && t.isFavorite !== true) return false;
@@ -346,8 +378,22 @@ export function applySetFilters(tracks: readonly LibraryTrack[], f: SetFilters, 
             const hay = haystack(t);
             if (!words.every((w) => hay.includes(w))) return false;
         }
+        if (key === "shift") {
+            afterShift.push(t);
+            return false;
+        }
         return true;
     });
+    return { natural, shift: afterShift };
+}
+
+/**
+ * `filterSet` as one list: the tracks that pass as they are first, then the ones that need a
+ * key shift (each group in pool order).
+ */
+export function applySetFilters(tracks: readonly LibraryTrack[], f: SetFilters, ref: SetReference, isPlayed: (trackId: string) => boolean): LibraryTrack[] {
+    const { natural, shift } = filterSet(tracks, f, ref, isPlayed);
+    return shift.length > 0 ? [...natural, ...shift] : natural;
 }
 
 /**

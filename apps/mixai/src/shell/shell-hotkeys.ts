@@ -8,18 +8,40 @@
  */
 import { useEffect } from "react";
 import { subscribeBleMidi } from "@/bridge/events";
+import { gigAllows } from "@/gig/gig-store";
 import { useLayoutStore } from "@/layout/layout-store";
 import { useUiStore } from "@/state/ui-store";
 import { translate, useLocale } from "@/i18n";
 import { create } from "zustand";
 
+/** How long an announcement stays on screen unless the caller asks for longer. */
+export const ANNOUNCE_MS = 2200;
+/** Bounds of a caller's own duration (a sentence must be readable, and must go away). */
+const ANNOUNCE_MIN_MS = 1000;
+const ANNOUNCE_MAX_MS = 10_000;
+
 interface Announce {
     text: string;
+    /** Changes with every announcement, also when the text is the same (the status region re-inserts its node on it). */
     at: number;
-    say: (text: string) => void;
+    /** How long this announcement stays on screen. */
+    ms: number;
+    /** Say `text` in the shell status region; `ms` = time on screen (default `ANNOUNCE_MS`). */
+    say: (text: string, ms?: number) => void;
 }
 
-export const useAnnounce = create<Announce>((set) => ({ text: "", at: 0, say: (text) => set({ text, at: Date.now() }) }));
+export const useAnnounce = create<Announce>((set, get) => ({
+    text: "",
+    at: 0,
+    ms: ANNOUNCE_MS,
+    say: (text, ms) =>
+        set({
+            text,
+            // Never the same value twice, so a repeated sentence is a new event.
+            at: Math.max(Date.now(), get().at + 1),
+            ms: typeof ms === "number" && Number.isFinite(ms) ? Math.min(ANNOUNCE_MAX_MS, Math.max(ANNOUNCE_MIN_MS, ms)) : ANNOUNCE_MS,
+        }),
+}));
 
 function isEditable(el: EventTarget | null): boolean {
     return el instanceof HTMLElement && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
@@ -42,14 +64,19 @@ export function controllerLayoutId(device: string, map: Record<string, string>):
     return null;
 }
 
-export function applyControllerLayout(device: string, locale: "en" | "ro"): void {
+/** Returns true when the layout mapped to `device` was applied. */
+export function applyControllerLayout(device: string, locale: "en" | "ro"): boolean {
     const ls = useLayoutStore.getState();
     const id = controllerLayoutId(device, ls.controllerLayouts);
-    if (!id) return;
+    if (!id) return false;
     const l = ls.all().find((x) => x.id === id);
-    if (!l) return;
+    if (!l) return false;
+    // Gig lock: the layout does not change by itself during a set. The connect is counted for
+    // the gig popover and NOT remembered: unlocking later does not switch the layout either.
+    if (!gigAllows("controllerLayout")) return false;
     ls.setActive(id);
     useAnnounce.getState().say(translate(locale, "shell.controllerLayout", { device, name: l.name }));
+    return true;
 }
 
 export function useShellHotkeys(): void {

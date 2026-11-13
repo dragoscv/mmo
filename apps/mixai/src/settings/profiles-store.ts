@@ -15,7 +15,7 @@ import {
     type ProfilesState,
     type SettingsProfile,
 } from "./profiles-core";
-import { apply, collect } from "./settings-live";
+import { applySections, collect, type ApplyOutcome } from "./settings-live";
 import { useUndoStore } from "./undo-store";
 
 function load(): ProfilesState {
@@ -38,7 +38,7 @@ interface ProfilesStore extends ProfilesState {
     get: (id: string) => SettingsProfile | undefined;
     /** Store the current live settings into a profile (and mark it active). */
     saveCurrent: (id: string) => Promise<void>;
-    /** Apply a profile (undoable). Returns false when the profile is empty. */
+    /** Apply a profile (undoable). Returns false when the profile is empty, or was not applied (the gig lock is on). */
     switchTo: (id: string, undoLabel: string) => Promise<boolean>;
     rename: (id: string, name: string) => void;
     remove: (id: string) => void;
@@ -66,7 +66,13 @@ export const useProfilesStore = create<ProfilesStore>((set, get) => {
         switchTo: async (id, undoLabel) => {
             const p = get().get(id);
             if (!p || Object.keys(p.data).length === 0) return false;
-            await useUndoStore.getState().run(undoLabel, () => apply(p.data));
+            // The outcome of the write decides: a profile that was not applied (the gig lock
+            // went on between the click and here) is not marked active.
+            const done: { outcome: ApplyOutcome } = { outcome: "locked" };
+            await useUndoStore.getState().run(undoLabel, async () => {
+                done.outcome = await applySections(p.data);
+            });
+            if (done.outcome !== "applied") return false;
             commit({ ...state(), active: id });
             return true;
         },

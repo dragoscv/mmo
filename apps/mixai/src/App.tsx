@@ -27,6 +27,7 @@ import { useLookNumber } from "./look/look";
 import { startWaveSync } from "./state/wave-store";
 import { startPlayHistory } from "./state/history-store";
 import { startSetLog } from "./setlog/setlog-store";
+import { startGig } from "./gig/gig-runtime";
 
 // Overlays and secondary surfaces load on demand so the entry chunk stays small.
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })));
@@ -35,6 +36,7 @@ const CommandPalette = lazy(() => import("./components/CommandPalette").then((m)
 const LayoutEditor = lazy(() => import("./layout/LayoutEditor").then((m) => ({ default: m.LayoutEditor })));
 const Onboarding = lazy(() => import("./shell/Onboarding").then((m) => ({ default: m.Onboarding })));
 const SkinEditorHost = lazy(() => import("./settings/SkinEditor").then((m) => ({ default: m.SkinEditorHost })));
+const GigCloseDialog = lazy(() => import("./gig/GigCloseDialog").then((m) => ({ default: m.GigCloseDialog })));
 const PluginServices = lazy(() =>
     import("./plugins/host").then((m) => ({
         default: function PluginServices() {
@@ -98,6 +100,8 @@ export function App() {
     useEffect(() => startPlayHistory(), []);
     // Automatic tracklist of the recorded set (title bar: Tracklist).
     useEffect(() => startSetLog(), []);
+    // Gig lock: shell sync (keep-awake, close confirmation), Ctrl/Cmd+Shift+G.
+    useEffect(() => startGig(), []);
 
     useEffect(() => {
         let cancelled = false;
@@ -164,6 +168,7 @@ export function App() {
                 <Onboarding />
                 <SkinEditorHost />
                 <PluginServices />
+                <GigCloseDialog />
             </Suspense>
         </div>
     );

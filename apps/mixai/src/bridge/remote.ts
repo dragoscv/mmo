@@ -22,6 +22,14 @@ export interface RemoteClient {
     role: RemoteRole;
     /** `ip:port` of the device. */
     addr: string;
+    /** A stream overlay (`/now` in OBS), not a phone; `role` is `viewer` then. Absent in shells before the overlay. */
+    overlay?: boolean;
+}
+
+/** The track the stream overlay shows. */
+export interface RemoteOnAir {
+    title: string | null;
+    artist: string | null;
 }
 
 export interface RemoteStatus {
@@ -39,6 +47,16 @@ export interface RemoteStatus {
     requestsPending: number;
     /** The DJ locked the phone controls (kept while off). Absent in shells before this field. */
     controlsLocked?: boolean;
+    /** Stream overlay address for OBS on this computer (loopback). Absent in shells before the overlay. */
+    urlOverlay?: string | null;
+    /** Stream overlay address for a second computer on the LAN; null when the server listens on loopback only. */
+    urlOverlayLan?: string | null;
+    /** Code of the stream overlay: kept by the UI and sent at the next start. */
+    overlayToken?: string | null;
+    /** The port asked for was taken: the server runs on another one. Absent = a shell before the overlay. */
+    portFallback?: boolean;
+    /** The track the stream overlay shows right now. */
+    onAir?: RemoteOnAir | null;
 }
 
 export type RequestStatus = "pending" | "accepted" | "rejected" | "played";
@@ -66,6 +84,7 @@ export interface RemoteEvent {
     controlsLocked?: boolean;
     clients: RemoteClient[];
     requests: SongRequest[];
+    onAir?: RemoteOnAir | null;
 }
 
 /** Payload of `remote://cue`: a phone moved the cue point of a deck. */
@@ -112,9 +131,13 @@ export const remote = {
     status(): Promise<RemoteStatus | null> {
         return call<RemoteStatus>("remote_status");
     },
-    /** Turn connected mode on (already on = the current status). `port` 0 / absent = any free port. */
-    start(opts: { partyOpen?: boolean; port?: number; bind?: string } = {}): Promise<RemoteStatus | null> {
-        return call<RemoteStatus>("remote_start", { partyOpen: opts.partyOpen ?? null, port: opts.port ?? null, bind: opts.bind ?? null });
+    /**
+     * Turn connected mode on (already on = the current status). `port` 0 / absent = any free
+     * port; a fixed port that is taken starts on a free one (`portFallback` in the answer).
+     * `overlayToken` = the stream overlay code of an earlier run.
+     */
+    start(opts: { partyOpen?: boolean; port?: number; bind?: string; overlayToken?: string } = {}): Promise<RemoteStatus | null> {
+        return call<RemoteStatus>("remote_start", { partyOpen: opts.partyOpen ?? null, port: opts.port ?? null, bind: opts.bind ?? null, overlayToken: opts.overlayToken ?? null });
     },
     /** Turn it off: devices are disconnected and the request queue is dropped. */
     stop(): Promise<RemoteStatus | null> {
@@ -133,9 +156,10 @@ export const remote = {
     /**
      * Deck labels (stored while off too), the party switch, dropping finished requests, and the
      * controls lock (while locked no phone command reaches the decks; requests keep working).
+     * `overlayRotate`: a new code for the stream overlay (read the new address with `status`).
      */
-    set(opts: { partyOpen?: boolean; labels?: RemoteLabel[]; clearDone?: boolean; controlsLocked?: boolean }): Promise<null> {
-        return call<null>("remote_set", { partyOpen: opts.partyOpen ?? null, labels: opts.labels ?? null, clearDone: opts.clearDone ?? null, controlsLocked: opts.controlsLocked ?? null });
+    set(opts: { partyOpen?: boolean; labels?: RemoteLabel[]; clearDone?: boolean; controlsLocked?: boolean; overlayRotate?: boolean }): Promise<null> {
+        return call<null>("remote_set", { partyOpen: opts.partyOpen ?? null, labels: opts.labels ?? null, clearDone: opts.clearDone ?? null, controlsLocked: opts.controlsLocked ?? null, overlayRotate: opts.overlayRotate ?? null });
     },
 };
 

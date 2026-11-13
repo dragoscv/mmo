@@ -20,6 +20,7 @@ import { practiceMessages } from "./messages-practice";
 import { remoteMessages } from "./messages-remote";
 import { copilotMessages } from "./messages-copilot";
 import { setlogMessages } from "./messages-setlog";
+import { gigMessages } from "./messages-gig";
 
 export const catalogs = [
     appMessages,
@@ -37,6 +38,8 @@ export const catalogs = [
     practiceMessages,
     remoteMessages,
     copilotMessages,
+    // Before the set tracklist: src/setlog/contract.test.ts pins `setlogMessages` as the last entry.
+    gigMessages,
     setlogMessages,
 ] as const;
 

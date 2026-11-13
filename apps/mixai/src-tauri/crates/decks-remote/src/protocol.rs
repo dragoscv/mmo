@@ -332,6 +332,12 @@ pub enum ServerMsg {
     Controls {
         locked: bool,
     },
+    /// Stream overlay (`/now`): the track that is on air, `null` texts when nothing is. Sent
+    /// when the overlay connects and whenever it changes; the overlay gets nothing else.
+    OnAir {
+        title: Option<String>,
+        artist: Option<String>,
+    },
     Error {
         reason: String,
     },
@@ -543,6 +549,28 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&ServerMsg::Controls { locked: true }).unwrap(),
             r#"{"type":"controls","locked":true}"#
+        );
+    }
+
+    #[test]
+    fn the_on_air_message_carries_the_two_texts_or_nulls() {
+        let m = ServerMsg::OnAir {
+            title: Some("Strobe".into()),
+            artist: Some("deadmau5".into()),
+        };
+        let j = serde_json::to_string(&m).unwrap();
+        assert_eq!(
+            j,
+            r#"{"type":"on_air","title":"Strobe","artist":"deadmau5"}"#
+        );
+        assert_eq!(serde_json::from_str::<ServerMsg>(&j).unwrap(), m);
+        let none = ServerMsg::OnAir {
+            title: None,
+            artist: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&none).unwrap(),
+            r#"{"type":"on_air","title":null,"artist":null}"#
         );
     }
 

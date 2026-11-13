@@ -10,11 +10,16 @@
  * - Pro packs: the download route on mixai.ro checks the decks_pro entitlement; a pro
  *   pack that reached us through it is installable. Packs from a local file marked pro
  *   need `proEntitled` (set after any successful pro download).
+ * - Gig lock: a skin try is a settings change by a door beside the Settings modal. Starting
+ *   one and keeping one ask the gate (refused while locked, with the sentence); a try that
+ *   runs when the lock goes on is ended at once by gig/gig-runtime (`endTry`: back to the
+ *   DJ's own skin now, not when its timer runs out during the set).
  */
 import { useEffect } from "react";
 import { create } from "zustand";
 import { normalizePrefs } from "@mmo/design-tokens";
 import { packs, type PackInfo } from "@/bridge/packs";
+import { gigAllows } from "@/gig/gig-store";
 import { PREFS_CHANGED_EVENT, applyPrefs, emitPrefsChanged, loadPrefs, savePrefs } from "@mmo/ui/theme";
 import { useLayoutStore } from "@/layout/layout-store";
 import { DEFAULT_LOOK, applyLook, emitLookChanged } from "@/look/look";
@@ -306,6 +311,7 @@ export const usePackStore = create<PackStore>((set, get) => ({
         }
     },
     startTry: (pack, bytes, opts = {}) => {
+        if (!gigAllows("changeSettings")) return;
         closePreview();
         if (tryTimer) clearTimeout(tryTimer);
         const cur = get().trying;
@@ -317,6 +323,8 @@ export const usePackStore = create<PackStore>((set, get) => ({
     keepTry: async () => {
         const t = get().trying;
         if (!t) return;
+        // "Keep" installs and applies the skin: refused while locked (the try itself is ended by the lock).
+        if (!gigAllows("changeSettings")) return;
         if (tryTimer) clearTimeout(tryTimer);
         const builtin = BUILTIN_SKINS.some((s) => s.manifest.id === t.pack.manifest.id);
         if (!builtin && t.bytes) {

@@ -5,6 +5,21 @@
 //! end of their HTTP request at once (the rest get 503 from the accept thread), and at most
 //! [`MAX_CLIENTS`] WebSocket sessions run. Every session is pinged; one that stays silent is
 //! dropped, so a phone that lost the network does not stay "connected".
+//!
+//! Besides the three roles there is the stream overlay (`/now`, an OBS Browser source): a
+//! socket that authenticates with the overlay code ([`RemoteServer::overlay_token`]) is told
+//! which track is on air ([`RemoteServer::publish_on_air`]) and nothing else, and everything it
+//! sends except `ping` is refused ([`OVERLAY_READ_ONLY`]). It is not a [`Role`]: the native
+//! bindings export that enum.
+//!
+//! A session keeps the code it was opened with and the revision of the codes at that moment,
+//! both read under the state lock in one go ([`Paired`]). "New code" changes a code and the
+//! revision under that same lock, so a session that was accepted just before a rotation
+//! always notices it: it either holds the new code already, or an older revision.
+//!
+//! Requests are served only when their `Host` header names the server by an address or as
+//! `localhost` ([`http::host_is_address`]): a DNS name that resolves to this computer is how a
+//! web page elsewhere reaches a listener on the local network.
 
 use std::collections::{HashMap, VecDeque};
 use std::io::{self, Read};
@@ -19,10 +34,11 @@ use tungstenite::protocol::WebSocketConfig;
 use tungstenite::{Message, WebSocket};
 
 use crate::PROTOCOL_VERSION;
-use crate::http::{self, Replay};
+use crate::http::{self, OVERLAY_PATH, Replay};
+use crate::on_air::OnAirTrack;
 use crate::party::{RequestQueue, RequestStatus, SongRequestView};
 use crate::protocol::{ClientMsg, ModerateAction, RemoteCommand, RemoteState, Role, ServerMsg};
-use crate::token::{ct_eq, new_token};
+use crate::token::{ct_eq, is_token, new_token};
 
 /// Connected devices at most (beyond this new sockets get 503).
 pub const MAX_CLIENTS: usize = 48;
@@ -41,6 +57,8 @@ pub const MAX_PENDING_COMMANDS: usize = 512;
 pub const MAX_MSGS_PER_SEC: u32 = 120;
 /// Largest WebSocket message accepted.
 pub const MAX_MESSAGE: usize = 16 * 1024;
+/// What a stream overlay socket is told when it sends anything but `ping`.
+pub const OVERLAY_READ_ONLY: &str = "the stream overlay is read-only";
 const POLL: Duration = Duration::from_millis(30);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +85,8 @@ impl Default for RemoteConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClientInfo {
     pub id: String,
+    /// What the device may do. A stream overlay ([`ClientInfo::overlay`]) is listed as a
+    /// viewer here (read-only is the nearest role); it gets less than a viewer.
     pub role: Role,
     pub addr: String,
     pub connected_ms: u64,
@@ -74,6 +94,9 @@ pub struct ClientInfo {
     /// by the device and two devices may share one).
     #[serde(default)]
     pub conn: u64,
+    /// A stream overlay (`/now`), paired with the overlay code: it only hears the on-air track.
+    #[serde(default)]
+    pub overlay: bool,
 }
 
 /// A validated controller command with the connection it came from
@@ -88,8 +111,20 @@ pub struct CommandFrom {
     pub command: RemoteCommand,
 }
 
+/// What a socket may do: one of the three roles, or the stream overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Access {
+    Role(Role),
+    /// `/now`: the on-air track, nothing else, and nothing accepted but `ping`.
+    Overlay,
+}
+
 struct State {
     tokens: [String; 3],
+    /// Code of the stream overlay.
+    overlay: String,
+    /// The track on air, as the app last published it.
+    on_air: Option<OnAirTrack>,
     remote: RemoteState,
     queue: RequestQueue,
     commands: VecDeque<CommandFrom>,
@@ -102,18 +137,40 @@ struct Inner {
     state: Mutex<State>,
     state_rev: AtomicU64,
     queue_rev: AtomicU64,
+    /// Revision of the codes. Changed only while the state lock is held (with the code).
     token_rev: AtomicU64,
     controls_rev: AtomicU64,
+    on_air_rev: AtomicU64,
     stop: AtomicBool,
     next_conn: AtomicU64,
     /// Connections between `accept` and the end of their HTTP request.
     handshakes: AtomicUsize,
     started: Instant,
+    /// Tests only: while set, a session waits right before its loop ([`Inner::wait_at_gate`]).
+    #[cfg(test)]
+    hold_sessions: AtomicBool,
+    /// Tests only: sessions waiting at that gate right now.
+    #[cfg(test)]
+    held_sessions: AtomicUsize,
 }
 
 impl Inner {
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Tests only: hold the calling session between its handshake and its loop while
+    /// `hold_sessions` is set, so a test can do something in exactly that gap.
+    #[cfg(test)]
+    fn wait_at_gate(&self) {
+        if !self.hold_sessions.load(Ordering::SeqCst) {
+            return;
+        }
+        self.held_sessions.fetch_add(1, Ordering::SeqCst);
+        while self.hold_sessions.load(Ordering::SeqCst) && !self.stop.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        self.held_sessions.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -137,15 +194,27 @@ pub fn lan_ip() -> IpAddr {
 }
 
 impl RemoteServer {
+    /// Start with a fresh code for every role and for the stream overlay.
     pub fn start(config: RemoteConfig) -> io::Result<Self> {
+        Self::start_with_overlay(config, None)
+    }
+
+    /// Like [`Self::start`], with the stream overlay code of an earlier run (so the address a
+    /// streamer pasted into OBS keeps working). It is taken only in the exact form
+    /// [`new_token`] produces ([`is_token`]); anything else is replaced by a fresh code, read
+    /// it back with [`Self::overlay_token`]. The code is valid from the first connection on.
+    pub fn start_with_overlay(config: RemoteConfig, overlay: Option<String>) -> io::Result<Self> {
         let listener = TcpListener::bind((config.bind, config.port))?;
         listener.set_nonblocking(true)?;
         let addr = listener.local_addr()?;
         let mut queue = RequestQueue::default();
         queue.set_open(config.party_open);
+        let overlay = overlay.filter(|t| is_token(t)).unwrap_or_else(new_token);
         let inner = Arc::new(Inner {
             state: Mutex::new(State {
                 tokens: [new_token(), new_token(), new_token()],
+                overlay,
+                on_air: None,
                 remote: RemoteState::default(),
                 queue,
                 commands: VecDeque::new(),
@@ -156,10 +225,15 @@ impl RemoteServer {
             queue_rev: AtomicU64::new(1),
             token_rev: AtomicU64::new(1),
             controls_rev: AtomicU64::new(1),
+            on_air_rev: AtomicU64::new(1),
             stop: AtomicBool::new(false),
             next_conn: AtomicU64::new(1),
             handshakes: AtomicUsize::new(0),
             started: Instant::now(),
+            #[cfg(test)]
+            hold_sessions: AtomicBool::new(false),
+            #[cfg(test)]
+            held_sessions: AtomicUsize::new(0),
         });
         let i2 = inner.clone();
         let accept = std::thread::Builder::new()
@@ -202,9 +276,56 @@ impl RemoteServer {
     /// New token for `role`; every device paired with the old one is disconnected.
     pub fn rotate_token(&self, role: Role) -> String {
         let t = new_token();
-        self.inner.lock().tokens[role.index()] = t.clone();
+        let mut s = self.inner.lock();
+        s.tokens[role.index()] = t.clone();
+        // Under the lock, with the code: a connection being accepted reads both or neither.
         self.inner.token_rev.fetch_add(1, Ordering::SeqCst);
         t
+    }
+
+    /// Current code of the stream overlay.
+    pub fn overlay_token(&self) -> String {
+        self.inner.lock().overlay.clone()
+    }
+
+    /// Address of the stream overlay page on `host`, with its code: what goes into the OBS
+    /// Browser source.
+    pub fn overlay_url(&self, host: IpAddr) -> String {
+        let h = match host {
+            IpAddr::V6(v6) => format!("[{v6}]"),
+            IpAddr::V4(v4) => v4.to_string(),
+        };
+        format!(
+            "http://{h}:{}{OVERLAY_PATH}?t={}",
+            self.port(),
+            self.overlay_token()
+        )
+    }
+
+    /// New code for the stream overlay; overlays paired with the old one are disconnected
+    /// (the phones, second screens and guests are not).
+    pub fn rotate_overlay_token(&self) -> String {
+        let t = new_token();
+        let mut s = self.inner.lock();
+        s.overlay = t.clone();
+        // Under the lock, with the code (see `rotate_token`).
+        self.inner.token_rev.fetch_add(1, Ordering::SeqCst);
+        t
+    }
+
+    /// Publish the track that is on air (`None` = nothing). Overlays are told when the title
+    /// or the artist changes.
+    pub fn publish_on_air(&self, track: Option<OnAirTrack>) {
+        let mut s = self.inner.lock();
+        if s.on_air != track {
+            s.on_air = track;
+            self.inner.on_air_rev.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// The track on air as last published.
+    pub fn on_air(&self) -> Option<OnAirTrack> {
+        self.inner.lock().on_air.clone()
     }
 
     /// Publish the deck state (only changes are pushed to clients).
@@ -418,6 +539,41 @@ fn role_for(state: &State, token: &str) -> Option<Role> {
         .find(|r| ct_eq(&state.tokens[r.index()], token))
 }
 
+/// What `token` unlocks. The overlay code is looked at first: should it ever equal a role's
+/// code, the socket gets the lesser access.
+fn access_for(state: &State, token: &str) -> Option<Access> {
+    if ct_eq(&state.overlay, token) {
+        return Some(Access::Overlay);
+    }
+    role_for(state, token).map(Access::Role)
+}
+
+/// The code `access` is paired with right now.
+fn token_of(state: &State, access: Access) -> &str {
+    match access {
+        Access::Role(role) => &state.tokens[role.index()],
+        Access::Overlay => &state.overlay,
+    }
+}
+
+/// The code a session was opened with and the revision of the codes at that moment. Both are
+/// read under the state lock in one go ([`Paired::read`]); the session compares its code
+/// again whenever the revision is no longer this one.
+struct Paired {
+    token: String,
+    rev: u64,
+}
+
+impl Paired {
+    /// Call with the state lock held (`state` is the locked state).
+    fn read(state: &State, inner: &Inner, access: Access) -> Self {
+        Self {
+            token: token_of(state, access).to_string(),
+            rev: inner.token_rev.load(Ordering::SeqCst),
+        }
+    }
+}
+
 fn handle(
     mut stream: TcpStream,
     peer: SocketAddr,
@@ -434,6 +590,13 @@ fn handle(
             return http::respond(&mut stream, "400 Bad Request", "text/plain", "bad request");
         }
     };
+    // Before anything else is answered: only a request that names this server by an address
+    // (or as `localhost`) is served. A page on another site that points its own DNS name at
+    // this computer sends that name here, and gets nothing: no page, no health answer, no
+    // socket.
+    if !http::host_is_address(head.host.as_deref()) {
+        return http::respond(&mut stream, "403 Forbidden", "text/plain", "host");
+    }
     if head.method != "GET" {
         return http::respond(
             &mut stream,
@@ -454,9 +617,9 @@ fn handle(
     if !http::same_origin(&head) {
         return http::respond(&mut stream, "403 Forbidden", "text/plain", "origin");
     }
-    let (role, token, conn, client) = {
+    let (access, paired, conn, client) = {
         let mut s = inner.lock();
-        let Some(role) = head.param("t").and_then(|t| role_for(&s, t)) else {
+        let Some(access) = head.param("t").and_then(|t| access_for(&s, t)) else {
             drop(s);
             return http::respond(&mut stream, "401 Unauthorized", "text/plain", "token");
         };
@@ -465,32 +628,43 @@ fn handle(
             return http::respond(&mut stream, "503 Service Unavailable", "text/plain", "full");
         }
         let conn = inner.next_conn.fetch_add(1, Ordering::SeqCst);
+        let overlay = access == Access::Overlay;
         let client = head
             .param("c")
             .filter(|c| valid_client_id(c))
             .map(str::to_string)
-            .unwrap_or_else(|| format!("anon-{}", &new_token()[..12]));
+            .unwrap_or_else(|| {
+                let kind = if overlay { "overlay" } else { "anon" };
+                format!("{kind}-{}", &new_token()[..12])
+            });
         s.clients.insert(
             conn,
             ClientInfo {
                 id: client.clone(),
-                role,
+                role: match access {
+                    Access::Role(role) => role,
+                    Access::Overlay => Role::Viewer,
+                },
                 addr: peer.to_string(),
                 connected_ms: inner.started.elapsed().as_millis() as u64,
                 conn,
+                overlay,
             },
         );
-        (role, s.tokens[role.index()].clone(), conn, client)
+        // The code and its revision, under the same lock as the lookup above: a rotation
+        // runs wholly before this (the session holds the new code) or wholly after (the
+        // session sees a newer revision and compares).
+        (access, Paired::read(&s, &inner, access), conn, client)
     };
     // The request is answered from here on: the session is bounded by `MAX_CLIENTS`, not by
     // the handshake slots.
     drop(slot);
     let who = Peer {
         conn,
-        role,
+        access,
         client: &client,
     };
-    let result = session(stream, raw, &inner, who, &token);
+    let result = session(stream, raw, &inner, who, paired);
     inner.lock().clients.remove(&conn);
     result
 }
@@ -499,7 +673,7 @@ fn handle(
 #[derive(Clone, Copy)]
 struct Peer<'a> {
     conn: u64,
-    role: Role,
+    access: Access,
     client: &'a str,
 }
 
@@ -519,6 +693,38 @@ struct Seen {
     queue: u64,
     controls: u64,
     now_playing: Vec<String>,
+    on_air_rev: u64,
+    /// Title and artist last sent to an overlay (`None` = nothing sent yet).
+    on_air: Option<(Option<String>, Option<String>)>,
+}
+
+/// The only push an overlay gets: the on-air track, once at the start and when its texts change.
+fn push_on_air(
+    ws: &mut WebSocket<Replay>,
+    inner: &Inner,
+    seen: &mut Seen,
+) -> Result<(), tungstenite::Error> {
+    let rev = inner.on_air_rev.load(Ordering::SeqCst);
+    if seen.on_air.is_some() && rev == seen.on_air_rev {
+        return Ok(());
+    }
+    seen.on_air_rev = rev;
+    let (title, artist) = match &inner.lock().on_air {
+        Some(t) => (t.title.clone(), t.artist.clone()),
+        None => (None, None),
+    };
+    let texts = (title, artist);
+    if seen.on_air.as_ref() != Some(&texts) {
+        send(
+            ws,
+            &ServerMsg::OnAir {
+                title: texts.0.clone(),
+                artist: texts.1.clone(),
+            },
+        )?;
+        seen.on_air = Some(texts);
+    }
+    Ok(())
 }
 
 fn push_updates(
@@ -527,7 +733,12 @@ fn push_updates(
     who: Peer<'_>,
     seen: &mut Seen,
 ) -> Result<(), tungstenite::Error> {
-    let Peer { role, client, .. } = who;
+    let Peer { access, client, .. } = who;
+    let role = match access {
+        // No deck state, no request queue, no controls lock: the on-air track only.
+        Access::Overlay => return push_on_air(ws, inner, seen),
+        Access::Role(role) => role,
+    };
     let crev = inner.controls_rev.load(Ordering::SeqCst);
     if crev != seen.controls {
         seen.controls = crev;
@@ -567,8 +778,22 @@ fn push_updates(
 }
 
 fn on_message(inner: &Inner, who: Peer<'_>, msg: ClientMsg) -> Option<ServerMsg> {
-    let Peer { conn, role, client } = who;
+    let Peer {
+        conn,
+        access,
+        client,
+    } = who;
     let err = |r: &str| Some(ServerMsg::Error { reason: r.into() });
+    let role = match access {
+        Access::Role(role) => role,
+        // The overlay code only reads: no command, request, vote or moderation is taken.
+        Access::Overlay => {
+            return match msg {
+                ClientMsg::Ping => Some(ServerMsg::Pong),
+                _ => err(OVERLAY_READ_ONLY),
+            };
+        }
+    };
     match msg {
         ClientMsg::Ping => Some(ServerMsg::Pong),
         ClientMsg::Command { command } => {
@@ -661,9 +886,9 @@ fn session(
     raw: Vec<u8>,
     inner: &Inner,
     who: Peer<'_>,
-    token: &str,
+    paired: Paired,
 ) -> io::Result<()> {
-    let Peer { role, client, .. } = who;
+    let Peer { access, client, .. } = who;
     let replay = Replay::new(raw, stream);
     let mut ws = tungstenite::accept_with_config(replay, Some(ws_config()))
         .map_err(|e| io::Error::other(e.to_string()))?;
@@ -673,16 +898,20 @@ fn session(
         let s = inner.lock();
         (s.queue.is_open(), s.controls_locked)
     };
-    send(
-        &mut ws,
-        &ServerMsg::Hello {
-            protocol: PROTOCOL_VERSION,
-            role,
-            client: client.to_string(),
-            party_open,
-        },
-    )
-    .map_err(io_err)?;
+    // An overlay gets no hello (it has no role to be told): its first message is the on-air
+    // track, pushed by the first pass of the loop.
+    if let Access::Role(role) = access {
+        send(
+            &mut ws,
+            &ServerMsg::Hello {
+                protocol: PROTOCOL_VERSION,
+                role,
+                client: client.to_string(),
+                party_open,
+            },
+        )
+        .map_err(io_err)?;
+    }
     let mut seen = Seen {
         state: 0,
         queue: 0,
@@ -693,8 +922,14 @@ fn session(
             inner.controls_rev.load(Ordering::SeqCst)
         },
         now_playing: vec![String::new()],
+        on_air_rev: 0,
+        on_air: None,
     };
-    let mut token_rev = inner.token_rev.load(Ordering::SeqCst);
+    #[cfg(test)]
+    inner.wait_at_gate();
+    // The revision the code was read at, NOT the revision of this moment: a code rotated
+    // since `handle` accepted this connection must be noticed by the first pass of the loop.
+    let mut token_rev = paired.rev;
     let mut window = Instant::now();
     let mut in_window = 0u32;
     // Heartbeat: a phone that left the Wi-Fi sends no FIN; without this it would stay in the
@@ -722,7 +957,7 @@ fn session(
         let trev = inner.token_rev.load(Ordering::SeqCst);
         if trev != token_rev {
             token_rev = trev;
-            let still = ct_eq(&inner.lock().tokens[role.index()], token);
+            let still = ct_eq(token_of(&inner.lock(), access), &paired.token);
             if !still {
                 let _ = ws.close(None);
                 let _ = ws.flush();
@@ -848,6 +1083,359 @@ mod tests {
 
     const PLAY: &str = r#"{"type":"command","command":{"cmd":"play","deck":0}}"#;
     const CUE_UP: &str = r#"{"type":"command","command":{"cmd":"cue","deck":0,"pressed":false}}"#;
+
+    /// Generous: a busy machine can hold a thread for seconds. A wait ends at once when what
+    /// it waits for happens; only a failure takes this long.
+    const LONG: Duration = Duration::from_secs(10);
+
+    fn wait_long(what: &str, mut f: impl FnMut() -> bool) {
+        let end = Instant::now() + LONG;
+        while Instant::now() < end {
+            if f() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("timed out: {what}");
+    }
+
+    /// Open a socket with `token` while every new session is held between its handshake and
+    /// its loop ([`Inner::wait_at_gate`]); returns once that session waits there. The gate
+    /// stays shut until [`open_gate`].
+    fn connect_held(s: &RemoteServer, token: &str, client: &str) -> Ws {
+        s.inner.hold_sessions.store(true, Ordering::SeqCst);
+        let before = s.inner.held_sessions.load(Ordering::SeqCst);
+        let url = format!("ws://127.0.0.1:{}/ws?t={token}&c={client}", s.port());
+        let (ws, _) = tungstenite::connect(url).unwrap();
+        if let MaybeTlsStream::Plain(t) = ws.get_ref() {
+            t.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        }
+        wait_long("the session waits before its loop", || {
+            s.inner.held_sessions.load(Ordering::SeqCst) == before + 1
+        });
+        ws
+    }
+
+    fn open_gate(s: &RemoteServer) {
+        s.inner.hold_sessions.store(false, Ordering::SeqCst);
+        wait_long("every held session went on", || {
+            s.inner.held_sessions.load(Ordering::SeqCst) == 0
+        });
+    }
+
+    /// Whether the server closes this socket within [`LONG`]. Its pings and pushes are read
+    /// past, and a read that merely timed out is not a close.
+    fn closes(ws: &mut Ws) -> bool {
+        if let MaybeTlsStream::Plain(t) = ws.get_ref() {
+            t.set_read_timeout(Some(Duration::from_millis(100)))
+                .unwrap();
+        }
+        let end = Instant::now() + LONG;
+        while Instant::now() < end {
+            match ws.read() {
+                Ok(Message::Close(_)) => return true,
+                Ok(_) => {}
+                Err(e) if is_timeout(&e) => {
+                    let _ = ws.flush();
+                }
+                Err(_) => return true,
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn a_code_changed_right_after_a_device_was_let_in_still_disconnects_it() {
+        let s = server();
+        // A second screen is let in with the viewer code; its session thread has answered the
+        // handshake and has not reached its loop yet. "New code" lands in exactly that gap.
+        // (A session that took the revision of the codes only now would find nothing changed
+        // and keep the revoked code for as long as the socket lives.)
+        let old = s.token(Role::Viewer);
+        let mut viewer = connect_held(&s, &old, "tv");
+        assert_eq!(s.clients().len(), 1, "it is listed as connected");
+        let new = s.rotate_token(Role::Viewer);
+        assert_ne!(old, new);
+        open_gate(&s);
+        assert!(closes(&mut viewer), "the viewer with the old code is gone");
+        wait_long("the viewer is no longer listed", || s.clients().is_empty());
+
+        // The same for the stream overlay and its own code.
+        let old = s.overlay_token();
+        let mut obs = connect_held(&s, &old, "obs");
+        assert!(s.clients()[0].overlay);
+        assert_ne!(old, s.rotate_overlay_token());
+        open_gate(&s);
+        assert!(closes(&mut obs), "the overlay with the old code is gone");
+        wait_long("the overlay is no longer listed", || s.clients().is_empty());
+
+        // Control: the gap by itself closes nobody. A device held there while ANOTHER code
+        // changes stays connected and is served, and still goes when its own code changes.
+        let mut phone = connect_held(&s, &s.token(Role::Controller), "phone");
+        s.rotate_token(Role::Guest);
+        s.rotate_overlay_token();
+        open_gate(&s);
+        until(&mut phone, |m| matches!(m, ServerMsg::Hello { .. }));
+        say(&mut phone, r#"{"type":"ping"}"#);
+        until(&mut phone, |m| matches!(m, ServerMsg::Pong));
+        assert_eq!(s.clients().len(), 1);
+        s.rotate_token(Role::Controller);
+        assert!(closes(&mut phone));
+        wait_long("the phone is no longer listed", || s.clients().is_empty());
+        let mut obs = connect_held(&s, &s.overlay_token(), "obs");
+        s.rotate_token(Role::Viewer);
+        s.rotate_token(Role::Controller);
+        open_gate(&s);
+        until(&mut obs, |m| matches!(m, ServerMsg::OnAir { .. }));
+        say(&mut obs, r#"{"type":"ping"}"#);
+        until(&mut obs, |m| matches!(m, ServerMsg::Pong));
+        assert_eq!(s.clients().len(), 1);
+        s.rotate_overlay_token();
+        assert!(closes(&mut obs));
+        wait_long("nobody is left", || s.clients().is_empty());
+    }
+
+    #[test]
+    fn a_session_is_paired_with_the_code_and_the_revision_of_one_moment() {
+        let s = server();
+        let rev = || s.inner.token_rev.load(Ordering::SeqCst);
+        let r0 = rev();
+        let read = |access| {
+            let st = s.inner.lock();
+            let p = Paired::read(&st, &s.inner, access);
+            (p.token, p.rev)
+        };
+        assert_eq!(read(Access::Role(Role::Guest)), (s.token(Role::Guest), r0));
+        assert_eq!(read(Access::Overlay), (s.overlay_token(), r0));
+        // Every "New code" moves the revision, whichever code it is: that is what makes each
+        // session look at its own code again.
+        let guest = s.rotate_token(Role::Guest);
+        assert_eq!(rev(), r0 + 1);
+        assert_eq!(read(Access::Role(Role::Guest)), (guest, r0 + 1));
+        let overlay = s.rotate_overlay_token();
+        assert_eq!(rev(), r0 + 2);
+        assert_eq!(read(Access::Overlay), (overlay, r0 + 2));
+        // The other codes did not change.
+        assert_eq!(
+            read(Access::Role(Role::Viewer)),
+            (s.token(Role::Viewer), r0 + 2)
+        );
+    }
+
+    /// One request with the `Host` header as given (`None` = no header at all); the status
+    /// line and the body (no body is read after `101`: the socket is a WebSocket then, and
+    /// dropping it here ends its session).
+    fn get_as(port: u16, path: &str, host: Option<&str>, extra: &str) -> (String, String) {
+        let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let host = host.map(|h| format!("Host: {h}\r\n")).unwrap_or_default();
+        write!(s, "GET {path} HTTP/1.1\r\n{host}{extra}\r\n").unwrap();
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            assert_eq!(s.read(&mut byte).unwrap(), 1, "an answer to {path}");
+            head.push(byte[0]);
+        }
+        let head = String::from_utf8_lossy(&head).into_owned();
+        let status = head.lines().next().unwrap_or("").to_string();
+        let mut body = String::new();
+        if !status.starts_with("HTTP/1.1 101") {
+            let _ = s.read_to_string(&mut body);
+        }
+        (status, body)
+    }
+
+    #[test]
+    fn a_request_that_names_the_server_by_a_dns_name_gets_nothing() {
+        let s = server();
+        let port = s.port();
+        let upgrade = "Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n";
+        let ws = format!("/ws?t={}&c=x", s.overlay_token());
+        let phone = format!("/ws?t={}&c=y", s.token(Role::Controller));
+        // A page on another site whose name was pointed at this computer: the browser sends
+        // that name as the host AND as the origin, so the origin check alone lets it through.
+        for name in [
+            format!("evil.example:{port}"),
+            "evil.example".to_string(),
+            format!("localhost.evil.example:{port}"),
+            format!("127.0.0.1.evil.example:{port}"),
+        ] {
+            let origin = format!("Origin: http://{name}\r\n");
+            for (path, extra) in [
+                (ws.as_str(), format!("{upgrade}{origin}")),
+                (phone.as_str(), format!("{upgrade}{origin}")),
+                (ws.as_str(), upgrade.to_string()),
+                ("/health", String::new()),
+                ("/now", String::new()),
+                ("/", String::new()),
+                ("/tokens.css", String::new()),
+                ("/nope", String::new()),
+            ] {
+                assert_eq!(
+                    get_as(port, path, Some(&name), &extra),
+                    ("HTTP/1.1 403 Forbidden".to_string(), "host".to_string()),
+                    "{name} {path}"
+                );
+            }
+        }
+        // No host at all, an empty one, a port that is not one.
+        for bad in [None, Some(""), Some("127.0.0.1:99999"), Some("[::1")] {
+            assert_eq!(
+                get_as(port, "/health", bad, "").0,
+                "HTTP/1.1 403 Forbidden",
+                "{bad:?}"
+            );
+            assert_eq!(
+                get_as(port, &ws, bad, upgrade).0,
+                "HTTP/1.1 403 Forbidden",
+                "{bad:?}"
+            );
+        }
+        assert!(s.clients().is_empty(), "nobody got in");
+        // By address, `localhost` or an IPv6 literal, with any port or none (the port in the
+        // header is the browser's business: a forwarded port differs from the one bound).
+        for ok in [
+            format!("127.0.0.1:{port}"),
+            "127.0.0.1".to_string(),
+            "192.168.1.20:8080".to_string(),
+            format!("localhost:{port}"),
+            "LOCALHOST".to_string(),
+            format!("[::1]:{port}"),
+            "[::1]".to_string(),
+        ] {
+            assert_eq!(
+                get_as(port, "/health", Some(&ok), ""),
+                ("HTTP/1.1 200 OK".to_string(), "ok".to_string()),
+                "{ok}"
+            );
+            let origin = format!("Origin: http://{ok}\r\n");
+            assert_eq!(
+                get_as(port, &ws, Some(&ok), &format!("{upgrade}{origin}")).0,
+                "HTTP/1.1 101 Switching Protocols",
+                "{ok}"
+            );
+        }
+        // The other checks still stand behind this one: a wrong code, a foreign origin.
+        let me = format!("127.0.0.1:{port}");
+        assert_eq!(
+            get_as(
+                port,
+                "/ws?t=00000000000000000000000000000000",
+                Some(&me),
+                upgrade
+            )
+            .0,
+            "HTTP/1.1 401 Unauthorized"
+        );
+        assert_eq!(
+            get_as(
+                port,
+                &ws,
+                Some(&me),
+                &format!("{upgrade}Origin: http://evil.example\r\n")
+            )
+            .0,
+            "HTTP/1.1 403 Forbidden"
+        );
+    }
+
+    #[test]
+    fn the_overlay_code_unlocks_the_overlay_and_each_role_code_its_role() {
+        let s = server();
+        let st = s.inner.lock();
+        assert_eq!(access_for(&st, &st.overlay), Some(Access::Overlay));
+        assert_eq!(token_of(&st, Access::Overlay), st.overlay);
+        for role in Role::ALL {
+            let t = &st.tokens[role.index()];
+            assert_ne!(t, &st.overlay, "{role:?} has its own code");
+            assert_eq!(access_for(&st, t), Some(Access::Role(role)));
+            assert_eq!(token_of(&st, Access::Role(role)), t);
+        }
+        assert_eq!(access_for(&st, ""), None);
+        assert_eq!(access_for(&st, &new_token()), None);
+        assert_eq!(access_for(&st, &st.overlay[..31]), None);
+    }
+
+    #[test]
+    fn an_overlay_may_only_ping() {
+        let s = server();
+        let play = || ClientMsg::Command {
+            command: RemoteCommand::Play { deck: 0 },
+        };
+        let request = || ClientMsg::Request {
+            title: "Strobe".into(),
+            artist: "deadmau5".into(),
+            note: String::new(),
+        };
+        let overlay = Peer {
+            conn: 1,
+            access: Access::Overlay,
+            client: "obs",
+        };
+        let refused = Some(ServerMsg::Error {
+            reason: OVERLAY_READ_ONLY.into(),
+        });
+        for msg in [
+            play(),
+            ClientMsg::Command {
+                command: RemoteCommand::Cue {
+                    deck: 0,
+                    pressed: false,
+                },
+            },
+            request(),
+            ClientMsg::Vote { id: 1 },
+            ClientMsg::Moderate {
+                id: 1,
+                action: ModerateAction::Accept,
+            },
+        ] {
+            assert_eq!(
+                on_message(&s.inner, overlay, msg.clone()),
+                refused,
+                "{msg:?}"
+            );
+        }
+        assert_eq!(
+            on_message(&s.inner, overlay, ClientMsg::Ping),
+            Some(ServerMsg::Pong)
+        );
+        assert!(s.drain_commands_from().is_empty());
+        assert!(s.requests().is_empty());
+        // The same messages from a phone are taken: the refusal is about the access.
+        let phone = Peer {
+            conn: 2,
+            access: Access::Role(Role::Controller),
+            client: "phone",
+        };
+        assert_eq!(on_message(&s.inner, phone, play()), None);
+        assert!(matches!(
+            on_message(&s.inner, phone, request()),
+            Some(ServerMsg::Requested { merged: false, .. })
+        ));
+        assert_eq!(s.drain_commands_from().len(), 1);
+        assert_eq!(s.requests().len(), 1);
+    }
+
+    #[test]
+    fn the_on_air_track_is_kept_and_republishing_it_is_not_a_change() {
+        let s = server();
+        assert_eq!(s.on_air(), None);
+        let rev = || s.inner.on_air_rev.load(Ordering::SeqCst);
+        let r0 = rev();
+        let track = OnAirTrack {
+            id: "t1".into(),
+            title: Some("Strobe".into()),
+            artist: None,
+        };
+        s.publish_on_air(Some(track.clone()));
+        assert_eq!(s.on_air(), Some(track.clone()));
+        assert_eq!(rev(), r0 + 1);
+        s.publish_on_air(Some(track));
+        assert_eq!(rev(), r0 + 1, "the same track again wakes nobody");
+        s.publish_on_air(None);
+        assert_eq!((s.on_air(), rev()), (None, r0 + 2));
+    }
 
     #[test]
     fn client_ids_are_restricted_to_safe_ascii() {

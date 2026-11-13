@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::camelot::key_score;
+use crate::camelot::{KEY_CLASH_BELOW, key_score};
 use crate::rank::tempo_score;
 use crate::{BEATS_PER_BAR, TrackFeatures};
 
@@ -96,7 +96,7 @@ pub fn check_safety(input: &SafetyInput) -> Vec<Warning> {
                 }
             }
             let (k, tag) = key_score(input.playing.key.as_deref(), next.key.as_deref());
-            if tag == "key_clash" && k < 0.45 {
+            if tag == "key_clash" && k < KEY_CLASH_BELOW {
                 out.push(Warning::KeyClash {
                     from: input.playing.key.clone().unwrap_or_default(),
                     to: next.key.clone().unwrap_or_default(),

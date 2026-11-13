@@ -31,6 +31,7 @@ mod window_ctl;
 
 // One module per feature area (each owns its commands and its managed state).
 mod copilot;
+mod gig;
 mod link;
 mod remote;
 mod stems;
@@ -1235,6 +1236,7 @@ pub fn run() {
         .manage(link::LinkCtl::default())
         .manage(remote::RemoteCtl::default())
         .manage(copilot::CopilotCtl::default())
+        .manage(gig::GigCtl::default())
         .setup(|app| {
             // Custom HTML title bar: drop the native frame on Windows/Linux only. macOS keeps
             // `decorations: true` + Overlay title bar from tauri.conf.json (native traffic lights).
@@ -1266,6 +1268,7 @@ pub fn run() {
             link::init(&handle);
             remote::init(&handle);
             copilot::init(&handle);
+            gig::init(&handle);
             std::thread::spawn(move || {
                 loop {
                     std::thread::sleep(Duration::from_millis(33));
@@ -1409,6 +1412,12 @@ pub fn run() {
             stems::deck_set_stem_xf,
             stems::deck_set_stem_mute_fx,
             stems::deck_save_cue_loop,
+            // -- gig lock (WP19-60): commands of src/gig.rs --
+            gig::gig_status,
+            gig::gig_set_locked,
+            gig::gig_system_status,
+            gig::gig_close_seen,
+            gig::gig_close_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MIXAI");

@@ -2,7 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { LibraryTrack } from "../bridge/types.ts";
-import { EMPTY_FILTERS, STOP_GRACE_MS, applySetFilters, bareStopMeans, clipText, fold, hasAnyFilter, isBareStop, isCommandText, parseSetRequest, tagTokens, type SetFilters } from "./set-builder.ts";
+import { keyCompatibility, parseCamelot } from "../lib/harmonic.ts";
+import { keyVerdict } from "./key-shift.ts";
+import { EMPTY_FILTERS, STOP_GRACE_MS, applySetFilters, bareStopMeans, clipText, filterSet, fold, hasAnyFilter, isBareStop, isCommandText, parseSetRequest, tagTokens, type SetFilters } from "./set-builder.ts";
 
 function tr(id: number, p: Partial<LibraryTrack> = {}): LibraryTrack {
     return {
@@ -226,6 +228,105 @@ test("filters apply to the pool with half / double time, relations and words", (
     // No reference energy: "more energy" keeps every analysed track.
     const noEnergy = applySetFilters(pool, { ...EMPTY_FILTERS, energyDirection: "up" }, { key: null, energy: null, trackId: null }, never);
     assert.equal(noEnergy.length, 7);
+});
+
+test("a harmonic request keeps a track that a key shift makes compatible, after the ones that fit", () => {
+    // Against 8A, by the co-pilot's one key verdict (the ranking's score): 9A adjacent, 8A same
+    // and 9B diagonal pass as they are. 1A (five steps round the wheel, same letter: one
+    // semitone away), 5A (three steps) and 3B (five steps, other letter) clash, and a key shift
+    // fixes them: 1A +1 = 8A (same), 5A +2 = 7A (adjacent), 3B -1 = 8B (relative). 2B and 12B
+    // clash and nothing within two semitones fixes them.
+    const pool = [
+        tr(1, { title: "Five steps, same letter", keyCamelot: "1A" }),
+        tr(2, { title: "Adjacent", keyCamelot: "9A" }),
+        tr(3, { title: "Hopeless", keyCamelot: "2B" }),
+        tr(4, { title: "Two semitones", keyCamelot: "5A" }),
+        tr(5, { title: "Same", keyCamelot: "8A" }),
+        tr(6, { title: "Hopeless too", keyCamelot: "12B" }),
+        tr(7, { title: "Relative after a shift", keyCamelot: "3B" }),
+        tr(8, { title: "No key", keyCamelot: null }),
+        tr(9, { title: "Not Camelot", keyCamelot: "Am" }),
+        tr(10, { title: "Diagonal", keyCamelot: "9B" }),
+    ];
+    const never = (_id: string) => false;
+    const ids = (f: Partial<SetFilters>, ref: { key: string | null; shiftable?: boolean }) => applySetFilters(pool, { ...EMPTY_FILTERS, ...f }, { energy: null, trackId: null, ...ref }, never).map((t) => t.id);
+    const harmonic = { keyRelation: "harmonic" as const };
+
+    // A shell without proposals (the flag left out or false): every clash is out, also the
+    // one-semitone pair the Library's own rule calls workable (the ranking tags it key_clash).
+    assert.deepEqual(ids(harmonic, { key: "8A" }), [2, 5, 10]);
+    assert.deepEqual(ids(harmonic, { key: "8A", shiftable: false }), [2, 5, 10]);
+    // With proposals: the shiftable tracks stay, AFTER the ones that fit, each group in pool
+    // order; the hopeless clashes and the tracks without a usable key stay out.
+    assert.deepEqual(ids(harmonic, { key: "8A", shiftable: true }), [2, 5, 10, 1, 4, 7]);
+    // The two groups, as the store ranks them apart.
+    const groups = filterSet(pool, { ...EMPTY_FILTERS, ...harmonic }, { key: "8A", energy: null, trackId: null, shiftable: true }, never);
+    assert.deepEqual([groups.natural.map((t) => t.id), groups.shift.map((t) => t.id)], [[2, 5, 10], [1, 4, 7]]);
+    assert.deepEqual(filterSet(pool, { ...EMPTY_FILTERS, ...harmonic }, { key: "8A", energy: null, trackId: null }, never).shift, [], "no shell proposals: no second group");
+    // "Same key" and "relative key" name one key: strict, with or without proposals.
+    assert.deepEqual(ids({ keyRelation: "same" }, { key: "8A", shiftable: true }), [5]);
+    assert.deepEqual(ids({ keyRelation: "same" }, { key: "8A" }), [5]);
+    assert.deepEqual(ids({ keyRelation: "relative" }, { key: "8A", shiftable: true }), []);
+    assert.deepEqual(ids({ keyRelation: "relative" }, { key: "8B", shiftable: true }), [5]);
+    // No key relation asked: the flag changes nothing, and nothing is reordered.
+    assert.deepEqual(ids({}, { key: "8A", shiftable: true }), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+    // The reference is the key the deck SOUNDS in: the same deck shifted +1 (8A sounds 3A)
+    // gives another answer. Against 3A: 1A and 5A are two steps away, 2B is the diagonal, 3B the
+    // relative key: all pass as they are. 9A is six steps away and one semitone fixes it (+1 =
+    // 4A, adjacent); 8A is five steps on the same letter, one semitone below 3A (+1 = 3A, the
+    // same key). 12B and 9B have no fix.
+    assert.deepEqual(ids(harmonic, { key: "3A" }), [1, 3, 4, 7]);
+    assert.deepEqual(ids(harmonic, { key: "3A", shiftable: true }), [1, 3, 4, 7, 2, 5]);
+
+    // The other filters still apply to a shiftable track.
+    const fast = [tr(1, { keyCamelot: "5A", bpm: 100 }), tr(2, { keyCamelot: "5A", bpm: 140 }), tr(3, { keyCamelot: "9A", bpm: 100 })];
+    const got = applySetFilters(fast, { ...EMPTY_FILTERS, keyRelation: "harmonic", bpmMin: 95, bpmMax: 105 }, { key: "8A", energy: null, trackId: null, shiftable: true }, never);
+    assert.deepEqual(
+        got.map((t) => t.id),
+        [3, 1],
+    );
+    // The playing track is never listed, shiftable or not.
+    const self = applySetFilters([tr(1, { keyCamelot: "5A" })], { ...EMPTY_FILTERS, keyRelation: "harmonic" }, { key: "8A", energy: null, trackId: "1", shiftable: true }, never);
+    assert.deepEqual(self, []);
+});
+
+test("the 'in key' filter, the row's key chip and the ranking give one verdict (8A against 1A and 3A)", () => {
+    const never = (_id: string) => false;
+    const harmonic = { ...EMPTY_FILTERS, keyRelation: "harmonic" as const };
+    for (const key of ["1A", "3A"]) {
+        const pool = [tr(1, { keyCamelot: key }), tr(2, { keyCamelot: "9A" })];
+        // The Library's rule would keep it as "workable" (0.6): that is the old behaviour ...
+        assert.ok(keyCompatibility(parseCamelot("8A"), parseCamelot(key)).score >= 0.45, `${key}: lib/harmonic keeps it`);
+        // ... the co-pilot calls it a clash on the chip ...
+        assert.equal(keyVerdict(key, "8A"), "clash", key);
+        // ... and the filter agrees: out without a proposal, kept AFTER the natural track with one.
+        const without = filterSet(pool, harmonic, { key: "8A", energy: null, trackId: null, shiftable: false }, never);
+        assert.deepEqual([without.natural.map((t) => t.id), without.shift.map((t) => t.id)], [[2], []], key);
+        const withProposals = filterSet(pool, harmonic, { key: "8A", energy: null, trackId: null, shiftable: true }, never);
+        assert.deepEqual([withProposals.natural.map((t) => t.id), withProposals.shift.map((t) => t.id)], [[2], [1]], key);
+        assert.deepEqual(
+            applySetFilters(pool, harmonic, { key: "8A", energy: null, trackId: null, shiftable: true }, never).map((t) => t.id),
+            [2, 1],
+            `${key}: listed after the track that fits`,
+        );
+    }
+    // For every pair of keys: "natural" in the filter is exactly "the chip does not say clash".
+    const keys: string[] = [];
+    for (let n = 1; n <= 12; n++) keys.push(`${n}A`, `${n}B`);
+    let clashes = 0;
+    for (const ref of keys) {
+        for (const key of keys) {
+            const g = filterSet([tr(1, { keyCamelot: key })], harmonic, { key: ref, energy: null, trackId: null, shiftable: true }, never);
+            const verdict = keyVerdict(key, ref);
+            assert.equal(g.natural.length === 1, verdict !== "clash", `${key} against ${ref}: filter ${g.natural.length} / chip ${verdict}`);
+            if (verdict === "clash") clashes++;
+        }
+    }
+    // 24 references x (7 same-letter + 9 other-letter clashing keys): of the 12 keys of the
+    // same letter 5 do not clash (same, two adjacent, two boost), of the other letter 3
+    // (relative, two diagonal).
+    assert.equal(clashes, 24 * 16);
 });
 
 test("text search folds diacritics on both sides (library tags and the request)", () => {

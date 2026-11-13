@@ -1513,7 +1513,11 @@ impl Engine {
         self.send(Command::SetRecording(true));
     }
 
-    /// Stop capturing and finalize the WAV file.
+    /// Stop capturing and finalize the WAV file. Returns when the file is complete on disk
+    /// (every block already handed to the writer is written and the header lengths are filled
+    /// in), or after `recorder::STOP_WAIT` on a stalled disk: a caller that closes the app right
+    /// after this leaves a playable file. The partial block the audio thread still holds
+    /// (under 1024 frames) is flushed by its next callback and may miss the file.
     pub fn stop_recording(&self) {
         // Turn off the RT tap first so it flushes its partial block, then
         // finalize the file.

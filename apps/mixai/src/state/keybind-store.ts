@@ -7,9 +7,14 @@
  * (via the profile) synced to the account. The live key handler resolves the
  * effective code→action map from defaults + overrides, so a remapped key wins
  * and the original key is freed.
+ *
+ * Gig lock: what the DJ does by hand in the shortcuts overlay (rebind, reset one, reset all)
+ * asks the gate and changes nothing while the lock is on. `setOverrides` is the restore path
+ * of a settings file / profile, which is gated where it starts (settings-live, cloud-sync).
  */
 
 import { create } from "zustand";
+import { gigAllows } from "@/gig/gig-store";
 import {
     ALL_SHORTCUTS,
     SHORTCUTS_BY_ID,
@@ -95,6 +100,7 @@ export const useKeybindStore = create<KeybindStore>((set, get) => ({
 
     rebind: (id, code) => {
         if (!SHORTCUTS_BY_ID.has(id) || !code) return;
+        if (!gigAllows("changeSettings")) return;
         const overrides = { ...get().overrides, [id]: code };
         set({ overrides, bindings: resolveBindings(overrides) });
         persist(overrides);
@@ -102,6 +108,7 @@ export const useKeybindStore = create<KeybindStore>((set, get) => ({
 
     reset: (id) => {
         if (!(id in get().overrides)) return;
+        if (!gigAllows("changeSettings")) return;
         const overrides = { ...get().overrides };
         delete overrides[id];
         set({ overrides, bindings: resolveBindings(overrides) });
@@ -109,6 +116,7 @@ export const useKeybindStore = create<KeybindStore>((set, get) => ({
     },
 
     resetAll: () => {
+        if (!gigAllows("changeSettings")) return;
         set({ overrides: {}, bindings: resolveBindings({}) });
         persist({});
     },

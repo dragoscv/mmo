@@ -4,6 +4,7 @@
  */
 import { useEffect } from "react";
 import { create } from "zustand";
+import { gigAllows } from "@/gig/gig-store";
 import { useUiStore } from "@/state/ui-store";
 
 interface SearchFocusRequest {
@@ -26,6 +27,9 @@ export function useSettingsHotkey(): void {
             if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
             if (e.key !== "," && e.code !== "Comma") return;
             e.preventDefault();
+            // Gig lock: Settings stay closed (said once, by the gate). No search-focus request
+            // may stay pending, or it would fire when Settings are opened after the unlock.
+            if (!gigAllows("openSettings")) return;
             useSettingsSearchFocus.getState().request();
             useUiStore.getState().openSettings();
         };

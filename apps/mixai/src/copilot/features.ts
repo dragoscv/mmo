@@ -5,6 +5,7 @@
  */
 import type { Candidate, PlanInfo, TrackFeat } from "../bridge/copilot.ts";
 import type { DeckId, DeckState, LibraryTrack } from "../bridge/types.ts";
+import { soundingKey } from "./key-shift.ts";
 
 const MAIN: readonly DeckId[] = ["a", "b", "c", "d"];
 
@@ -77,6 +78,18 @@ export function deckFeat(d: DeckLike, key: string | null, row: LibraryTrack | nu
 export function rowOf(pool: readonly LibraryTrack[], trackId: string | null): LibraryTrack | null {
     if (!trackId) return null;
     return pool.find((t) => String(t.id) === trackId) ?? null;
+}
+
+/**
+ * Features of the track on a deck with the key the deck SOUNDS in: `deckFeat`, its key moved
+ * by the deck's whole key shift (`soundingKey`). The ranking, the plan and the safety check
+ * all get the reference deck this way, so a deck playing 8A shifted by +1 is ranked, planned
+ * and checked as 3A.
+ */
+export function soundingFeat(d: DeckLike, key: string | null, row: LibraryTrack | null, keyShift: number | null | undefined): TrackFeat {
+    const feat = deckFeat(d, key, row);
+    const sounding = soundingKey(feat.key, keyShift);
+    return sounding === feat.key ? feat : { ...feat, key: sounding };
 }
 
 /**
@@ -162,8 +175,9 @@ export function controlMin(css: string | null | undefined): number {
 
 /**
  * Arrow keys in the suggestion list: Up / Down move between rows in the same column, Left /
- * Right between Load A and Load B of the row, Home / End to the first / last row. The position
- * stops at the edges (no wrap). Null = not a key of the list.
+ * Right between the buttons of the row (Load A, Load B and, with `cols` = 3, the "load with
+ * key shift" button), Home / End to the first / last row. The position stops at the edges (no
+ * wrap). Null = not a key of the list.
  */
 export function listMove(key: string, row: number, col: number, rows: number, cols = 2): { row: number; col: number } | null {
     if (rows <= 0 || cols <= 0) return null;
@@ -187,6 +201,158 @@ export function listMove(key: string, row: number, col: number, rows: number, co
     }
 }
 
+/**
+ * Slot number of the "load with key shift" button of a suggestion row (WP19-61). Load A is 0
+ * and Load B is 1 (`data-cp-slot="row:<row>:<slot>"`); only a row with a proposal has slot 2.
+ */
+export const SHIFT_COL = 2;
+
+/**
+ * The buttons of a row in the order they stand on screen, as slot numbers: the key-shift
+ * button (when the row has one) stands at the end of the title, before the tempo, the key and
+ * the two Load buttons, so a row without it keeps its whole title width and every other
+ * column stays aligned from row to row.
+ */
+export function rowOrder(hasShift: boolean): number[] {
+    return hasShift ? [SHIFT_COL, 0, 1] : [0, 1];
+}
+
+/**
+ * Is a page with this query string (`location.search`) a pop-out window? The app opens one
+ * panel in a second window as `index.html?popout=<panel>` (shell/PopoutApp.tsx reads the same
+ * parameter, gig/gig-store.ts tests for it the same way). Any `popout` parameter counts, also
+ * one that names no panel: the cautious answer for a page that is not the main window.
+ */
+export function isPopoutPage(search: string | null | undefined): boolean {
+    if (typeof search !== "string" || search.length === 0) return false;
+    try {
+        return new URLSearchParams(search).has("popout");
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * What the "load with key shift" button of a suggestion row is right now:
+ *   `none`     no button: the row has no proposal, there is no incoming deck, or this is a
+ *              pop-out window (see below);
+ *   `load`     load the track on the incoming deck and shift its key;
+ *   `shift`    the track is on that deck already: shift its key;
+ *   `done`     the track is there with the co-pilot's shift (also while the rest of its load,
+ *              the stems, is still on its way);
+ *   `busy`     that very load is in flight (the key follows when the engine has the track);
+ *   `playing`  the incoming deck is playing: nothing is loaded over a deck on air by a button
+ *              that also changes pitch (the plain Load buttons stay the DJ's call).
+ * Only `load` and `shift` act; `busy`, `done` and `playing` are shown soft-disabled (the
+ * button keeps focus and its name says why), never natively disabled. A press on `busy` or
+ * `playing` is answered in the status line by the store.
+ *
+ * Pop-out windows get no button: a pop-out is a separate page with its own co-pilot store, so
+ * a shift applied there would be recorded nowhere the main window looks, never be put back
+ * to 0 on the next track, and die with the pop-out. The reason text of the row still says
+ * what a shift would give.
+ */
+export type ShiftButtonState = "none" | "load" | "shift" | "busy" | "done" | "playing";
+
+export function shiftButtonState(row: {
+    /** This window is a pop-out (`index.html?popout=<panel>`). */
+    popout: boolean;
+    /** The row carries a key-shift proposal. */
+    proposal: boolean;
+    /** There is an incoming deck to load to. */
+    target: boolean;
+    /** The incoming deck holds this row's track. */
+    onTarget: boolean;
+    /** ... with exactly this proposal's shift, set by the co-pilot. */
+    applied: boolean;
+    /** A "load with key shift" of this row's track is in flight on the incoming deck. */
+    busy: boolean;
+    /** The incoming deck is playing. */
+    targetPlaying: boolean;
+}): ShiftButtonState {
+    if (row.popout || !row.proposal || !row.target) return "none";
+    if (row.onTarget && row.applied) return "done";
+    if (row.busy) return "busy";
+    if (row.targetPlaying) return "playing";
+    return row.onTarget ? "shift" : "load";
+}
+
+/** The states in which the key-shift button is shown soft-disabled. */
+export function shiftButtonSoft(state: ShiftButtonState): boolean {
+    return state === "busy" || state === "done" || state === "playing";
+}
+
+/**
+ * The suggestion "Mix next" loads on an empty incoming deck by itself: the first row that is
+ * not the playing track and carries NO key-shift proposal. A row with a proposal is a clash
+ * until its key is shifted, and the automatic load does not shift (nothing changes the sound
+ * without a gesture): loaded as it is, the plan would be an echo-out over a key clash. Only
+ * when every row carries a proposal is the first one taken; `clash` then says so, and the
+ * caller tells the DJ which button shifts it.
+ */
+export function pickNext<T>(rows: readonly T[], isPlaying: (row: T) => boolean, hasProposal: (row: T) => boolean): { row: T; clash: boolean } | null {
+    const free = rows.filter((r) => !isPlaying(r));
+    const natural = free.find((r) => !hasProposal(r));
+    if (natural !== undefined) return { row: natural, clash: false };
+    return free.length > 0 ? { row: free[0]!, clash: true } : null;
+}
+
+/**
+ * Rank groups of rows one after the other, so the order of the groups survives the ranking:
+ * the first group fills the list (`limit` rows at most), the next one gets the rows that are
+ * left, and so on. An "in key" request ranks its tracks this way, the ones that fit as they
+ * are before the ones that need a key shift: ranked as one list, a track that needs a shift
+ * can outscore one that does not (same tempo: a one-semitone proposal 0.7 against a natural
+ * "boost" 0.6) and, past the list's cut, push it out altogether. `rank` = one ranking of some
+ * rows (null = no shell); an empty group is not asked. Null as soon as one ranking is null.
+ */
+export async function rankInGroups<T, R>(groups: readonly (readonly T[])[], limit: number, rank: (rows: readonly T[], limit: number) => Promise<R[] | null>): Promise<R[] | null> {
+    const out: R[] = [];
+    for (const rows of groups) {
+        const left = limit - out.length;
+        if (left <= 0) break;
+        if (rows.length === 0) continue;
+        const ranked = await rank(rows, left);
+        if (!ranked) return null;
+        out.push(...ranked.slice(0, left));
+    }
+    return out;
+}
+
+/**
+ * `listMove` for rows that do not all have the same buttons: `shifts[i]` = row `i` has the
+ * key-shift button. Left / Right walk the buttons of the row in screen order and stop at its
+ * ends; Up / Down / Home / End keep the button, and from a key-shift button to a row without
+ * one they go to that row's Load A (the nearest button on screen). `col` is a slot number.
+ * Null = not a key of the list.
+ */
+export function listMoveIn(key: string, row: number, col: number, shifts: readonly boolean[]): { row: number; col: number } | null {
+    const rows = shifts.length;
+    if (rows <= 0) return null;
+    const r = Math.min(Math.max(Number.isFinite(row) ? Math.floor(row) : 0, 0), rows - 1);
+    const order = rowOrder(shifts[r] === true);
+    // A stale slot (the row lost its key-shift button) counts as Load A.
+    const at = Math.max(0, order.indexOf(col) < 0 ? order.indexOf(0) : order.indexOf(col));
+    const slot = order[at]!;
+    const inRow = (target: number) => ({ row: target, col: rowOrder(shifts[target] === true).includes(slot) ? slot : 0 });
+    switch (key) {
+        case "ArrowUp":
+            return inRow(Math.max(0, r - 1));
+        case "ArrowDown":
+            return inRow(Math.min(rows - 1, r + 1));
+        case "ArrowLeft":
+            return { row: r, col: order[Math.max(0, at - 1)]! };
+        case "ArrowRight":
+            return { row: r, col: order[Math.min(order.length - 1, at + 1)]! };
+        case "Home":
+            return inRow(0);
+        case "End":
+            return inRow(rows - 1);
+        default:
+            return null;
+    }
+}
+
 /** The four arrow keys: global shortcuts of the app (crossfader hard left / right, centre). */
 export function isArrowKey(key: string): boolean {
     return key === "ArrowLeft" || key === "ArrowRight" || key === "ArrowUp" || key === "ArrowDown";
@@ -201,6 +367,19 @@ export function isArrowKey(key: string): boolean {
 export function orderReasons(reasons: readonly string[]): string[] {
     const unknown = (r: string) => r.endsWith("_unknown");
     return [...reasons.filter((r) => !unknown(r)), ...reasons.filter(unknown)];
+}
+
+/** Reason tag of a suggestion that fits after a key shift (crate: `KEY_SHIFTABLE`). */
+export const SHIFT_REASON = "key_shiftable";
+
+/**
+ * The reasons of a row as they are shown: `shift` = the row carries the key-shift reason (it
+ * is written first on the line, before the score, with the shift and the key it leads to);
+ * `rest` = the other reasons in display order (`orderReasons`).
+ */
+export function rowReasons(reasons: readonly string[]): { shift: boolean; rest: string[] } {
+    const ordered = orderReasons(reasons);
+    return { shift: ordered.includes(SHIFT_REASON), rest: ordered.filter((r) => r !== SHIFT_REASON) };
 }
 
 /**
@@ -281,6 +460,18 @@ export function quantBpm(bpm: number): number {
 export function decksKey(decks: readonly Pick<DeckState, "id" | "loaded" | "playing" | "trackId" | "bpm" | "tempo">[], clockSource: string | null | undefined, keys: Readonly<Record<DeckId, string | null>>): string {
     const parts = decks.map((d) => [d.id, d.loaded ? 1 : 0, d.playing ? 1 : 0, d.loaded ? (d.trackId ?? "") : "", d.bpm > 0 ? quantBpm(d.bpm * (d.tempo > 0 ? d.tempo : 1)).toFixed(1) : "0", keys[d.id] ?? ""].join("\u0002"));
     return `${clockSource ?? ""}\u0001${parts.join("\u0001")}`;
+}
+
+/**
+ * One string for the decks' key shifts as the co-pilot counts them (whole semitones, the
+ * rounding of `soundingKey`): it changes when a deck may sound in another key, so the list is
+ * ranked again then, and not on a fine nudge inside the same semitone.
+ */
+export function shiftsKey(decks: Readonly<Partial<Record<DeckId, { keyShift: number }>>>): string {
+    return MAIN.map((id) => {
+        const n = decks[id]?.keyShift;
+        return typeof n === "number" && Number.isFinite(n) ? Math.round(n) + 0 : 0;
+    }).join(",");
 }
 
 /**

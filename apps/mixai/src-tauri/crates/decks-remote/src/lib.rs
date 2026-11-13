@@ -9,11 +9,16 @@
 //!   tablet, laptop or TV browser.
 //! * **Party DJ** ([`Role::Guest`]): guests scan a QR code, request songs and vote; the DJ accepts,
 //!   rejects or marks them played ([`RequestQueue`]).
+//! * **Stream overlay** (no role: its own read-only code): `/now` is a page for an OBS Browser
+//!   source that shows the title and artist of the track on air ([`on_air`] has the rule,
+//!   [`RemoteServer::start_with_overlay`] switches the access on, the app feeds
+//!   [`RemoteServer::publish_on_air`]).
 //!
-//! Transport: plain HTTP for the page (`/`, `/party`, `/tokens.css`, `/health`) and one WebSocket
-//! (`/ws?t=<token>&c=<client>`) with JSON messages ([`ClientMsg`] in, [`ServerMsg`] out). Each role
-//! has its own 128-bit token carried in the pairing URL / QR; rotating a token disconnects that
-//! role at once. LAN only, no TLS, no cloud relay, no GPL code (own protocol, not Ableton Link).
+//! Transport: plain HTTP for the page (`/`, `/party`, `/now`, `/tokens.css`, `/health`) and one
+//! WebSocket (`/ws?t=<token>&c=<client>`) with JSON messages ([`ClientMsg`] in, [`ServerMsg`]
+//! out). Each role has its own 128-bit token carried in the pairing URL / QR; rotating a token
+//! disconnects that role at once. LAN only, no TLS, no cloud relay, no GPL code (own protocol,
+//! not Ableton Link).
 //!
 //! Guards: text from guests loses control, zero-width and bidirectional formatting characters
 //! ([`is_hidden_char`]); at most [`MAX_HANDSHAKES`] connections may be in their HTTP request at
@@ -28,12 +33,15 @@
 //! `docs/decks/remote.md`.
 
 mod http;
+pub mod on_air;
 mod party;
 mod protocol;
 mod qr;
 mod server;
 mod token;
 
+pub use http::OVERLAY_PATH;
+pub use on_air::{ON_AIR_SEC, OnAir, OnAirTrack};
 pub use party::{
     PartyError, PublicRequest, RequestQueue, RequestStatus, SongRequestView, is_hidden_char,
     strip_hidden,
@@ -44,9 +52,9 @@ pub use protocol::{
 pub use qr::{QrMatrix, qr_matrix, qr_svg};
 pub use server::{
     ClientInfo, CommandFrom, DEAD_AFTER, HANDSHAKE_TIMEOUT, MAX_CLIENTS, MAX_HANDSHAKES,
-    PING_INTERVAL, RemoteConfig, RemoteServer, lan_ip,
+    OVERLAY_READ_ONLY, PING_INTERVAL, RemoteConfig, RemoteServer, lan_ip,
 };
-pub use token::{ct_eq, new_token};
+pub use token::{ct_eq, is_token, new_token};
 
 /// Protocol version announced in [`ServerMsg::Hello`]; bump on breaking message changes.
 pub const PROTOCOL_VERSION: u32 = 1;

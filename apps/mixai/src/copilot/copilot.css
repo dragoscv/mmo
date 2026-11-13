@@ -15,6 +15,9 @@
     from this one variable. CopilotPopover reads the same value for the row fit (fitRows). */
 .cp-pop[data-slot="popover-content"] {
      --cp-min: var(--dt-min, 24px);
+    /* Width of the "load with key shift" button of a row: deck letter + shift ("B+1"), never
+        narrower than the smallest control (44 px in touch mode). */
+    --cp-shift-w: max(var(--cp-min), 34px);
     width: min(92vw, 360px);
     padding: 10px;
     display: grid;
@@ -208,6 +211,24 @@
     grid-template-rows: var(--cp-min);
     height: var(--cp-min);
 }
+/* A row with a key-shift proposal has one more button, between the title and the tempo: the
+    tempo, key and Load columns keep their place from row to row, only the title gets shorter
+    (measured at the 360 px popover: 155 px left for it, 105 px in touch mode). */
+.cp-row[data-shift] {
+    grid-template-columns: minmax(0, 1fr) var(--cp-shift-w) 36px 46px var(--cp-min) var(--cp-min);
+}
+.cp-row-shift {
+    width: var(--cp-shift-w);
+    height: var(--cp-min);
+    min-height: var(--cp-min);
+    padding: 0;
+    gap: 1px;
+}
+.cp-row-shift > .dk-num {
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 700;
+}
 .cp-row-text {
     font-size: 11px;
     line-height: 1.2;
@@ -359,4 +380,32 @@
 }
 .cp-note[data-tone="error"] > svg {
     color: var(--alert, var(--destructive));
+}
+/* Standing line(s): which deck carries a key shift the co-pilot applied. Full text colour (it
+    is a fact about the sound, not a hint); one line per deck, may wrap. */
+.cp-shifts {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--foreground);
+}
+.cp-shifts[data-empty] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+.cp-shift-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+}
+.cp-shift-line > svg {
+    flex: none;
+    margin-top: 1.5px;
+    color: var(--on, var(--primary));
 }

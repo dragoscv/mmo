@@ -1,6 +1,12 @@
 //! Offline co-pilot (WP19-39): Tauri side of `decks-transition`.
 //!
 //! * `copilot_rank`: next-track suggestions for the playing deck from the loaded library.
+//!   With `keyShift: true` (the desktop UI sends it) a clashing track that one or two
+//!   semitones of key shift make fit carries that proposal and gets a key term between a clash
+//!   and an adjacent key; it never ranks above a track that fits as it is (the crate caps its
+//!   score below the lowest-scoring fit of the candidate list, before the cut to `limit`)
+//!   (WP19-61). The ranking the native apps get through `decks-ffi` has no such option and is
+//!   unchanged.
 //! * `copilot_plan`: a phrase-aligned transition plan (editable automation as JSON).
 //! * `copilot_run` / `copilot_cancel` / `copilot_status`: play a plan against the engine. One
 //!   thread ticks the crate's `TransitionRunner` every 20 ms while a run exists (it sleeps on a
@@ -243,6 +249,12 @@ pub struct RankedOut {
     pub energy: f64,
     pub reasons: Vec<String>,
     pub tempo_ratio: Option<f64>,
+    /// Proposed key shift of this track in semitones (+1, -1, +2, -2) that makes it fit the
+    /// reference key; `null` = none. Always on the wire, so the UI can tell a shell that knows
+    /// proposals (field there) from an older one (field absent).
+    pub key_shift: Option<i8>,
+    /// The track's key after the proposed shift (Camelot); `null` without a proposal.
+    pub key_after: Option<String>,
 }
 
 fn parse_energy(s: Option<&str>) -> Result<dt::EnergyDirection, String> {
@@ -267,6 +279,7 @@ fn rank_impl(
     candidates: Vec<CandidateIn>,
     energy: Option<&str>,
     limit: Option<u32>,
+    key_shift: Option<bool>,
 ) -> Result<Vec<RankedOut>, String> {
     if candidates.len() > MAX_CANDIDATES {
         return Err(format!("at most {MAX_CANDIDATES} candidates"));
@@ -287,7 +300,11 @@ fn rank_impl(
                 .map(|m| m.max(0.0)),
         });
     }
-    Ok(dt::rank_next(&playing, &list, &opts)
+    // Left out (an older UI, another caller) = the plain ranking, as before the option existed.
+    let extras = dt::RankExtras {
+        key_shift: key_shift.unwrap_or(false),
+    };
+    Ok(dt::rank_next_with(&playing, &list, &opts, extras)
         .into_iter()
         .map(|r| RankedOut {
             id: r.id,
@@ -297,6 +314,8 @@ fn rank_impl(
             energy: r.energy,
             reasons: r.reasons,
             tempo_ratio: r.tempo_ratio,
+            key_shift: r.key_shift,
+            key_after: r.key_after,
         })
         .collect())
 }
@@ -1478,15 +1497,20 @@ pub fn init(app: &tauri::AppHandle) {
 // ---- commands -------------------------------------------------------------------------------
 
 /// Rank `candidates` as the next track after `playing`. `energy` = `hold` (default) | `up` |
-/// `down`; `limit` 1..200 (default 8).
+/// `down`; `limit` 1..200 (default 8). `key_shift` = true: propose a key shift of one or two
+/// semitones for a clashing track that it makes fit, and rank that track by the proposal
+/// (never above a candidate that fits as it is; default false: the plain ranking).
+/// `playing.key` is the reference key as the UI gives it: the desktop sends the key the deck
+/// sounds in (its whole key shift applied).
 #[tauri::command]
 pub fn copilot_rank(
     playing: TrackFeat,
     candidates: Vec<CandidateIn>,
     energy: Option<String>,
     limit: Option<u32>,
+    key_shift: Option<bool>,
 ) -> Result<Vec<RankedOut>, String> {
-    rank_impl(playing, candidates, energy.as_deref(), limit)
+    rank_impl(playing, candidates, energy.as_deref(), limit, key_shift)
 }
 
 /// Plan a transition from `from` (on `from_deck`, playhead at `from_pos_sec`) to `to` (on
@@ -1920,7 +1944,7 @@ mod tests {
             .map(|(i, k)| cand(feat(&format!("h{i}"), 124.0, k)))
             .collect();
         pool.push(cand(feat("ok", 124.0, "9A")));
-        let r = rank_impl(feat("now", 124.0, "8A"), pool.clone(), None, Some(50)).unwrap();
+        let r = rank_impl(feat("now", 124.0, "8A"), pool.clone(), None, Some(50), None).unwrap();
         assert_eq!(r.len(), 7, "every row is ranked");
         let reason = |id: &str| r.iter().find(|x| x.id == id).unwrap().reasons[0].clone();
         assert_eq!(reason("h0"), "key_unknown");
@@ -1928,7 +1952,10 @@ mod tests {
         assert_eq!(reason("h2"), "key_unknown");
         assert_eq!(reason("ok"), "key_adjacent");
         for k in hostile {
-            assert!(rank_impl(feat("now", 124.0, k), pool.clone(), None, None).is_ok());
+            assert!(rank_impl(feat("now", 124.0, k), pool.clone(), None, None, None).is_ok());
+            // With proposals asked for, a key that is not Camelot is still just unknown.
+            let on = rank_impl(feat("now", 124.0, k), pool.clone(), None, None, Some(true));
+            assert!(on.is_ok(), "{k:?}");
             let p = plan_impl(
                 feat("a", 128.0, k),
                 feat("b", 128.0, k),
@@ -2118,22 +2145,22 @@ mod tests {
             down.energy = Some(3.0);
             vec![cand(up), cand(down), cand(feat("now", 124.0, "8A"))]
         };
-        let r = rank_impl(playing.clone(), list(), Some("up"), None).unwrap();
+        let r = rank_impl(playing.clone(), list(), Some("up"), None, None).unwrap();
         assert_eq!(r.len(), 2, "the playing track is not suggested");
         assert_eq!(r[0].id, "up");
         assert!(r[0].reasons.contains(&"energy_up".to_string()));
-        let r = rank_impl(playing.clone(), list(), Some("down"), None).unwrap();
+        let r = rank_impl(playing.clone(), list(), Some("down"), None, None).unwrap();
         assert_eq!(r[0].id, "down");
-        let r = rank_impl(playing.clone(), list(), None, Some(0)).unwrap();
+        let r = rank_impl(playing.clone(), list(), None, Some(0), None).unwrap();
         assert_eq!(r.len(), 1, "limit is clamped to 1..=200");
         let wire = serde_json::to_value(&r[0]).unwrap();
         assert!(wire.get("tempoRatio").is_some(), "{wire}");
-        assert!(rank_impl(playing.clone(), list(), Some("sideways"), None).is_err());
+        assert!(rank_impl(playing.clone(), list(), Some("sideways"), None, None).is_err());
         let many = vec![CandidateIn::default(); MAX_CANDIDATES + 1];
-        assert!(rank_impl(playing.clone(), many, None, None).is_err());
+        assert!(rank_impl(playing.clone(), many, None, None, None).is_err());
         let mut bad = list();
         bad[1].track.duration_sec = f64::NAN;
-        let e = rank_impl(playing, bad, None, None).unwrap_err();
+        let e = rank_impl(playing, bad, None, None, None).unwrap_err();
         assert!(e.contains("candidates[1]"), "{e}");
     }
 
@@ -2144,9 +2171,232 @@ mod tests {
             track: feat("recent", 124.0, "8A"),
             played_minutes_ago: Some(5.0),
         };
-        let r = rank_impl(feat("now", 124.0, "8A"), vec![recent, fresh], None, None).unwrap();
+        let r = rank_impl(
+            feat("now", 124.0, "8A"),
+            vec![recent, fresh],
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(r[0].id, "fresh");
         assert!(r[1].reasons.contains(&"recently_played".to_string()));
+    }
+
+    /// A pool with every kind of key relation to 8A (see the names).
+    fn key_pool() -> Vec<CandidateIn> {
+        [
+            ("same", "8A"),
+            ("adjacent", "9A"),
+            ("boost", "10A"),
+            ("diagonal", "9B"),
+            ("one-up", "1A"),
+            ("one-down", "3A"),
+            ("two-up", "5A"),
+            ("two-down", "11A"),
+            ("relative-by-one", "1B"),
+            ("hopeless", "2B"),
+            ("no-key", "A minor"),
+        ]
+        .iter()
+        .map(|(id, key)| cand(feat(id, 124.0, key)))
+        .collect()
+    }
+
+    #[test]
+    fn the_key_shift_proposal_is_asked_for_and_off_by_default() {
+        let now = || feat("now", 124.0, "8A");
+        // Left out, null and false: the plain ranking, and it is the crate's `rank_next`.
+        let plain = rank_impl(now(), key_pool(), None, Some(50), None).unwrap();
+        let off = rank_impl(now(), key_pool(), None, Some(50), Some(false)).unwrap();
+        assert_eq!(plain, off);
+        assert_eq!(plain.len(), 11);
+        assert!(
+            plain
+                .iter()
+                .all(|r| r.key_shift.is_none() && r.key_after.is_none())
+        );
+        assert!(plain.iter().all(|r| r.reasons[0] != "key_shiftable"));
+        let opts = dt::RankOptions {
+            limit: 50,
+            ..Default::default()
+        };
+        let list: Vec<dt::Candidate> = key_pool()
+            .into_iter()
+            .map(|c| dt::Candidate {
+                track: c.track.features("c").unwrap(),
+                played_minutes_ago: None,
+            })
+            .collect();
+        let crate_plain = dt::rank_next(&now().features("p").unwrap(), &list, &opts);
+        let same = |a: &RankedOut, b: &dt::Ranked| {
+            a.id == b.id && a.score == b.score && a.key == b.key && a.reasons == b.reasons
+        };
+        assert_eq!(plain.len(), crate_plain.len());
+        assert!(plain.iter().zip(&crate_plain).all(|(a, b)| same(a, b)));
+
+        // Asked for: the five clashes a shift fixes carry it, nothing else does.
+        let on = rank_impl(now(), key_pool(), None, Some(50), Some(true)).unwrap();
+        let of = |list: &[RankedOut], id: &str| list.iter().find(|r| r.id == id).unwrap().clone();
+        for (id, shift, after) in [
+            ("one-up", 1i8, "8A"),
+            ("one-down", -1, "8A"),
+            ("two-up", 2, "7A"),
+            ("two-down", -2, "9A"),
+            ("relative-by-one", 1, "8B"),
+        ] {
+            let r = of(&on, id);
+            assert_eq!(
+                (r.key_shift, r.key_after.as_deref()),
+                (Some(shift), Some(after)),
+                "{id}"
+            );
+            assert_eq!(r.reasons[0], "key_shiftable", "{id}");
+            let was = of(&plain, id);
+            assert_eq!(was.reasons[0], "key_clash", "{id}");
+            assert!(was.key < r.key && r.key < of(&on, "adjacent").key, "{id}");
+            assert!(r.score > was.score, "{id}");
+        }
+        for id in [
+            "same", "adjacent", "boost", "diagonal", "hopeless", "no-key",
+        ] {
+            assert_eq!(of(&on, id), of(&plain, id), "{id}");
+        }
+        assert!(
+            of(&on, "one-up").key > of(&on, "two-up").key,
+            "one semitone ranks above two"
+        );
+        // Never above a pair that fits as it is, everything else equal.
+        let order: Vec<&str> = on.iter().map(|r| r.id.as_str()).collect();
+        let at = |id: &str| order.iter().position(|x| *x == id).unwrap();
+        assert!(at("adjacent") < at("one-up") && at("one-up") < at("boost"));
+        assert!(at("boost") < at("two-up") && at("two-up") < at("diagonal"));
+        assert!(at("diagonal") < at("hopeless"));
+    }
+
+    #[test]
+    fn a_proposal_reaches_the_ui_below_every_track_that_fits_as_it_is() {
+        // Nine adjacent-key tracks 3 BPM off and one clash dead on tempo that one semitone
+        // fixes: by key, tempo and energy alone the clash would be first (0.88 against 0.871).
+        let now = || feat("now", 124.0, "8A");
+        let pool = || {
+            let mut list: Vec<CandidateIn> = (0..9)
+                .map(|i| cand(feat(&format!("fit{i}"), 127.0, "9A")))
+                .collect();
+            list.push(cand(feat("shift", 124.0, "1A")));
+            list
+        };
+        let on = rank_impl(now(), pool(), None, Some(50), Some(true)).unwrap();
+        assert_eq!(on.len(), 10);
+        assert_eq!(on[9].id, "shift");
+        assert_eq!(
+            (on[9].key_shift, on[9].key_after.as_deref()),
+            (Some(1), Some("8A"))
+        );
+        assert!(
+            on[9].score < on[8].score,
+            "the score on the wire is the capped one"
+        );
+        // The default list of the popover (8 rows): the proposal is not among them.
+        let top = rank_impl(now(), pool(), None, None, Some(true)).unwrap();
+        assert_eq!(top.len(), 8);
+        assert!(top.iter().all(|r| r.id != "shift" && r.key_shift.is_none()));
+        // Without the option the same track is a plain clash, last as before.
+        let off = rank_impl(now(), pool(), None, Some(50), None).unwrap();
+        assert_eq!(
+            (off[9].id.as_str(), off[9].reasons[0].as_str()),
+            ("shift", "key_clash")
+        );
+    }
+
+    #[test]
+    fn the_proposal_fields_are_always_on_the_wire_in_camel_case() {
+        let now = || feat("now", 124.0, "8A");
+        let on = rank_impl(now(), key_pool(), None, Some(50), Some(true)).unwrap();
+        let wire = serde_json::to_value(&on).unwrap();
+        let row = |id: &str| {
+            wire.as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["id"] == id)
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(row("one-down")["keyShift"], json!(-1));
+        assert_eq!(row("one-down")["keyAfter"], json!("8A"));
+        // No proposal: the two fields are there and null (a shell that knows proposals says so).
+        let none = row("adjacent");
+        let fields = none.as_object().unwrap();
+        assert!(fields.contains_key("keyShift") && fields.contains_key("keyAfter"));
+        assert_eq!(
+            (&none["keyShift"], &none["keyAfter"]),
+            (&json!(null), &json!(null))
+        );
+        // The same on the plain ranking.
+        let plain = rank_impl(now(), key_pool(), None, Some(50), None).unwrap();
+        let wire = serde_json::to_value(&plain[0]).unwrap();
+        assert_eq!(wire["keyShift"], json!(null));
+        assert!(wire.as_object().unwrap().contains_key("keyAfter"));
+    }
+
+    #[test]
+    fn the_reference_key_is_the_sounding_key_the_ui_sends() {
+        // Deck on 8A with its key shifted +1 sounds 3A: the UI sends 3A as `playing.key`.
+        let sounding = feat("now", 124.0, "3A");
+        let r = rank_impl(sounding, key_pool(), None, Some(50), Some(true)).unwrap();
+        let of = |id: &str| r.iter().find(|x| x.id == id).unwrap().clone();
+        // 3A itself now fits as it is; 8A (the deck's own printed key) needs +1 to 3A.
+        assert_eq!(of("one-down").reasons[0], "key_same");
+        assert_eq!(of("one-down").key_shift, None);
+        assert_eq!(
+            (of("same").key_shift, of("same").key_after),
+            (Some(1), Some("3A".into()))
+        );
+        // The plan and the safety check read the same features: a plan made after the DJ
+        // applied a proposal (incoming 1A shifted +1 sounds 8A, the UI sends 8A) is no clash.
+        let clash = plan_impl(
+            feat("a", 128.0, "8A"),
+            feat("b", 128.0, "1A"),
+            "a",
+            "b",
+            60.0,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            clash.reasons.contains(&"key_clash_echo".to_string()),
+            "{:?}",
+            clash.reasons
+        );
+        let fixed = plan_impl(
+            feat("a", 128.0, "8A"),
+            feat("b", 128.0, "8A"),
+            "a",
+            "b",
+            60.0,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            !fixed.reasons.contains(&"key_clash_echo".to_string()),
+            "{:?}",
+            fixed.reasons
+        );
+        let mut playing = feat("a", 120.0, "8A");
+        playing.duration_sec = 300.0;
+        let w = safety_impl(
+            playing.clone(),
+            280.0,
+            1.0,
+            Some(feat("b", 120.0, "1A")),
+            None,
+        )
+        .unwrap();
+        assert!(w.iter().any(|x| x.code == "key_clash"), "{w:?}");
+        let w = safety_impl(playing, 280.0, 1.0, Some(feat("b", 120.0, "8A")), None).unwrap();
+        assert!(!w.iter().any(|x| x.code == "key_clash"), "{w:?}");
     }
 
     #[test]

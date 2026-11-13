@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" data-mode="dark" data-surface="solid" data-align="left">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MixAI Now playing</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/tokens.css">
+<style>
+  /* Stream overlay for an OBS Browser source: the page background stays transparent, the text
+     carries its own dark halo so it reads on any video. Sizes follow the source's box: the title
+      is as large as fits two title lines, the artist and the optional label in the height
+      (padding 0.7 + title 2 x 1.35 + artist 0.87 + label 0.54 = 4.81 title sizes; 5.31 with the
+      plate). Line boxes are 1.35 high so a descender is never cut by the two-line clamp.
+      Fonts: the page ships none. It asks for the token families and, after them, for fonts
+      every system has, so the computer that runs OBS decides the face (never a serif default). */
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+    html { --scale: 1; --t: min(20vh, calc(5vw * var(--scale))); --shade: color-mix(in oklch, var(--background) 86%, transparent);
+      --fallback: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+    html[data-plate="box"] { --t: min(18vh, calc(5vw * var(--scale))); }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: transparent; }
+  body { display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: calc(var(--t) * 0.1);
+    padding: calc(var(--t) * 0.35); font-family: var(--font-sans), var(--fallback); color: var(--foreground); text-align: left; }
+  html[data-align="center"] body { align-items: center; text-align: center; }
+  html[data-align="right"] body { align-items: flex-end; text-align: right; }
+  html[data-plate="full"] body { background: var(--background); }
+  .box { min-width: 0; max-width: 100%; font-size: var(--t); opacity: 0; transition: opacity var(--dur-slow) var(--ease-out);
+    filter: drop-shadow(0 0 0.04em var(--shade)) drop-shadow(0 0 0.04em var(--shade)) drop-shadow(0 0.04em 0.18em var(--shade)); }
+  .box[data-on="true"] { opacity: 1; }
+  html[data-plate] .box { filter: none; }
+  html[data-plate="box"] .box { padding: 0.25em 0.4em; border-radius: var(--radius); background: var(--background); }
+  .label { font-size: 0.4em; line-height: 1.35; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .title { font-family: var(--font-heading), var(--fallback); font-weight: 700; line-height: 1.35; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .artist { margin-top: 0.1em; font-size: 0.6em; line-height: 1.35; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg { margin: 0; max-width: 100%; padding: 0.3em 0.6em; border-radius: var(--radius); background: var(--background); color: var(--foreground);
+    font-size: clamp(10px, 5vh, 14px); line-height: 1.3; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+</style>
+</head>
+<body>
+<main class="box" data-on="false" aria-live="polite">
+  <div class="label" hidden></div>
+  <div class="title"></div>
+  <div class="artist" hidden></div>
+</main>
+<p class="msg" hidden></p>
+<script>
+(() => {
+  "use strict";
+  // Options (all optional; a value that is not listed here is ignored):
+  //   align=left|center|right   scale=0.5..3   plate=1|full   label=1   lang=en|ro
+  const q = new URLSearchParams(location.search);
+  const pick = (name, allowed) => { const v = q.get(name); return allowed.includes(v) ? v : null; };
+  const lang = pick("lang", ["en", "ro"]);
+  const ro = lang ? lang === "ro" : (navigator.language || "en").toLowerCase().startsWith("ro");
+  const T = ro ? {
+    label: "Acum se aude", denied: "MixAI Decks nu a acceptat această adresă. Copiaz-o din nou din Conectare, Stream."
+  } : {
+    label: "Now playing", denied: "MixAI Decks did not accept this address. Copy it again from Connect, Stream."
+  };
+  const root = document.documentElement;
+  root.lang = ro ? "ro" : "en";
+  root.dataset.align = pick("align", ["left", "center", "right"]) || "left";
+  const plate = pick("plate", ["1", "full"]);
+  if (plate) root.dataset.plate = plate === "full" ? "full" : "box";
+  const s = q.get("scale");
+  const scale = s !== null && /^\d(\.\d{1,2})?$/.test(s) && Number(s) >= 0.5 && Number(s) <= 3 ? Number(s) : 1;
+  root.style.setProperty("--scale", String(scale));
+
+  const el = name => document.querySelector("." + name);
+  const box = el("box"), elTitle = el("title"), elArtist = el("artist"), elLabel = el("label"), elMsg = el("msg");
+  if (pick("label", ["1"])) { elLabel.textContent = T.label; elLabel.hidden = false; }
+
+  /** How long a lost connection keeps the last title on screen (ms). */
+  const KEEP_MS = 5000;
+  /** The page pings this often, and a connection that said nothing for SILENT_MS counts as lost
+      (a streaming PC that left the network sends no goodbye). */
+  const PING_MS = 4000;
+  const SILENT_MS = 12000;
+  const text = v => (typeof v === "string" ? v.trim() : "");
+  const fadeMs = () => { const d = parseFloat(getComputedStyle(box).transitionDuration); return Number.isFinite(d) ? d * 1000 : 0; };
+  let shown = "\n", want = { title: "", artist: "" }, swap = 0;
+  function paint() {
+    elTitle.textContent = want.title;
+    elArtist.textContent = want.artist;
+    elArtist.hidden = !want.artist;
+    shown = want.title + "\n" + want.artist;
+    box.dataset.on = String(want.title !== "");
+  }
+  /** Show a track (empty = nothing on air): fade the old text out, swap, fade in. */
+  function show(title, artist) {
+    let t = text(title), a = text(artist);
+    // A track without a title shows its artist alone; without both there is nothing to show.
+    if (!t) { t = a; a = ""; }
+    want = { title: t, artist: a };
+    const key = t + "\n" + a;
+    if (key === shown && !swap) return;
+    clearTimeout(swap); swap = 0;
+    if (box.dataset.on === "true" && key !== shown) {
+      box.dataset.on = "false";
+      swap = setTimeout(() => { swap = 0; paint(); }, fadeMs());
+    } else paint();
+  }
+  const say = t => { elMsg.textContent = t; elMsg.hidden = !t; };
+
+  const token = q.get("t") || "";
+  const cid = "overlay-" + Math.random().toString(36).slice(2, 12);
+  let delay = 500, drop = 0;
+    /** The socket was refused before any message. The server still answers = it refused this
+      address (the code is wrong or was replaced; or 48 devices are connected already); no
+      answer = MixAI Decks or Connect is off, which shows nothing. */
+  function why() {
+    fetch("/health", { cache: "no-store" }).then(r => {
+      if (!r.ok) return say("");
+      clearTimeout(drop); drop = 0;
+      show("", "");
+      say(T.denied);
+    }, () => say(""));
+  }
+  function retry() { setTimeout(connect, delay); delay = Math.min(delay * 2, 8000); }
+  function connect() {
+    let live = false, over = false, heard = Date.now(), beat = 0, ws;
+    const end = () => {
+      if (over) return;
+      over = true;
+      clearInterval(beat);
+      try { ws.onclose = null; ws.onmessage = null; ws.close(); } catch { /* already gone */ }
+      if (!live) why();
+      if (!drop) drop = setTimeout(() => { drop = 0; show("", ""); }, KEEP_MS);
+      retry();
+    };
+    try {
+      ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?t=" + encodeURIComponent(token) + "&c=" + encodeURIComponent(cid));
+    } catch { retry(); return; }
+    ws.onmessage = ev => {
+      heard = Date.now();
+      let m;
+      try { m = JSON.parse(ev.data); } catch { return; }
+      if (!m || m.type !== "on_air") return;
+      live = true; delay = 500;
+      clearTimeout(drop); drop = 0;
+      say("");
+      show(m.title, m.artist);
+    };
+    ws.onclose = end;
+    beat = setInterval(() => {
+      if (Date.now() - heard > SILENT_MS) end();
+      else if (ws.readyState === 1) ws.send('{"type":"ping"}');
+    }, PING_MS);
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

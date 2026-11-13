@@ -60,8 +60,20 @@ decks-remote = { path = "crates/decks-remote" }
 decks-transition = { path = "crates/decks-transition" }
 
 [target.'cfg(windows)'.dependencies]
-# SendInput for the Windows 11 Snap Layouts flyout on the custom title bar.
-windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+# SendInput for the Windows 11 Snap Layouts flyout on the custom title bar; gig lock (src/gig.rs):
+# power status, the keep-awake power request and the free space of the recording volume.
+windows-sys = { version = "0.61.2", features = [
+	"Win32_UI_Input_KeyboardAndMouse",
+	"Win32_Foundation",
+	"Win32_System_Power",
+	"Win32_System_Threading",
+	"Win32_Storage_FileSystem",
+] }
+
+[target.'cfg(unix)'.dependencies]
+# statvfs for the free space of the recording volume (src/gig.rs). Already in the lock file
+# through other crates; MIT / Apache-2.0.
+libc = "0.2"
 
 [features]
 # Forward the ASIO opt-in to the core for low-latency Windows builds.

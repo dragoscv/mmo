@@ -16,7 +16,7 @@
  * engine state and the "kHz · ms" readout live in the status bar (StatusBar.tsx).
  */
 import { useEffect, useRef, useState } from "react";
-import { Circle, Command, Expand, Keyboard, LayoutGrid, Minimize2, Minus, Settings, Shrink, Square, Theater, X, ZoomIn } from "lucide-react";
+import { Circle, Command, Expand, Keyboard, LayoutGrid, Lock, Minimize2, Minus, Settings, Shrink, Square, Theater, X, ZoomIn } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -40,6 +40,7 @@ import { openLayoutEditor } from "@/layout/editor-bridge";
 import { layoutName } from "@/layout/presets";
 import { ProfileSwitcher } from "@/settings/ProfileSwitcher";
 import { SetlogButton } from "@/setlog/SetlogButton";
+import { useGigLocked } from "@/gig/gig-store";
 import { useT } from "@/i18n";
 import { PerfHud } from "./PerfHud";
 import { useShellPrefs } from "./shell-prefs";
@@ -56,6 +57,8 @@ export function TitleBar() {
     const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen);
     const setCommandOpen = useUiStore((s) => s.setCommandOpen);
     const booth = useShellPrefs((s) => s.booth);
+    // Gig lock: the gear stays focusable; pressing it says why Settings stay closed (ui-store asks the gate).
+    const gigLocked = useGigLocked();
 
     return (
         <header
@@ -149,13 +152,20 @@ export function TitleBar() {
             <Tooltip>
                 <TooltipTrigger
                     render={
-                        <button type="button" className="dk-btn dk-btn-icon tb-btn" data-settings-button="" onClick={() => openSettings()} aria-label={t("topbar.settings")}>
-                            <Settings aria-hidden />
+                        <button
+                            type="button"
+                            className="dk-btn dk-btn-icon tb-btn"
+                            data-settings-button=""
+                            onClick={() => openSettings()}
+                            aria-disabled={gigLocked || undefined}
+                            aria-label={gigLocked ? `${t("topbar.settings")}. ${t("gig.lockedShort")}` : t("topbar.settings")}
+                        >
+                            {gigLocked ? <Lock aria-hidden /> : <Settings aria-hidden />}
                         </button>
                     }
                 />
                 <TooltipContent>
-                    {t("topbar.settings")} <KbdCombo combo="mod+," />
+                    {gigLocked ? t("gig.lockedShort") : t("topbar.settings")} <KbdCombo combo="mod+," />
                 </TooltipContent>
             </Tooltip>
 

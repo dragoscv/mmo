@@ -3547,6 +3547,7 @@ dependencies = [
  "env_logger",
  "futures",
  "hidapi",
+ "libc",
  "log",
  "midir",
  "mixai-core",

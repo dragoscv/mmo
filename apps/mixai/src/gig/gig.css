@@ -1,0 +1,256 @@
+/* Gig lock + checklist (src/gig/*). Shared vocabulary: src/look/look.css (dk-*), status bar: shell/shell.css (.sb-*).
+   --gg-min = the smallest control: 24 px, 44 px in touch mode (the app's --dt-min, set on :root by
+   components/deck-tabs.css). Touch mode forces 44 x 44 px on every button (styles.css). */
+
+/* Chip: a padlock (open / closed) + "GIG" + the word "Locked" while on (shape and word, never colour alone). */
+.gg-chip-icon {
+    flex-shrink: 0;
+}
+.gg-chip[data-on="true"] .gg-chip-icon,
+.gg-chip[data-on="true"] .gg-chip-word {
+    color: var(--on, var(--primary));
+}
+
+/* Controls that open Settings while the lock is on: they stay focusable and say why when pressed. */
+.mixai-statusbar.sb button.sb-item[aria-disabled="true"],
+[data-gig-locked="true"] {
+    cursor: not-allowed;
+}
+.mixai-statusbar.sb button.sb-item[aria-disabled="true"]:hover {
+    background: transparent;
+    color: var(--muted-foreground);
+}
+
+/* Popover: one fixed column, two tabs. Nothing scrolls in a window of the minimum size (600 px high);
+   below that (or at a large zoom) the popover keeps to the room it has and scrolls inside, so no control is
+   ever out of reach (--available-height is set by the popover positioner). */
+.gg-pop[data-slot="popover-content"] {
+    --gg-min: var(--dt-min, 24px);
+    box-sizing: border-box;
+    width: min(92vw, 400px);
+    max-height: var(--available-height, 100vh);
+    overflow-y: auto;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+    border-radius: var(--ctl-radius, 6px);
+}
+.gg-body,
+.gg-panel {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+.gg-body p {
+    margin: 0;
+}
+.gg-tabs {
+    display: flex;
+    gap: 14px;
+    min-width: 0;
+    border-bottom: 1px solid var(--line, var(--border));
+}
+.gg-tabs > .dk-tab {
+    min-height: var(--gg-min);
+}
+
+/* Lock tab. */
+.gg-switch {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+.gg-state {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground);
+}
+.gg-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.gg-actions > .dk-btn {
+    min-height: max(var(--gg-min), var(--ctl-h, 24px));
+}
+.gg-hint,
+.gg-list,
+.gg-awake,
+.gg-warn {
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--muted-foreground);
+}
+.gg-sec {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line, var(--border));
+}
+.gg-list {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--foreground);
+}
+.gg-list > li {
+    padding-left: 8px;
+    border-left: 2px solid var(--line, var(--border));
+}
+.gg-warn {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px;
+    align-items: start;
+    padding-left: 8px;
+    border-left: 2px solid var(--warning);
+    color: var(--foreground);
+}
+.gg-warn > svg {
+    margin-top: 1px;
+    color: var(--warning);
+}
+.gg-awake {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line, var(--border));
+    color: var(--foreground);
+}
+
+/* Checklist tab. */
+.gg-run {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.gg-run > .dk-btn {
+    min-height: max(var(--gg-min), var(--ctl-h, 24px));
+}
+.gg-run-note {
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+}
+.gg-rows {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+/* A row: first line [icon + state word] [name] [time of this result], then the sentence and
+    what to do on the full width (fewer wrapped lines: the worst checklist must fit the 600 px
+    minimum window in touch mode too). The left edge repeats the state as a line; the icon and
+    the word carry it for everyone. */
+.gg-row {
+    display: grid;
+     grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 1px;
+    align-items: center;
+    padding-left: 8px;
+    border-left: 2px solid var(--line, var(--border));
+    font-size: 11px;
+    line-height: 1.3;
+}
+.gg-row-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    color: var(--muted-foreground);
+}
+.gg-row-state > svg {
+    flex-shrink: 0;
+}
+.gg-row-state > .dk-label {
+    color: inherit;
+}
+/* The body's three lines are laid out by the row itself. */
+.gg-row-body {
+    display: contents;
+}
+.gg-row-name {
+    min-width: 0;
+    color: var(--muted-foreground);
+}
+/* When a result was taken (checklist rows, hidden notifications). */
+.gg-row-at {
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.gg-row-text,
+.gg-row-fix {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+.gg-row-text {
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+}
+.gg-row-fix {
+    color: var(--muted-foreground);
+}
+.gg-row[data-state="ok"] {
+    border-left-color: var(--on, var(--primary));
+}
+.gg-row[data-state="ok"] .gg-row-state {
+    color: var(--on, var(--primary));
+}
+.gg-row[data-state="warn"] {
+    border-left-color: var(--warning);
+}
+.gg-row[data-state="warn"] .gg-row-state {
+    color: var(--warning);
+}
+.gg-row[data-state="problem"] {
+    border-left-color: var(--alert, var(--destructive));
+}
+.gg-row[data-state="problem"] .gg-row-state {
+    color: var(--alert, var(--destructive));
+}
+
+/* Held tab: what the lock held back, and the last hidden notifications (time + text, newest first). */
+.gg-held {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.gg-hidden > li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: baseline;
+}
+/* A notification is somebody else's text: two lines at most, the rest is cut (the full text was never shown anyway). */
+.gg-hidden-text {
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.35;
+}
+
+/* Close question: what went wrong with "Close anyway" (text, with the alert colour on its edge only). */
+.gg-close-problem {
+    margin: 0;
+    padding-left: 8px;
+    border-left: 2px solid var(--alert, var(--destructive));
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--foreground);
+}

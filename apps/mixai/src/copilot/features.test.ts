@@ -10,6 +10,8 @@ import {
     ROW_H,
     ROW_H_DENSE,
     ROW_WHY_H,
+    SHIFT_COL,
+    SHIFT_REASON,
     barsUntil,
     candidates,
     controlMin,
@@ -19,19 +21,30 @@ import {
     fitRows,
     intentDeck,
     isArrowKey,
+    isPopoutPage,
     keepArrowFromShortcuts,
     listMove,
+    listMoveIn,
     orderReasons,
     otherDeck,
+    pickNext,
     playingDeck,
     quantBpm,
+    rankInGroups,
     rankKey,
     referenceDeck,
     rowHeight,
     rowOf,
+    rowOrder,
+    rowReasons,
+    shiftButtonSoft,
+    shiftButtonState,
+    shiftsKey,
+    soundingFeat,
     trackChangedDeck,
     trackFeat,
     type DeckLike,
+    type ShiftButtonState,
 } from "./features.ts";
 
 function tr(id: number, p: Partial<LibraryTrack> = {}): LibraryTrack {
@@ -210,6 +223,199 @@ test("arrow keys walk the suggestion list and stop at its edges", () => {
     assert.deepEqual(listMove("ArrowUp", -4, -1, 3), { row: 0, col: 0 });
 });
 
+test("the key-shift button stands before Load A and Load B; arrows walk the row in screen order", () => {
+    const A = 0;
+    const B = 1;
+    assert.equal(SHIFT_COL, 2, "slot numbers of Load A / Load B stay 0 and 1");
+    assert.deepEqual(rowOrder(true), [SHIFT_COL, A, B]);
+    assert.deepEqual(rowOrder(false), [A, B]);
+    // Row 0 and 2 carry a proposal, row 1 does not.
+    const shifts = [true, false, true];
+    // Left / Right inside a row with the button: shift, A, B, and no further.
+    assert.deepEqual(listMoveIn("ArrowRight", 0, SHIFT_COL, shifts), { row: 0, col: A });
+    assert.deepEqual(listMoveIn("ArrowRight", 0, A, shifts), { row: 0, col: B });
+    assert.deepEqual(listMoveIn("ArrowRight", 0, B, shifts), { row: 0, col: B });
+    assert.deepEqual(listMoveIn("ArrowLeft", 0, B, shifts), { row: 0, col: A });
+    assert.deepEqual(listMoveIn("ArrowLeft", 0, A, shifts), { row: 0, col: SHIFT_COL });
+    assert.deepEqual(listMoveIn("ArrowLeft", 0, SHIFT_COL, shifts), { row: 0, col: SHIFT_COL });
+    // A row without the button: Left from Load A stays, the shift slot is never reached.
+    assert.deepEqual(listMoveIn("ArrowLeft", 1, A, shifts), { row: 1, col: A });
+    assert.deepEqual(listMoveIn("ArrowRight", 1, A, shifts), { row: 1, col: B });
+    // Up / Down keep the button; from a shift button to a row without one: that row's Load A.
+    assert.deepEqual(listMoveIn("ArrowDown", 0, SHIFT_COL, shifts), { row: 1, col: A });
+    assert.deepEqual(listMoveIn("ArrowDown", 1, A, shifts), { row: 2, col: A });
+    assert.deepEqual(listMoveIn("ArrowDown", 0, B, shifts), { row: 1, col: B });
+    assert.deepEqual(listMoveIn("End", 0, SHIFT_COL, shifts), { row: 2, col: SHIFT_COL });
+    assert.deepEqual(listMoveIn("Home", 2, SHIFT_COL, shifts), { row: 0, col: SHIFT_COL });
+    assert.deepEqual(listMoveIn("ArrowUp", 2, SHIFT_COL, shifts), { row: 1, col: A });
+    assert.deepEqual(listMoveIn("ArrowUp", 0, B, shifts), { row: 0, col: B }, "no wrap");
+    assert.deepEqual(listMoveIn("ArrowDown", 2, B, shifts), { row: 2, col: B }, "no wrap");
+    // No row has a proposal: exactly the old list (two buttons per row).
+    const plain = [false, false, false];
+    for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"]) {
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) assert.deepEqual(listMoveIn(key, r, c, plain), listMove(key, r, c, 3, 2), `${key} ${r},${c}`);
+    }
+    // A stale position (the row lost its button, the list got shorter) is put right, never thrown out.
+    assert.deepEqual(listMoveIn("ArrowRight", 1, SHIFT_COL, shifts), { row: 1, col: B }, "counts as Load A, then one to the right");
+    assert.deepEqual(listMoveIn("ArrowDown", 9, 7, shifts), { row: 2, col: A });
+    assert.deepEqual(listMoveIn("ArrowUp", -2, A, shifts), { row: 0, col: A });
+    assert.equal(listMoveIn("ArrowDown", 0, 0, []), null);
+    for (const key of ["Enter", " ", "Tab", "a", "Escape"]) assert.equal(listMoveIn(key, 0, 0, shifts), null, key);
+    // Every arrow is answered on every button (none falls through to a global shortcut).
+    for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+        shifts.forEach((has, r) => {
+            for (const c of rowOrder(has)) assert.notEqual(listMoveIn(key, r, c, shifts), null, `${key} ${r},${c}`);
+        });
+    }
+});
+
+test("the key-shift reason is taken out of the list and shown first", () => {
+    assert.equal(SHIFT_REASON, "key_shiftable");
+    assert.deepEqual(rowReasons(["key_shiftable", "energy_hold", "tempo_close"]), { shift: true, rest: ["energy_hold", "tempo_close"] });
+    // Wherever the tag stands, and with the "unknown" reasons still last.
+    assert.deepEqual(rowReasons(["energy_unknown", "tempo_close", "key_shiftable"]), { shift: true, rest: ["tempo_close", "energy_unknown"] });
+    assert.deepEqual(rowReasons(["key_clash", "energy_hold"]), { shift: false, rest: ["key_clash", "energy_hold"] });
+    assert.deepEqual(rowReasons([]), { shift: false, rest: [] });
+});
+
+test("F3 'Mix next' picks, by itself, the first row that needs no key shift", () => {
+    type Row = { id: string; shift: boolean };
+    const row = (id: string, shift = false): Row => ({ id, shift });
+    const pick = (rows: Row[], playing = "now") =>
+        pickNext(
+            rows,
+            (r) => r.id === playing,
+            (r) => r.shift,
+        );
+    // The top row carries a proposal (it would be loaded unshifted, as a clash): passed over.
+    assert.deepEqual(pick([row("s1", true), row("s2", true), row("fit"), row("boost")]), { row: row("fit"), clash: false });
+    // No proposal on top: the top row, as before.
+    assert.deepEqual(pick([row("fit"), row("s1", true)]), { row: row("fit"), clash: false });
+    // The playing track is never picked, with or without a proposal.
+    assert.deepEqual(pick([row("now"), row("s1", true), row("next")]), { row: row("next"), clash: false });
+    // Every row carries a proposal: the first one, and the caller is told it clashes as loaded.
+    assert.deepEqual(pick([row("s1", true), row("s2", true)]), { row: row("s1", true), clash: true });
+    assert.deepEqual(pick([row("now", true), row("s2", true)]), { row: row("s2", true), clash: true }, "still not the playing track");
+    // Nothing to pick.
+    assert.equal(pick([]), null);
+    assert.equal(pick([row("now")]), null);
+});
+
+test("F4 groups are ranked one after the other: the second group only gets the rows the first leaves", async () => {
+    // A ranking that sorts by score (highest first) and cuts to the limit, as the shell does.
+    const calls: { ids: string[]; limit: number }[] = [];
+    type Row = { id: string; score: number };
+    const rank = (rows: readonly Row[], limit: number): Promise<Row[] | null> => {
+        calls.push({ ids: rows.map((r) => r.id), limit });
+        return Promise.resolve([...rows].sort((a, b) => b.score - a.score).slice(0, limit));
+    };
+    const natural: Row[] = [
+        { id: "boost", score: 0.59 },
+        { id: "fit", score: 0.87 },
+        { id: "diagonal", score: 0.55 },
+    ];
+    const shift: Row[] = [
+        { id: "two", score: 0.82 },
+        { id: "one", score: 0.88 },
+    ];
+    // By score alone "one" (0.88) and "two" (0.82) stand above the boost and the diagonal, and
+    // "one" above the fit: the fixture can tell the two orders apart.
+    const flat = await rank([...natural, ...shift], 8);
+    assert.deepEqual(flat!.map((r) => r.id), ["one", "fit", "two", "boost", "diagonal"]);
+    calls.length = 0;
+    const grouped = await rankInGroups([natural, shift], 8, rank);
+    assert.deepEqual(grouped!.map((r) => r.id), ["fit", "boost", "diagonal", "one", "two"], "every row without a proposal first, each group in ranked order");
+    assert.deepEqual(calls, [
+        { ids: ["boost", "fit", "diagonal"], limit: 8 },
+        { ids: ["two", "one"], limit: 5 },
+    ]);
+    // The list is full of natural rows: the tracks that need a shift are not even ranked.
+    calls.length = 0;
+    const full = await rankInGroups([natural, shift], 2, rank);
+    assert.deepEqual(full!.map((r) => r.id), ["fit", "boost"]);
+    assert.equal(calls.length, 1);
+    // One row left: the best of the second group.
+    assert.deepEqual((await rankInGroups([natural, shift], 4, rank))!.map((r) => r.id), ["fit", "boost", "diagonal", "one"]);
+    // An empty first group is not asked; one group is one plain ranking.
+    calls.length = 0;
+    assert.deepEqual((await rankInGroups([[], shift], 8, rank))!.map((r) => r.id), ["one", "two"]);
+    assert.deepEqual(calls, [{ ids: ["two", "one"], limit: 8 }]);
+    assert.deepEqual((await rankInGroups([[...natural, ...shift]], 8, rank))!.map((r) => r.id), flat!.map((r) => r.id));
+    assert.deepEqual(await rankInGroups([[], []], 8, rank), []);
+    // No shell (a ranking answers null): no list, whichever group it was.
+    assert.equal(await rankInGroups([natural, shift], 8, () => Promise.resolve(null)), null);
+    let n = 0;
+    assert.equal(await rankInGroups([natural, shift], 8, (rows, limit) => (++n === 2 ? Promise.resolve(null) : rank(rows, limit))), null);
+    // A ranking that returns more than it was asked for cannot overfill the list.
+    assert.equal((await rankInGroups([natural, shift], 4, (rows) => Promise.resolve([...rows])))!.length, 4);
+});
+
+test("F6 / F7 the key-shift button: what it is in every situation, and none in a pop-out window", () => {
+    const base = { popout: false, proposal: true, target: true, onTarget: false, applied: false, busy: false, targetPlaying: false };
+    const state = (p: Partial<typeof base>): ShiftButtonState => shiftButtonState({ ...base, ...p });
+    assert.equal(state({}), "load");
+    assert.equal(state({ onTarget: true }), "shift", "the track is there already: shift only");
+    assert.equal(state({ onTarget: true, applied: true }), "done");
+    assert.equal(state({ busy: true }), "busy", "its load is in flight");
+    // The incoming deck is playing: no load over a deck on air by a button that changes pitch.
+    assert.equal(state({ targetPlaying: true }), "playing");
+    assert.equal(state({ targetPlaying: true, onTarget: true }), "playing", "nor a pitch change under the audience");
+    // Applied and still loading its stems: "done" (the shift is on), not "busy".
+    assert.equal(state({ onTarget: true, applied: true, busy: true }), "done");
+    // Done stays done while that deck plays (the status line says the shift is on).
+    assert.equal(state({ onTarget: true, applied: true, targetPlaying: true }), "done");
+    // `applied` without the track on the deck is not "done" (another track holds the record).
+    assert.equal(state({ applied: true }), "load");
+    // No button at all: no proposal, no incoming deck, or a pop-out window (whatever else holds).
+    assert.equal(state({ proposal: false }), "none");
+    assert.equal(state({ target: false }), "none");
+    for (const p of [{}, { onTarget: true }, { onTarget: true, applied: true }, { busy: true }, { targetPlaying: true }]) {
+        assert.equal(state({ ...p, popout: true }), "none", `pop-out: ${JSON.stringify(p)}`);
+    }
+    // Which states are shown soft-disabled (never natively disabled: the button keeps focus).
+    const soft = (["none", "load", "shift", "busy", "done", "playing"] as const).filter(shiftButtonSoft);
+    assert.deepEqual(soft, ["busy", "done", "playing"]);
+});
+
+test("F6 a pop-out window is a page opened with the popout parameter", () => {
+    assert.equal(isPopoutPage("?popout=library"), true);
+    assert.equal(isPopoutPage("?x=1&popout=deckA"), true);
+    assert.equal(isPopoutPage("popout=library"), true);
+    // Any popout parameter counts, also one without a panel: not the main window.
+    assert.equal(isPopoutPage("?popout"), true);
+    assert.equal(isPopoutPage("?popout="), true);
+    // The main window.
+    assert.equal(isPopoutPage(""), false);
+    assert.equal(isPopoutPage("?"), false);
+    assert.equal(isPopoutPage("?panel=library"), false);
+    assert.equal(isPopoutPage("?notpopout=1"), false);
+    assert.equal(isPopoutPage("?q=popout"), false, "a value, not the parameter");
+    assert.equal(isPopoutPage(null), false);
+    assert.equal(isPopoutPage(undefined), false);
+});
+
+test("the features of a deck carry the key it sounds in", () => {
+    const d = deck("a", { trackId: "7", loaded: true, bpm: 128, duration: 200 });
+    const row = tr(7, { keyCamelot: "5A", bpm: 128 });
+    // No shift: the same object as the plain features would be, key untouched.
+    assert.deepEqual(soundingFeat(d, "8A", null, 0), deckFeat(d, "8A", null));
+    assert.equal(soundingFeat(d, "8A", null, 0).key, "8A");
+    // The deck's whole key shift moves the key: +1 semitone is seven steps round the wheel.
+    assert.equal(soundingFeat(d, "8A", null, 1).key, "3A");
+    assert.equal(soundingFeat(d, "8A", null, -2).key, "6A");
+    assert.equal(soundingFeat(d, "8A", null, 0.6).key, "3A", "a fractional shift counts as the nearest semitone");
+    // The key of the library row is the fallback, and it is shifted the same way.
+    assert.equal(soundingFeat(d, null, row, 1).key, "12A");
+    // Nothing else of the features changes.
+    const { key: _k, ...rest } = soundingFeat(d, "8A", row, 1);
+    const { key: _p, ...plain } = deckFeat(d, "8A", row);
+    assert.deepEqual(rest, plain);
+    // Unknown key, unknown shift.
+    assert.equal(soundingFeat(d, null, null, 3).key, null);
+    assert.equal(soundingFeat(d, "8A", null, null).key, "8A");
+    assert.equal(soundingFeat(d, "8A", null, undefined).key, "8A");
+});
+
 test("an arrow pressed in the popover is kept from the global crossfader shortcuts", () => {
     const key = (k: string, mods: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean }> = {}) => ({ key: k, ctrlKey: false, metaKey: false, altKey: false, ...mods });
     const button = { tagName: "BUTTON" };
@@ -279,6 +485,26 @@ test("the decks key changes with load, transport, tempo, key and clock source on
     assert.notEqual(decksKey([{ ...a, trackId: "8" }], "a", keys), base);
     assert.notEqual(decksKey([a], "internal", keys), base);
     assert.notEqual(decksKey([a], "a", { ...keys, a: "9A" }), base);
+});
+
+test("the key-shifts key changes per whole semitone of any deck, like the sounding key", () => {
+    const at = (a: number, b = 0) => shiftsKey({ a: { keyShift: a }, b: { keyShift: b }, c: { keyShift: 0 }, d: { keyShift: 0 } });
+    const base = at(0);
+    assert.equal(base, "0,0,0,0");
+    assert.notEqual(at(1), base, "deck A shifted by a semitone");
+    assert.notEqual(at(0, -2), base, "deck B shifted");
+    assert.notEqual(at(1), at(0, 1), "which deck matters");
+    // Inside the same whole semitone nothing changes (soundingKey rounds the same way).
+    assert.equal(at(0.4), base);
+    assert.equal(at(-0.4), base, "no '-0'");
+    assert.equal(at(0.6), at(1));
+    for (const shift of [-2, -1.4, -0.6, -0.4, 0, 0.4, 0.6, 1, 1.5, 2]) {
+        const moved = soundingFeat(deck("a", { loaded: true, trackId: "7" }), "8A", null, shift).key !== "8A";
+        assert.equal(at(shift) !== base, moved, `shift ${shift}: the key changes exactly when the sounding key does`);
+    }
+    // A missing deck or a broken value counts as no shift.
+    assert.equal(shiftsKey({}), base);
+    assert.equal(shiftsKey({ a: { keyShift: Number.NaN } }), base);
 });
 
 test("a pitch ride changes the decks key and the ranking question per half BPM, not per 0.1 BPM", () => {

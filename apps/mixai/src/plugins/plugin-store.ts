@@ -11,6 +11,7 @@
 import { create } from "zustand";
 import { engine } from "@/bridge/engine";
 import { subscribeMixerState } from "@/bridge/events";
+import { gigAllows } from "@/gig/gig-store";
 import { useMixerStore } from "@/state/mixer-store";
 import type { MixerState } from "@/bridge/types";
 import { BUILTIN_PLUGINS } from "./builtins";
@@ -265,6 +266,9 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
     contextFor: (id) => contextFor(id),
 
     pushToast: (message) => {
+        // Gig lock: no notification interrupts a set. Dropped here and counted by the gate,
+        // which keeps the text of the last few (gig popover: "N notifications hidden" + the texts).
+        if (!gigAllows("showToast", message)) return;
         const toast = { id: ++toastSeq, message };
         set({ toasts: [...get().toasts, toast] });
         setTimeout(() => get().dismissToast(toast.id), 3200);

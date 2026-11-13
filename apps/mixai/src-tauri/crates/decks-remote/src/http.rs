@@ -2,7 +2,7 @@
 //! the WebSocket handshake with the already-read bytes replayed.
 
 use std::io::{self, Read, Write};
-use std::net::TcpStream;
+use std::net::{Ipv4Addr, Ipv6Addr, TcpStream};
 use std::time::{Duration, Instant};
 
 /// Largest accepted request head.
@@ -10,6 +10,10 @@ pub const MAX_HEAD: usize = 8 * 1024;
 
 pub const PAGE_REMOTE: &str = include_str!("../assets/remote.html");
 pub const PAGE_PARTY: &str = include_str!("../assets/party.html");
+/// The stream overlay ("Now playing" for OBS, WP19-59).
+pub const PAGE_NOW: &str = include_str!("../assets/now.html");
+/// Path of the stream overlay page.
+pub const OVERLAY_PATH: &str = "/now";
 /// Copy of `packages/design-tokens/dist/tokens.plain.css` (drift-tested in `tests/assets.rs`).
 pub const TOKENS_CSS: &str = include_str!("../assets/tokens.css");
 
@@ -105,6 +109,39 @@ pub fn same_origin(head: &Head) -> bool {
     }
 }
 
+/// Whether a `Host` header names the server by an ADDRESS: an IPv4 literal, a bracketed IPv6
+/// literal or `localhost`, each with an optional port. Everything else is refused, a missing
+/// header included.
+///
+/// Why: [`same_origin`] compares `Origin` with `Host`, and both are whatever name the browser
+/// was given. A page on another site can point its own DNS name at this computer ("DNS
+/// rebinding"); its requests then arrive here with that name in both headers. The pairing
+/// addresses and the stream overlay address always name an IP address, so a real phone, a
+/// second screen or OBS never sends anything else.
+pub fn host_is_address(host: Option<&str>) -> bool {
+    let Some(host) = host else {
+        return false;
+    };
+    // Digits only (`"+80".parse::<u16>()` is `Ok`), at most 65535.
+    let port_ok = |p: &str| {
+        !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()) && p.parse::<u16>().is_ok()
+    };
+    if let Some(rest) = host.strip_prefix('[') {
+        // `[v6]` or `[v6]:port`.
+        let Some((v6, after)) = rest.split_once(']') else {
+            return false;
+        };
+        return v6.parse::<Ipv6Addr>().is_ok()
+            && (after.is_empty() || after.strip_prefix(':').is_some_and(port_ok));
+    }
+    let name = match host.rsplit_once(':') {
+        Some((name, port)) if port_ok(port) => name,
+        Some(_) => return false,
+        None => host,
+    };
+    name.eq_ignore_ascii_case("localhost") || name.parse::<Ipv4Addr>().is_ok()
+}
+
 const SECURITY_HEADERS: &str = "Cache-Control: no-store\r\n\
 X-Content-Type-Options: nosniff\r\n\
 X-Frame-Options: DENY\r\n\
@@ -126,6 +163,7 @@ pub fn static_route(path: &str) -> Option<(&'static str, &'static str)> {
     match path {
         "/" | "/remote" => Some(("text/html; charset=utf-8", PAGE_REMOTE)),
         "/party" => Some(("text/html; charset=utf-8", PAGE_PARTY)),
+        OVERLAY_PATH => Some(("text/html; charset=utf-8", PAGE_NOW)),
         "/tokens.css" => Some(("text/css; charset=utf-8", TOKENS_CSS)),
         _ => None,
     }
@@ -199,9 +237,106 @@ mod tests {
     }
 
     #[test]
+    fn only_an_address_or_localhost_is_a_host_this_server_answers_to() {
+        // What a phone, a second screen and OBS send: the address they were given.
+        for ok in [
+            "127.0.0.1",
+            "127.0.0.1:47831",
+            "192.168.1.20:47831",
+            "10.0.0.2:1",
+            "10.0.0.2:65535",
+            "localhost",
+            "localhost:47831",
+            "LocalHost:47831",
+            "[::1]",
+            "[::1]:47831",
+            "[fe80::1c2a:3bff:fe4d:5e6f]:47831",
+            "[::ffff:192.168.1.20]:80",
+        ] {
+            assert!(host_is_address(Some(ok)), "{ok}");
+        }
+        // A name is never an address, however much it looks like one.
+        for name in [
+            "evil.example",
+            "evil.example:47831",
+            "my-pc.local:47831",
+            "my-pc",
+            "127.0.0.1.evil.example",
+            "127.0.0.1.evil.example:47831",
+            "localhost.evil.example",
+            "localhost.evil.example:47831",
+            "notlocalhost",
+            "localhost.",
+            "xn--80ak6aa92e.com",
+        ] {
+            assert!(!host_is_address(Some(name)), "{name}");
+        }
+        // No header at all, an empty one, and forms no browser sends for an address.
+        assert!(!host_is_address(None));
+        for odd in [
+            "",
+            " ",
+            ":47831",
+            "127.0.0.1:",
+            "127.0.0.1:65536",
+            "127.0.0.1:123456",
+            "127.0.0.1:-1",
+            "127.0.0.1:+80",
+            "127.0.0.1:80a",
+            "127.0.0.1:47831:1",
+            "127.0.0.1 ",
+            "127.1",
+            "2130706433",
+            "0x7f.0.0.1",
+            "0127.0.0.1",
+            "256.0.0.1",
+            "::1",
+            "::1:47831",
+            "[::1",
+            "::1]",
+            "[::1]47831",
+            "[::1]:",
+            "[::1]:65536",
+            "[::1]x",
+            "[127.0.0.1]",
+            "[localhost]",
+            "[fe80::1%eth0]",
+            "[]",
+            "user@127.0.0.1",
+            "127.0.0.1/path",
+            "127.0.0.1,evil.example",
+        ] {
+            assert!(!host_is_address(Some(odd)), "{odd:?}");
+        }
+        // The header as the parser hands it over: a rebinding page passes the origin check
+        // (its `Origin` and its `Host` are the same name) and is stopped by this one.
+        let rebound = parse_head(
+            b"GET /ws?t=abc HTTP/1.1\r\nHost: evil.example:47831\r\nUpgrade: websocket\r\nOrigin: http://evil.example:47831\r\n\r\n",
+        )
+        .unwrap();
+        assert!(same_origin(&rebound));
+        assert!(!host_is_address(rebound.host.as_deref()));
+        let phone = parse_head(
+            b"GET /ws?t=abc HTTP/1.1\r\nHost: 192.168.1.20:47831\r\nUpgrade: websocket\r\nOrigin: http://192.168.1.20:47831\r\n\r\n",
+        )
+        .unwrap();
+        assert!(same_origin(&phone) && host_is_address(phone.host.as_deref()));
+        let no_host = parse_head(b"GET /health HTTP/1.1\r\n\r\n").unwrap();
+        assert!(!host_is_address(no_host.host.as_deref()));
+    }
+
+    #[test]
     fn static_routes_cover_pages_and_tokens() {
         assert!(static_route("/").unwrap().1.contains("<html"));
         assert!(static_route("/party").unwrap().1.contains("<html"));
+        let (ctype, now) = static_route("/now").unwrap();
+        assert_eq!(ctype, "text/html; charset=utf-8");
+        assert!(now.contains("<html") && now.contains("on_air"));
+        assert_ne!(now, static_route("/party").unwrap().1);
+        // Only the exact path: no prefix, no trailing slash, no other case.
+        for not_a_page in ["/now/", "/now.html", "/NOW", "/nowhere", "/no"] {
+            assert!(static_route(not_a_page).is_none(), "{not_a_page}");
+        }
         assert!(
             static_route("/tokens.css")
                 .unwrap()

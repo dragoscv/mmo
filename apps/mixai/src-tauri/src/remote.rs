@@ -47,18 +47,31 @@
 //! "Controls locked" ([`Ctl::locked`], `remote_set`): the server refuses every phone command
 //! except letting go of CUE; song requests, votes and moderation keep working.
 //!
+//! Stream overlay (WP19-59, `/now` for an OBS Browser source): while the server runs the pump
+//! feeds the on-air rule (`decks_remote::on_air`: the loudest audible track for 8 s) from the
+//! engine view on every step ([`on_air_decks`]: playing, channel fader, the deck's crossfader
+//! assignment, the same cleaned title and artist the phones get) with a monotonic clock, and
+//! hands the result to the server ([`feed_on_air`]). All of a pump step that does not need
+//! Tauri is [`pump_step`] (commands, holds, the on-air rule, the published state, the UI
+//! event): the thread only finds the two managed states, calls it and emits what it returns,
+//! so the tests run the very step the app runs. The page has its own read-only code, which
+//! the UI keeps between starts (`remote_start` `overlay_token`); `remote_set`
+//! `overlay_rotate` makes a new one. `remote_start` on a port that is taken starts on a free
+//! one and says so ([`RemoteStatus::port_fallback`]); the shell keeps no port between starts.
+//!
 //! Lock order: `RemoteCtl` then `EngineState`. Nothing takes them the other way round.
 
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Mutex, MutexGuard};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use decks_remote::on_air::{Observation, OnAir, Side, TrackRef};
 use decks_remote::{
-    CommandFrom, EqBand, RemoteCommand, RemoteConfig, RemoteDeck, RemoteServer, RemoteState,
-    RequestStatus, Role, SongRequestView,
+    CommandFrom, EqBand, OnAirTrack, RemoteCommand, RemoteConfig, RemoteDeck, RemoteServer,
+    RemoteState, RequestStatus, Role, SongRequestView,
 };
-use mixai_core::{Command, DeckId, DeckState, Engine, MixerState};
+use mixai_core::{Command, CrossfaderAssign, DeckId, DeckState, Engine, MixerState};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 
@@ -230,10 +243,19 @@ struct Ctl {
     server: Option<RemoteServer>,
     /// Address the pairing URLs name (the LAN address, or the bind address when one was given).
     host: Option<IpAddr>,
+    /// Address the server listens on (decides which stream overlay addresses answer).
+    bind: Option<IpAddr>,
+    /// The port asked for was taken: the server runs on another one.
+    port_fallback: bool,
     labels: [DeckLabel; 4],
     cue: [CueDeck; 4],
     /// The DJ locked the phone controls (kept while the server is off; applied at the start).
     locked: bool,
+    /// Which track is on air (stream overlay). Fed only while the server runs; new at every
+    /// start.
+    on_air: OnAir,
+    /// Zero of the on-air rule's clock: when the server started.
+    since: Option<Instant>,
     /// The pump thread, parked while the server is off. None = it could not be spawned.
     pump: Option<JoinHandle<()>>,
 }
@@ -267,6 +289,16 @@ pub struct ClientView {
     pub id: String,
     pub role: Role,
     pub addr: String,
+    /// A stream overlay (`/now`), not a phone: `role` is `viewer` then, and it gets less.
+    pub overlay: bool,
+}
+
+/// The track the stream overlay shows.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnAirView {
+    pub title: Option<String>,
+    pub artist: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -286,6 +318,19 @@ pub struct RemoteStatus {
     pub requests_pending: u32,
     /// The DJ locked the phone controls (kept while off).
     pub controls_locked: bool,
+    /// Stream overlay address for OBS on this computer (loopback: it stays valid when the
+    /// Wi-Fi address changes). None while off, and when the server listens on one LAN address
+    /// only (loopback does not answer then).
+    pub url_overlay: Option<String>,
+    /// Stream overlay address for a second streaming computer on the LAN. None while off and
+    /// when the server listens on loopback only.
+    pub url_overlay_lan: Option<String>,
+    /// Code of the stream overlay (the UI keeps it and sends it at the next start).
+    pub overlay_token: Option<String>,
+    /// The port asked for was taken: `port` is another one, so the addresses changed.
+    pub port_fallback: bool,
+    /// The track the stream overlay shows right now (none while off or nothing on air).
+    pub on_air: Option<OnAirView>,
 }
 
 /// Payload of `remote://state`.
@@ -297,6 +342,7 @@ struct RemoteEvent {
     controls_locked: bool,
     clients: Vec<ClientView>,
     requests: Vec<SongRequestView>,
+    on_air: Option<OnAirView>,
 }
 
 /// Payload of `remote://cue`.
@@ -722,6 +768,7 @@ pub(crate) struct DeckExtra {
 }
 
 /// Everything [`remote_state`] reads of the engine, taken in one go.
+#[derive(Clone)]
 pub(crate) struct EngineView {
     mixer: MixerState,
     decks: [DeckExtra; 4],
@@ -768,6 +815,20 @@ fn effective_key(key: Option<u8>, key_shift: f64, tempo: f64, key_lock: bool) ->
     mixai_core::keys::key_to_camelot(pc + if minor { 12 } else { 0 })
 }
 
+/// Title and artist of a deck as every page shows them: the label when it was sent for the
+/// loaded track, the engine's own (cleaned) texts otherwise.
+fn deck_texts(d: &DeckState, labels: &[DeckLabel; 4]) -> (Option<String>, Option<String>) {
+    let label = Some(&labels[d.id.index()]).filter(|l| d.loaded && l.track_id == d.track_id);
+    (
+        label
+            .and_then(|l| l.title.clone())
+            .or_else(|| clean_text(d.title.clone())),
+        label
+            .and_then(|l| l.artist.clone())
+            .or_else(|| clean_text(d.artist.clone())),
+    )
+}
+
 /// The deck state the phones show. A label counts only for the track it was sent for (the
 /// engine's own title and artist otherwise); the bar phase goes out as 0..1 (protocol).
 pub(crate) fn remote_state(v: &EngineView, labels: &[DeckLabel; 4]) -> RemoteState {
@@ -779,7 +840,7 @@ pub(crate) fn remote_state(v: &EngineView, labels: &[DeckLabel; 4]) -> RemoteSta
         .map(|d| {
             let i = d.id.index();
             let x = &v.decks[i];
-            let label = Some(&labels[i]).filter(|l| d.loaded && l.track_id == d.track_id);
+            let (title, artist) = deck_texts(d, labels);
             let bpm = if x.bpm > 0.0 {
                 Some(x.bpm)
             } else if d.bpm > 0.0 {
@@ -790,12 +851,8 @@ pub(crate) fn remote_state(v: &EngineView, labels: &[DeckLabel; 4]) -> RemoteSta
             RemoteDeck {
                 deck: i as u8,
                 loaded: d.loaded,
-                title: label
-                    .and_then(|l| l.title.clone())
-                    .or_else(|| clean_text(d.title.clone())),
-                artist: label
-                    .and_then(|l| l.artist.clone())
-                    .or_else(|| clean_text(d.artist.clone())),
+                title,
+                artist,
                 bpm,
                 key: effective_key(x.key, x.key_shift, d.tempo, d.key_lock),
                 position_sec: d.position,
@@ -822,6 +879,68 @@ pub(crate) fn remote_state(v: &EngineView, labels: &[DeckLabel; 4]) -> RemoteSta
     }
 }
 
+// ---- engine side: which track is on air (stream overlay) ---------------------------
+
+/// Identity of the track on a deck for the on-air rule: the engine's track id; for a file
+/// loaded without one, its texts and its length to 10 ms (the same limit as a CUE hold: two
+/// such files with equal texts and length count as one track).
+fn on_air_id(d: &DeckState, title: Option<&str>, artist: Option<&str>) -> String {
+    match d.track_id.as_deref().filter(|id| !id.is_empty()) {
+        Some(id) => format!("id\u{1}{id}"),
+        None => format!(
+            "file\u{1}{}\u{1}{}\u{1}{:.0}",
+            title.unwrap_or(""),
+            artist.unwrap_or(""),
+            d.duration / SAME_TRACK_SEC
+        ),
+    }
+}
+
+/// What the on-air rule reads of the decks: playing, the channel fader, the deck's own
+/// crossfader assignment (a deck on THRU ignores the crossfader) and the track with the texts
+/// the phones get. An empty deck has no track.
+pub(crate) fn on_air_decks(v: &EngineView, labels: &[DeckLabel; 4]) -> Vec<Observation> {
+    v.mixer
+        .decks
+        .iter()
+        .map(|d| {
+            let track = d.loaded.then(|| {
+                let (title, artist) = deck_texts(d, labels);
+                TrackRef {
+                    id: on_air_id(d, title.as_deref(), artist.as_deref()),
+                    title,
+                    artist,
+                }
+            });
+            Observation {
+                playing: d.playing,
+                fader: d.volume,
+                side: match d.crossfader_assign {
+                    CrossfaderAssign::A => Side::A,
+                    CrossfaderAssign::Thru => Side::Thru,
+                    CrossfaderAssign::B => Side::B,
+                },
+                track,
+            }
+        })
+        .collect()
+}
+
+/// One step of the on-air rule at `now` (the rule's clock counts from `since`, the start of
+/// the server: monotonic, it never goes back), handed to the server for the overlays.
+fn feed_on_air(
+    on_air: &mut OnAir,
+    server: &RemoteServer,
+    since: Instant,
+    now: Instant,
+    decks: &[Observation],
+    crossfader: f32,
+) {
+    let t = now.saturating_duration_since(since).as_secs_f64();
+    let current: Option<OnAirTrack> = on_air.observe(t, decks, crossfader).cloned();
+    server.publish_on_air(current);
+}
+
 // ---- server control ------------------------------------------------------------------
 
 fn pairing(server: &RemoteServer, role: Role, host: IpAddr) -> Result<Pairing, String> {
@@ -838,8 +957,56 @@ fn clients_of(server: &RemoteServer) -> Vec<ClientView> {
             id: c.id,
             role: c.role,
             addr: c.addr,
+            overlay: c.overlay,
         })
         .collect()
+}
+
+fn on_air_of(server: &RemoteServer) -> Option<OnAirView> {
+    server.on_air().map(|t| OnAirView {
+        title: t.title,
+        artist: t.artist,
+    })
+}
+
+/// The port cannot be had right now: another program listens on it, or the system keeps it
+/// (Windows answers "access denied" for a port in a reserved range).
+fn port_is_taken(e: &std::io::Error) -> bool {
+    matches!(
+        e.kind(),
+        std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
+    )
+}
+
+/// Open the server with `open`; when a FIXED port (not 0) is taken, open it on any free port
+/// instead and say so (`true`). Every other failure is returned as it is.
+fn open_with_fallback<T>(
+    config: RemoteConfig,
+    open: impl Fn(RemoteConfig) -> std::io::Result<T>,
+) -> std::io::Result<(T, bool)> {
+    match open(config.clone()) {
+        Ok(server) => Ok((server, false)),
+        Err(e) if config.port != 0 && port_is_taken(&e) => {
+            open(RemoteConfig { port: 0, ..config }).map(|server| (server, true))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// The hosts the stream overlay address can name for a server bound to `bind` whose pairing
+/// URLs name `host`: (this computer, the LAN). Only what actually answers: every interface =
+/// loopback and the LAN address; loopback = itself; one LAN address = only that.
+fn overlay_hosts(bind: IpAddr, host: IpAddr) -> (Option<IpAddr>, Option<IpAddr>) {
+    if bind.is_unspecified() {
+        (
+            Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            (!host.is_loopback() && !host.is_unspecified()).then_some(host),
+        )
+    } else if bind.is_loopback() {
+        (Some(bind), None)
+    } else {
+        (None, Some(bind))
+    }
 }
 
 impl Ctl {
@@ -854,17 +1021,34 @@ impl Ctl {
     ///
     /// Refused, before any port is opened, when the pump thread is not there (never spawned,
     /// or it ended): phones would connect to a server whose commands nobody applies.
+    #[cfg(test)]
     fn start(&mut self, party_open: bool, port: u16, bind: IpAddr) -> Result<(), String> {
+        self.start_with(party_open, port, bind, None)
+    }
+
+    /// [`Ctl::start`] with the stream overlay code of an earlier run (`None` or a malformed
+    /// one = a fresh code). A fixed `port` that is taken does not fail the start: the server
+    /// opens on a free port and [`Ctl::port_fallback`] says so.
+    fn start_with(
+        &mut self,
+        party_open: bool,
+        port: u16,
+        bind: IpAddr,
+        overlay: Option<String>,
+    ) -> Result<(), String> {
         if self.server.is_some() {
             return Ok(());
         }
         let Some(pump) = self.pump.as_ref().filter(|p| !p.is_finished()) else {
             return Err(NO_PUMP.into());
         };
-        let server = RemoteServer::start(RemoteConfig {
+        let config = RemoteConfig {
             bind,
             port,
             party_open,
+        };
+        let (server, fallback) = open_with_fallback(config, |c| {
+            RemoteServer::start_with_overlay(c, overlay.clone())
         })
         .map_err(|e| format!("{NO_PORT}: {e}"))?;
         server.set_controls_locked(self.locked);
@@ -873,6 +1057,11 @@ impl Ctl {
         } else {
             bind
         });
+        self.bind = Some(bind);
+        self.port_fallback = fallback;
+        // Nothing is on air yet: the rule starts from scratch with every start.
+        self.on_air = OnAir::new();
+        self.since = Some(Instant::now());
         self.server = Some(server);
         // No hold can be left (`stop` ends them); what was asked of a deck before is history.
         for c in &mut self.cue {
@@ -893,6 +1082,10 @@ impl Ctl {
             None => self.cue.iter_mut().for_each(CueDeck::drop_hold),
         }
         self.host = None;
+        self.bind = None;
+        self.port_fallback = false;
+        self.on_air = OnAir::new();
+        self.since = None;
         self.server.take()
     }
 
@@ -933,6 +1126,7 @@ impl Ctl {
             .iter()
             .filter(|r| r.status == RequestStatus::Pending)
             .count();
+        let (here, lan) = overlay_hosts(self.bind.unwrap_or(host), host);
         RemoteStatus {
             running: true,
             port: Some(server.port()),
@@ -945,6 +1139,11 @@ impl Ctl {
             requests_pending: u32::try_from(pending).unwrap_or(u32::MAX),
             controls_locked: self.locked,
             pairings,
+            url_overlay: here.map(|h| server.overlay_url(h)),
+            url_overlay_lan: lan.map(|h| server.overlay_url(h)),
+            overlay_token: Some(server.overlay_token()),
+            port_fallback: self.port_fallback,
+            on_air: on_air_of(server),
         }
     }
 
@@ -956,6 +1155,7 @@ impl Ctl {
                 controls_locked: self.locked,
                 clients: clients_of(server),
                 requests: server.requests(),
+                on_air: on_air_of(server),
             },
             None => RemoteEvent::default(),
         }
@@ -977,20 +1177,15 @@ impl Ctl {
     }
 
     /// Labels and cue points of the loaded decks (kept while the server is off too).
+    #[cfg(test)]
     fn set_labels(&mut self, labels: Vec<LabelReq>) -> Result<(), String> {
-        if labels.len() > self.labels.len() {
-            return Err("at most one label per deck".into());
-        }
-        // Validate everything before anything is stored.
-        let mut parsed = Vec::with_capacity(labels.len());
-        for l in labels {
-            let deck = parse_deck(&l.deck)?;
-            let cue = l.cue_sec.unwrap_or(0.0);
-            if !cue.is_finite() || cue < 0.0 {
-                return Err(format!("cueSec {cue} must be finite and >= 0"));
-            }
-            parsed.push((deck, l, cue));
-        }
+        let parsed = parse_labels(labels)?;
+        self.store_labels(parsed);
+        Ok(())
+    }
+
+    /// Store labels that [`parse_labels`] accepted. Cannot fail.
+    fn store_labels(&mut self, parsed: Vec<(DeckId, LabelReq, f64)>) {
         for (deck, l, cue) in parsed {
             let i = deck.index();
             let track_id = clean_id(l.track_id);
@@ -1008,8 +1203,69 @@ impl Ctl {
             c.track_id = track_id;
             c.point = cue;
         }
+    }
+
+    /// Everything `remote_set` can change, as ONE batch: it is refused whole (nothing stored,
+    /// nothing sent to the server) or applied whole. What needs the running server (the party
+    /// switch, dropping finished requests, a new stream overlay code) is refused while Connect
+    /// is off; labels and the controls lock are kept while off too. The server is taken once,
+    /// after the last thing that can fail: no step of a batch can find it gone.
+    fn set(&mut self, req: SetReq) -> Result<(), String> {
+        if req.party_open.is_some() || req.clear_done || req.overlay_rotate {
+            self.running()?;
+        }
+        let labels = req.labels.map(parse_labels).transpose()?;
+        // Nothing below can fail.
+        if let Some(labels) = labels {
+            self.store_labels(labels);
+        }
+        if let Some(locked) = req.controls_locked {
+            // The pump ends the CUE holds at its next step (within 50 ms).
+            self.set_locked(locked);
+        }
+        if let Some(server) = &self.server {
+            if let Some(open) = req.party_open {
+                server.set_party_open(open);
+            }
+            if req.clear_done {
+                server.clear_done_requests();
+            }
+            if req.overlay_rotate {
+                // Overlays paired with the old code are disconnected, the phones are not.
+                // The new addresses are in the next [`Ctl::status`].
+                server.rotate_overlay_token();
+            }
+        }
         Ok(())
     }
+}
+
+/// One `remote_set` call ([`Ctl::set`]).
+#[derive(Debug, Default)]
+struct SetReq {
+    party_open: Option<bool>,
+    labels: Option<Vec<LabelReq>>,
+    clear_done: bool,
+    controls_locked: Option<bool>,
+    overlay_rotate: bool,
+}
+
+/// Check a batch of deck labels: at most one per deck, a known deck, a cue point that is a
+/// time. Nothing is stored here: a bad label refuses the whole batch.
+fn parse_labels(labels: Vec<LabelReq>) -> Result<Vec<(DeckId, LabelReq, f64)>, String> {
+    if labels.len() > DeckId::ALL.len() {
+        return Err("at most one label per deck".into());
+    }
+    let mut parsed = Vec::with_capacity(labels.len());
+    for l in labels {
+        let deck = parse_deck(&l.deck)?;
+        let cue = l.cue_sec.unwrap_or(0.0);
+        if !cue.is_finite() || cue < 0.0 {
+            return Err(format!("cueSec {cue} must be finite and >= 0"));
+        }
+        parsed.push((deck, l, cue));
+    }
+    Ok(parsed)
 }
 
 // ---- pump ------------------------------------------------------------------------------
@@ -1045,57 +1301,111 @@ impl Emitted {
     }
 }
 
-/// One pump step; false when the server is off (the thread parks until the next start).
+/// What one pump step leaves for the thread to send to the UI.
+#[derive(Debug)]
+struct Stepped {
+    /// False = the server is off: the thread parks until the next start.
+    running: bool,
+    /// Cue points a phone moved in this step (`remote://cue`).
+    moved: Vec<CueMoved>,
+    /// The state for `remote://state`, when one is to be offered.
+    event: Option<RemoteEvent>,
+}
+
+/// One pump step, everything of it that needs no Tauri: the phone commands and the CUE holds
+/// go to `engine`, the on-air rule is fed from the engine's state (`view` reads it, AFTER the
+/// commands), the deck state is published to the phones, and the UI event is made when
+/// `event_due`. `engine` is none when the audio engine is not running. `now` is the time of
+/// the step (the on-air rule counts from the start of the server).
+///
+/// [`pump_once`] calls this with the real engine and [`engine_view`]; the tests call it with
+/// a stand-in engine and a view of their own, on a real server.
+fn pump_step<E: EngineOps>(
+    ctl: &mut Ctl,
+    engine: Option<&E>,
+    view: impl FnOnce(&E) -> EngineView,
+    now: Instant,
+    event_due: bool,
+) -> Stepped {
+    let Ctl {
+        server,
+        labels,
+        cue,
+        locked,
+        on_air,
+        since,
+        ..
+    } = &mut *ctl;
+    let Some(server) = server.as_ref() else {
+        // Just stopped: tell the UI at once, whatever the interval says.
+        return Stepped {
+            running: false,
+            moved: Vec::new(),
+            event: Some(RemoteEvent::default()),
+        };
+    };
+    let cmds = server.drain_commands_from();
+    let since = *since.get_or_insert(now);
+    let mut moved = Vec::new();
+    let state = match engine {
+        Some(engine) => {
+            // Commands first, then the CUE holds whose phone is gone (lost Wi-Fi, closed tab,
+            // rotated code) or locked out.
+            moved = pump_engine(
+                engine,
+                &cmds,
+                cue,
+                *locked,
+                |conn| server.is_connected(conn),
+                now,
+            );
+            let view = view(engine);
+            feed_on_air(
+                on_air,
+                server,
+                since,
+                now,
+                &on_air_decks(&view, labels),
+                view.mixer.crossfader,
+            );
+            remote_state(&view, labels)
+        }
+        // No audio engine (device failure): the phones see empty decks and their commands
+        // are dropped; requests keep working. Nothing plays, so no hold is left to end, and
+        // nothing is audible: the overlay clears after its 8 s.
+        None => {
+            cue.iter_mut().for_each(CueDeck::drop_hold);
+            feed_on_air(on_air, server, since, now, &[], 0.0);
+            RemoteState::default()
+        }
+    };
+    server.publish(state);
+    Stepped {
+        running: true,
+        moved,
+        event: event_due.then(|| ctl.event()),
+    }
+}
+
+/// One pump step of the thread; false when the server is off (the thread parks until the
+/// next start). Only what needs Tauri is here: finding the two managed states and emitting
+/// what [`pump_step`] returns.
 fn pump_once(app: &tauri::AppHandle, emitted: &mut Emitted) -> bool {
     let now = Instant::now();
     let ctl_state = app.state::<RemoteCtl>();
-    let mut moved = Vec::new();
-    let (running, event) = {
+    let stepped = {
+        // Lock order: `RemoteCtl`, then `EngineState` (module docs).
         let mut ctl = ctl_state.lock();
-        let Ctl {
-            server,
-            labels,
-            cue,
-            locked,
-            ..
-        } = &mut *ctl;
-        match server.as_ref() {
-            Some(server) => {
-                let cmds = server.drain_commands_from();
-                let engine_state = app.state::<EngineState>();
-                let state = {
-                    let guard = engine_state.0.lock().unwrap_or_else(|p| p.into_inner());
-                    match guard.as_ref() {
-                        Some(engine) => {
-                            // Commands first, then the CUE holds whose phone is gone (lost
-                            // Wi-Fi, closed tab, rotated code) or locked out.
-                            moved = pump_engine(
-                                engine,
-                                &cmds,
-                                cue,
-                                *locked,
-                                |conn| server.is_connected(conn),
-                                now,
-                            );
-                            remote_state(&engine_view(engine), labels)
-                        }
-                        // No audio engine (device failure): the phones see empty decks and
-                        // their commands are dropped; requests keep working. Nothing plays,
-                        // so no hold is left to end.
-                        None => {
-                            cue.iter_mut().for_each(CueDeck::drop_hold);
-                            RemoteState::default()
-                        }
-                    }
-                };
-                server.publish(state);
-                (true, emitted.due(now).then(|| ctl.event()))
-            }
-            // Just stopped: tell the UI at once, whatever the interval says.
-            None => (false, Some(RemoteEvent::default())),
+        if ctl.server.is_some() {
+            let engine_state = app.state::<EngineState>();
+            let guard = engine_state.0.lock().unwrap_or_else(|p| p.into_inner());
+            pump_step(&mut ctl, guard.as_ref(), engine_view, now, emitted.due(now))
+        } else {
+            // Off: the engine is not asked for at all.
+            pump_step::<Engine>(&mut ctl, None, engine_view, now, false)
         }
     };
-    for m in moved {
+    for m in stepped.moved {
         let _ = app.emit(
             CUE_EVENT,
             CuePayload {
@@ -1104,13 +1414,13 @@ fn pump_once(app: &tauri::AppHandle, emitted: &mut Emitted) -> bool {
             },
         );
     }
-    if let Some(event) = event
+    if let Some(event) = stepped.event
         && let Ok(json) = serde_json::to_string(&event)
         && emitted.changed(json, now)
     {
         let _ = app.emit(STATE_EVENT, event);
     }
-    running
+    stepped.running
 }
 
 fn pump_loop(app: tauri::AppHandle) {
@@ -1170,21 +1480,31 @@ pub fn remote_status(ctl: State<'_, RemoteCtl>) -> RemoteStatus {
 }
 
 /// Turn connected mode on. `party_open` (default true) = accept song requests from the start;
-/// `port` (default 0) = any free port; `bind` (default `0.0.0.0`) = address to listen on, e.g.
-/// `127.0.0.1` to stay off the network. Already on = the current status. An error (no port is
-/// left open then) when the port cannot be opened or the worker thread cannot be started.
+/// `port` (default 0) = any free port; a fixed port that is taken does not fail the start: the
+/// server opens on a free one and the status says so (`portFallback`). `bind` (default
+/// `0.0.0.0`) = address to listen on, e.g. `127.0.0.1` to stay off the network.
+/// `overlay_token` = the stream overlay code of an earlier run (kept when it has the form of a
+/// code, replaced by a fresh one otherwise; the status has the code in force). Already on =
+/// the current status. An error (no port is left open then) when no port can be opened or
+/// the worker thread cannot be started.
 #[tauri::command]
 pub fn remote_start(
     party_open: Option<bool>,
     port: Option<u16>,
     bind: Option<String>,
+    overlay_token: Option<String>,
     app: tauri::AppHandle,
     ctl: State<'_, RemoteCtl>,
 ) -> Result<RemoteStatus, String> {
     let bind = parse_bind(bind.as_deref())?;
     let mut c = ctl.lock();
     ensure_pump(&app, &mut c)?;
-    c.start(party_open.unwrap_or(true), port.unwrap_or(0), bind)?;
+    c.start_with(
+        party_open.unwrap_or(true),
+        port.unwrap_or(0),
+        bind,
+        overlay_token,
+    )?;
     Ok(c.status())
 }
 
@@ -1237,35 +1557,26 @@ pub fn remote_request_set(
 /// `party_open`: open or close song requests; `clear_done`: drop played and rejected requests.
 /// `controls_locked`: lock or unlock the phone controls (stored while off too): while locked
 /// no phone command reaches the decks or the mixer, requests keep working.
-/// Everything is validated before anything is applied.
+/// `overlay_rotate`: a new code for the stream overlay (`/now`): overlays paired with the old
+/// one are disconnected; read the new addresses with `remote_status`.
+/// One call is one batch ([`Ctl::set`]): everything is validated before anything is applied,
+/// so a refused call changed nothing.
 #[tauri::command]
 pub fn remote_set(
     party_open: Option<bool>,
     labels: Option<Vec<LabelReq>>,
     clear_done: Option<bool>,
     controls_locked: Option<bool>,
+    overlay_rotate: Option<bool>,
     ctl: State<'_, RemoteCtl>,
 ) -> Result<(), String> {
-    let mut c = ctl.lock();
-    if party_open.is_some() || clear_done == Some(true) {
-        c.running()?;
-    }
-    if let Some(labels) = labels {
-        c.set_labels(labels)?;
-    }
-    if let Some(locked) = controls_locked {
-        // The pump ends the CUE holds at its next step (within 50 ms).
-        c.set_locked(locked);
-    }
-    if let Ok((server, _)) = c.running() {
-        if let Some(open) = party_open {
-            server.set_party_open(open);
-        }
-        if clear_done == Some(true) {
-            server.clear_done_requests();
-        }
-    }
-    Ok(())
+    ctl.lock().set(SetReq {
+        party_open,
+        labels,
+        clear_done: clear_done == Some(true),
+        controls_locked,
+        overlay_rotate: overlay_rotate == Some(true),
+    })
 }
 
 #[cfg(test)]
@@ -2977,11 +3288,16 @@ mod tests {
                 "partyOpen": false,
                 "requestsPending": 0,
                 "controlsLocked": false,
+                "urlOverlay": null,
+                "urlOverlayLan": null,
+                "overlayToken": null,
+                "portFallback": false,
+                "onAir": null,
             })
         );
         assert_eq!(
             serde_json::to_value(ctl.event()).unwrap(),
-            serde_json::json!({ "running": false, "partyOpen": false, "controlsLocked": false, "clients": [], "requests": [] })
+            serde_json::json!({ "running": false, "partyOpen": false, "controlsLocked": false, "clients": [], "requests": [], "onAir": null })
         );
         assert_eq!(
             serde_json::to_value(CuePayload {
@@ -3309,5 +3625,834 @@ mod tests {
         assert!(e.changed(on.clone(), t0 + EVENT_INTERVAL));
         assert!(!e.changed(on, t0 + EVENT_INTERVAL * 2), "same again");
         assert!(e.changed(off, t0 + EVENT_INTERVAL * 3));
+    }
+
+    // ---- stream overlay (WP19-59) ----
+
+    /// A deck of the engine view with a track on it.
+    fn load(v: &mut EngineView, deck: usize, id: Option<&str>, title: &str, playing: bool) {
+        let d = &mut v.mixer.decks[deck];
+        d.loaded = true;
+        d.playing = playing;
+        d.volume = 1.0;
+        d.duration = 300.0;
+        d.track_id = id.map(str::to_string);
+        d.title = Some(title.into());
+    }
+
+    /// One pump step of the app, `at` after the server started, with the engine reporting
+    /// `v`: [`pump_step`], the function the pump thread itself runs (so a step that stopped
+    /// feeding the on-air rule fails every test that uses this).
+    fn feed(ctl: &mut Ctl, v: &EngineView, at: Duration) {
+        let now = ctl.since.expect("the server runs") + at;
+        let stepped = pump_step(ctl, Some(&Mock::default()), |_| v.clone(), now, false);
+        assert!(stepped.running, "the server runs");
+    }
+
+    /// The same step with the audio engine gone (a device failure).
+    fn feed_without_engine(ctl: &mut Ctl, at: Duration) {
+        let now = ctl.since.expect("the server runs") + at;
+        let stepped =
+            pump_step::<Mock>(ctl, None, |_| unreachable!("no engine to read"), now, false);
+        assert!(stepped.running, "the server runs");
+    }
+
+    /// `remote_set(overlay_rotate: true)`.
+    fn rotate_overlay(ctl: &mut Ctl) -> Result<(), String> {
+        ctl.set(SetReq {
+            overlay_rotate: true,
+            ..SetReq::default()
+        })
+    }
+
+    fn shown(title: &str, artist: Option<&str>) -> Option<OnAirView> {
+        Some(OnAirView {
+            title: Some(title.into()),
+            artist: artist.map(str::to_string),
+        })
+    }
+
+    /// A WebSocket on a real loopback socket with `token` (handshake by hand, like `phone`);
+    /// the HTTP status line when the server refuses it.
+    fn socket(server: &RemoteServer, token: &str, client: &str) -> Result<TcpStream, String> {
+        let mut s = TcpStream::connect(("127.0.0.1", server.port())).unwrap();
+        // Generous: a busy machine can hold the server's thread for seconds; an answer that
+        // comes returns at once.
+        s.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
+        write!(
+            s,
+            "GET /ws?t={token}&c={client} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+            server.port()
+        )
+        .unwrap();
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            assert_eq!(s.read(&mut byte).unwrap(), 1, "handshake answer");
+            head.push(byte[0]);
+        }
+        let head = String::from_utf8_lossy(&head).into_owned();
+        if head.starts_with("HTTP/1.1 101") {
+            Ok(s)
+        } else {
+            Err(head.lines().next().unwrap_or("").to_string())
+        }
+    }
+
+    /// The next text frame the server sent (server frames are not masked). Its pings are
+    /// answered on the way, as a browser does, so a slow test run does not get the socket
+    /// dropped as silent.
+    fn next_text(s: &mut TcpStream) -> String {
+        // The server pings every second: without an overall limit a text that never comes
+        // would hang the test instead of failing it.
+        let end = Instant::now() + Duration::from_secs(20);
+        loop {
+            assert!(Instant::now() < end, "no text frame within 20 s");
+            let mut h = [0u8; 2];
+            s.read_exact(&mut h).unwrap();
+            let len = match h[1] & 0x7f {
+                126 => {
+                    let mut b = [0u8; 2];
+                    s.read_exact(&mut b).unwrap();
+                    usize::from(u16::from_be_bytes(b))
+                }
+                127 => panic!("frame too long for this test"),
+                n => usize::from(n),
+            };
+            let mut payload = vec![0u8; len];
+            s.read_exact(&mut payload).unwrap();
+            match h[0] & 0x0f {
+                1 => return String::from_utf8(payload).unwrap(),
+                // Ping: a masked pong with the same (short) payload.
+                9 if len < 126 => {
+                    let mask = [0x12u8, 0x34, 0x56, 0x78];
+                    let mut pong = vec![0x8a, 0x80 | len as u8];
+                    pong.extend_from_slice(&mask);
+                    pong.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+                    s.write_all(&pong).unwrap();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
+    fn the_on_air_rule_reads_playing_fader_assignment_and_the_texts_the_phones_get() {
+        let mut v = view();
+        load(&mut v, 0, Some("t1"), "strobe.flac", true);
+        v.mixer.decks[0].volume = 0.8;
+        v.mixer.decks[0].artist = Some(" deadmau5\u{200B} ".into());
+        load(&mut v, 1, Some("t2"), "levels.flac", false);
+        v.mixer.decks[1].crossfader_assign = CrossfaderAssign::Thru;
+        load(&mut v, 2, None, "no id.wav", true);
+        v.mixer.decks[2].crossfader_assign = CrossfaderAssign::B;
+        let mut l = labels();
+        l[1] = DeckLabel {
+            track_id: Some("t2".into()),
+            title: Some("Levels".into()),
+            artist: Some("Avicii".into()),
+        };
+        // A label left over from another track must not name this one.
+        l[0] = DeckLabel {
+            track_id: Some("old".into()),
+            title: Some("Old title".into()),
+            artist: None,
+        };
+        let decks = on_air_decks(&v, &l);
+        assert_eq!(decks.len(), 4);
+        assert_eq!(
+            decks.iter().map(|d| d.side).collect::<Vec<_>>(),
+            [Side::A, Side::Thru, Side::B, Side::B]
+        );
+        assert_eq!(
+            decks.iter().map(|d| d.playing).collect::<Vec<_>>(),
+            [true, false, true, false]
+        );
+        assert_eq!(decks[0].fader, 0.8);
+        let t = |i: usize| decks[i].track.as_ref().unwrap();
+        assert_eq!(
+            (t(0).title.as_deref(), t(0).artist.as_deref()),
+            (Some("strobe.flac"), Some("deadmau5")),
+            "the engine's own texts, cleaned"
+        );
+        assert_eq!(
+            (t(1).title.as_deref(), t(1).artist.as_deref()),
+            (Some("Levels"), Some("Avicii")),
+            "the label of its own track wins"
+        );
+        assert_eq!(decks[3].track, None, "an empty deck has no track");
+        // Identity: the engine id; without one, texts + length. The same file on two decks is
+        // one track, another file is another.
+        assert_ne!(t(0).id, t(1).id);
+        let mut twice = view();
+        load(&mut twice, 0, None, "no id.wav", true);
+        load(&mut twice, 1, None, "no id.wav", true);
+        load(&mut twice, 2, None, "other.wav", true);
+        load(&mut twice, 3, None, "no id.wav", true);
+        twice.mixer.decks[3].duration = 301.0;
+        let d = on_air_decks(&twice, &labels());
+        let id = |i: usize| d[i].track.as_ref().unwrap().id.clone();
+        assert_eq!(id(0), id(1));
+        assert_ne!(id(0), id(2));
+        assert_ne!(id(0), id(3), "another length is another file");
+        assert_eq!(id(0), t(2).id, "the same in another view");
+        // An id and a title that spell the same are still two things.
+        let mut named = view();
+        load(&mut named, 0, Some("no id.wav"), "no id.wav", true);
+        assert_ne!(
+            on_air_decks(&named, &labels())[0]
+                .track
+                .as_ref()
+                .unwrap()
+                .id,
+            id(0)
+        );
+    }
+
+    #[test]
+    fn the_pump_feeds_the_rule_eight_seconds_and_an_overlay_hears_the_change() {
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        ctl.start(true, 0, LOOPBACK).unwrap();
+        let mut v = view();
+        load(&mut v, 0, Some("t1"), "strobe.flac", true);
+        ctl.labels[0] = DeckLabel {
+            track_id: Some("t1".into()),
+            title: Some("Strobe".into()),
+            artist: Some("deadmau5".into()),
+        };
+        let token = ctl.status().overlay_token.unwrap();
+        let mut obs = socket(ctl.server.as_ref().unwrap(), &token, "obs").unwrap();
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":null,"artist":null}"#
+        );
+        feed(&mut ctl, &v, ms(0));
+        feed(&mut ctl, &v, ms(7_900));
+        assert_eq!(ctl.status().on_air, None, "7.9 s is not on air yet");
+        assert_eq!(ctl.event().on_air, None);
+        feed(&mut ctl, &v, ms(8_000));
+        assert_eq!(ctl.status().on_air, shown("Strobe", Some("deadmau5")));
+        assert_eq!(ctl.event().on_air, shown("Strobe", Some("deadmau5")));
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":"Strobe","artist":"deadmau5"}"#
+        );
+        // The UI is told: the event payload changed with the track.
+        let json = serde_json::to_value(ctl.event()).unwrap();
+        assert_eq!(
+            json["onAir"],
+            serde_json::json!({ "title": "Strobe", "artist": "deadmau5" })
+        );
+        // The overlay is in the device list, marked as one; a phone is not.
+        let _phone = phone(ctl.server.as_ref().unwrap(), "phone");
+        let clients = ctl.status().clients;
+        let flags: Vec<(&str, bool)> = clients.iter().map(|c| (c.id.as_str(), c.overlay)).collect();
+        assert_eq!(flags, [("obs", true), ("phone", false)]);
+        assert_eq!(
+            serde_json::to_value(&clients[0]).unwrap()["overlay"],
+            serde_json::json!(true)
+        );
+        // The mix moves to deck B (assigned B): it takes over 8 s after it became the louder
+        // one, not before.
+        load(&mut v, 1, Some("t2"), "Levels", true);
+        v.mixer.crossfader = 0.5;
+        feed(&mut ctl, &v, ms(20_000));
+        feed(&mut ctl, &v, ms(27_900));
+        assert_eq!(ctl.status().on_air, shown("Strobe", Some("deadmau5")));
+        feed(&mut ctl, &v, ms(28_000));
+        assert_eq!(ctl.status().on_air, shown("Levels", None));
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":"Levels","artist":null}"#
+        );
+        // Everything paused: cleared after 8 s.
+        v.mixer.decks[0].playing = false;
+        v.mixer.decks[1].playing = false;
+        feed(&mut ctl, &v, ms(30_000));
+        feed(&mut ctl, &v, ms(37_900));
+        assert_eq!(ctl.status().on_air, shown("Levels", None));
+        feed(&mut ctl, &v, ms(38_000));
+        assert_eq!(ctl.status().on_air, None);
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":null,"artist":null}"#
+        );
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+    }
+
+    #[test]
+    fn the_decks_own_crossfader_assignment_counts_not_its_position_in_the_mixer() {
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        ctl.start(true, 0, LOOPBACK).unwrap();
+        // Deck A re-assigned to side B, the crossfader hard on side A: deck A is silent however
+        // long it plays (a rule that went by the deck index would put it on air).
+        let mut v = view();
+        load(&mut v, 0, Some("t1"), "On side B", true);
+        v.mixer.decks[0].crossfader_assign = CrossfaderAssign::B;
+        v.mixer.crossfader = -1.0;
+        feed(&mut ctl, &v, ms(0));
+        feed(&mut ctl, &v, ms(60_000));
+        assert_eq!(ctl.status().on_air, None);
+        // The same deck on THRU ignores the crossfader: on air after 8 s.
+        v.mixer.decks[0].crossfader_assign = CrossfaderAssign::Thru;
+        feed(&mut ctl, &v, ms(61_000));
+        feed(&mut ctl, &v, ms(68_900));
+        assert_eq!(ctl.status().on_air, None);
+        feed(&mut ctl, &v, ms(69_000));
+        assert_eq!(ctl.status().on_air, shown("On side B", None));
+        // The fader down takes it off again (8 s later).
+        v.mixer.decks[0].volume = 0.0;
+        feed(&mut ctl, &v, ms(70_000));
+        feed(&mut ctl, &v, ms(78_000));
+        assert_eq!(ctl.status().on_air, None);
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+    }
+
+    #[test]
+    fn one_pump_step_does_everything_the_thread_needs_on_a_real_server() {
+        // The step the pump thread runs ([`pump_step`]), against a real loopback server, a
+        // stand-in engine and a view the test controls: a phone's command reaches the engine,
+        // the deck state is published to the phone, the on-air rule is fed with THAT view
+        // (after the command), the overlay hears the result, and the UI event is made only
+        // when it is due. Deleting any call inside the step makes a line below fail.
+        let m = Mock::with_deck(DeckId::A, loaded(0.0, false));
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        ctl.start(true, 0, LOOPBACK).unwrap();
+        let since = ctl.since.unwrap();
+        let token = ctl.status().overlay_token.unwrap();
+        let mut obs = socket(ctl.server.as_ref().unwrap(), &token, "obs").unwrap();
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":null,"artist":null}"#
+        );
+        let mut ph = phone(ctl.server.as_ref().unwrap(), "phone");
+        let hello = next_text(&mut ph);
+        assert!(hello.contains(r#""type":"hello""#), "{hello}");
+        // A step while nothing happens: not running = false, no cue moved, event only when due.
+        let s = pump_step(&mut ctl, Some(&m), |_| view(), since + ms(50), false);
+        assert!(s.running && s.moved.is_empty() && s.event.is_none());
+        let s = pump_step(&mut ctl, Some(&m), |_| view(), since + ms(100), true);
+        assert!(s.event.is_some_and(|e| e.running && e.on_air.is_none()));
+        // The phone presses PLAY: the step hands it to the engine.
+        say(
+            &mut ph,
+            r#"{"type":"command","command":{"cmd":"play","deck":0}}"#,
+        );
+        let mut v = view();
+        load(&mut v, 0, Some("t1"), "Strobe", true);
+        v.mixer.decks[0].artist = Some("deadmau5".into());
+        // Every step of this wait is the same moment of the rule's clock (0.5 s after the
+        // start, exact in binary like the other times below), so "8 s later" is known.
+        let t0 = 500;
+        let end = Instant::now() + Duration::from_secs(20);
+        let mut played = false;
+        while !played && Instant::now() < end {
+            let s = pump_step(&mut ctl, Some(&m), |_| v.clone(), since + ms(t0), false);
+            assert!(s.running);
+            played = m.calls.borrow().contains(&"play 0".to_string());
+            std::thread::sleep(ms(10));
+        }
+        assert!(
+            played,
+            "the phone's PLAY reached the engine through the step"
+        );
+        // The phone is sent the state the step published: deck A playing "Strobe".
+        let end = Instant::now() + Duration::from_secs(20);
+        let mut seen_state = false;
+        while !seen_state && Instant::now() < end {
+            let t = next_text(&mut ph);
+            seen_state = t.contains(r#""type":"state""#) && t.contains("Strobe");
+        }
+        assert!(seen_state, "the published state reached the phone");
+        // The on-air rule was fed from that view at every step: 8 s after the first step
+        // that saw deck A playing the overlay hears it, and the UI event carries it.
+        pump_step(
+            &mut ctl,
+            Some(&m),
+            |_| v.clone(),
+            since + ms(t0 + 7_900),
+            false,
+        );
+        assert_eq!(ctl.status().on_air, None, "7.9 s: not yet");
+        let s = pump_step(
+            &mut ctl,
+            Some(&m),
+            |_| v.clone(),
+            since + ms(t0 + 8_000),
+            true,
+        );
+        assert_eq!(s.event.unwrap().on_air, shown("Strobe", Some("deadmau5")));
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":"Strobe","artist":"deadmau5"}"#
+        );
+        // No audio engine: the step feeds silence (the overlay clears after 8 s) and publishes
+        // empty decks; nothing is read from an engine.
+        feed_without_engine(&mut ctl, ms(20_000));
+        assert_eq!(ctl.status().on_air, shown("Strobe", Some("deadmau5")));
+        feed_without_engine(&mut ctl, ms(27_900));
+        assert_eq!(ctl.status().on_air, shown("Strobe", Some("deadmau5")));
+        feed_without_engine(&mut ctl, ms(28_000));
+        assert_eq!(
+            ctl.status().on_air,
+            None,
+            "silence for 8 s clears the overlay"
+        );
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":null,"artist":null}"#
+        );
+        drop(obs);
+        // A phone that holds CUE and vanishes: the step ends the hold (the engine is told).
+        m.set(DeckId::A, |d| d.playing = false);
+        ctl.cue[0] = cue_at(0.0);
+        m.take();
+        say(
+            &mut ph,
+            r#"{"type":"command","command":{"cmd":"cue","deck":0,"pressed":true}}"#,
+        );
+        // (The rule's clock stands still at 30 s for these steps; the real time only bounds
+        // the wait.)
+        let t1 = since + ms(30_000);
+        let end = Instant::now() + Duration::from_secs(20);
+        while holder(&ctl.cue[0]).is_none() && Instant::now() < end {
+            pump_step(&mut ctl, Some(&m), |_| v.clone(), t1, false);
+            std::thread::sleep(ms(10));
+        }
+        assert_eq!(m.take(), ["play 0"], "CUE held on the cue point plays");
+        drop(ph);
+        let end = Instant::now() + Duration::from_secs(20);
+        while holder(&ctl.cue[0]).is_some() && Instant::now() < end {
+            pump_step(&mut ctl, Some(&m), |_| v.clone(), t1, false);
+            std::thread::sleep(ms(10));
+        }
+        assert_eq!(
+            m.take(),
+            ["pause 0", "seek 0 0"],
+            "the vanished phone's hold ended"
+        );
+        // Off: the step says so and offers the "off" event at once.
+        drop(ctl.stop(Some(&m), Instant::now()));
+        let s = pump_step(&mut ctl, Some(&m), |_| view(), Instant::now(), false);
+        assert!(!s.running);
+        assert_eq!(s.event, Some(RemoteEvent::default()));
+    }
+
+    #[test]
+    fn the_pump_thread_runs_that_step_with_the_real_engine_and_nothing_of_its_own() {
+        // `pump_once` needs a Tauri app, so no test can call it. What can be pinned is its
+        // text: it hands the step to `pump_step` with the engine it found and the real
+        // `engine_view`, and does no part of the step itself (a second, untested copy of the
+        // feed or of the publish here is how the overlay would stay empty in the real app
+        // while every test passes).
+        let src = include_str!("remote.rs").replace("\r\n", "\n");
+        let start = src
+            .find("\nfn pump_once(app: &tauri::AppHandle, emitted: &mut Emitted) -> bool {")
+            .expect("pump_once in remote.rs");
+        let body = &src[start..];
+        let body = &body[..body.find("\n}\n").expect("end of pump_once")];
+        assert!(
+            body.contains(
+                "pump_step(&mut ctl, guard.as_ref(), engine_view, now, emitted.due(now))"
+            ),
+            "pump_once runs pump_step with the engine it found, the real view and the event clock"
+        );
+        // The only other call is the one for a server that is off (no engine is asked for).
+        assert_eq!(body.matches("pump_step").count(), 2);
+        assert!(body.contains("pump_step::<Engine>(&mut ctl, None, engine_view, now, false)"));
+        for own_work in [
+            "feed_on_air(",
+            "on_air_decks(",
+            "pump_engine(",
+            "remote_state(",
+            ".publish(",
+            "publish_on_air(",
+            "drain_commands",
+        ] {
+            assert!(
+                !body.contains(own_work),
+                "pump_once does `{own_work}` itself"
+            );
+        }
+        // Lock order: `RemoteCtl`, then `EngineState`.
+        let ctl_lock = body.find("ctl_state.lock()").expect("the remote lock");
+        let engine_lock = body.find("engine_state.0.lock()").expect("the engine lock");
+        assert!(ctl_lock < engine_lock);
+        // What the step returns is what goes to the UI.
+        for sent in ["for m in stepped.moved", "stepped.event", "stepped.running"] {
+            assert!(body.contains(sent), "pump_once ignores `{sent}`");
+        }
+        // And the step itself feeds the rule in both arms (with an engine, and without one).
+        let start = src
+            .find("\nfn pump_step<E: EngineOps>(")
+            .expect("pump_step");
+        let step = &src[start..];
+        let step = &step[..step.find("\n}\n").expect("end of pump_step")];
+        assert_eq!(step.matches("feed_on_air(").count(), 2);
+        assert_eq!(step.matches("server.publish(state);").count(), 1);
+    }
+
+    #[test]
+    fn remote_set_is_one_batch_refused_whole_or_applied_whole() {
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        // Off: labels and the lock are kept; anything that needs the server refuses the whole
+        // batch, labels and lock included.
+        ctl.set(SetReq {
+            labels: Some(vec![label("a", "t1", "Strobe", Some(1.0))]),
+            controls_locked: Some(true),
+            ..SetReq::default()
+        })
+        .unwrap();
+        assert_eq!(ctl.labels[0].title.as_deref(), Some("Strobe"));
+        assert!(ctl.locked);
+        for needs_server in [
+            SetReq {
+                party_open: Some(false),
+                ..SetReq::default()
+            },
+            SetReq {
+                clear_done: true,
+                ..SetReq::default()
+            },
+            SetReq {
+                overlay_rotate: true,
+                ..SetReq::default()
+            },
+        ] {
+            let refused = SetReq {
+                labels: Some(vec![label("a", "t2", "Other", Some(2.0))]),
+                controls_locked: Some(false),
+                ..needs_server
+            };
+            assert_eq!(ctl.set(refused), Err(NOT_RUNNING.to_string()));
+            assert_eq!(
+                ctl.labels[0].title.as_deref(),
+                Some("Strobe"),
+                "label not stored"
+            );
+            assert!(ctl.locked, "lock not changed");
+        }
+        // On: a bad label refuses the batch before the server is touched.
+        ctl.start(true, 0, LOOPBACK).unwrap();
+        let s0 = ctl.status();
+        assert!(s0.party_open && s0.controls_locked);
+        let err = ctl
+            .set(SetReq {
+                party_open: Some(false),
+                labels: Some(vec![label("e", "t2", "Other", None)]),
+                controls_locked: Some(false),
+                overlay_rotate: true,
+                ..SetReq::default()
+            })
+            .unwrap_err();
+        assert!(err.contains("invalid deck"), "{err}");
+        let s1 = ctl.status();
+        assert_eq!(
+            (
+                s1.party_open,
+                s1.controls_locked,
+                &s1.overlay_token,
+                &s1.url_overlay
+            ),
+            (true, true, &s0.overlay_token, &s0.url_overlay),
+            "nothing of the refused batch was applied"
+        );
+        assert_eq!(ctl.labels[0].title.as_deref(), Some("Strobe"));
+        // A good batch: everything lands, in one call.
+        ctl.set(SetReq {
+            party_open: Some(false),
+            labels: Some(vec![label("a", "t2", "Other", Some(2.0))]),
+            controls_locked: Some(false),
+            overlay_rotate: true,
+            ..SetReq::default()
+        })
+        .unwrap();
+        let s2 = ctl.status();
+        assert!(!s2.party_open && !s2.controls_locked);
+        assert_ne!(s2.overlay_token, s0.overlay_token, "a new overlay code");
+        assert_eq!(ctl.labels[0].title.as_deref(), Some("Other"));
+        assert_eq!(ctl.cue[0].point, 2.0);
+        // An empty call changes nothing.
+        ctl.set(SetReq::default()).unwrap();
+        assert_eq!(ctl.status(), s2);
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+    }
+
+    #[test]
+    fn the_on_air_rule_starts_from_nothing_at_every_start_and_keeps_nothing_while_off() {
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        assert_eq!(ctl.since, None, "no clock while off");
+        ctl.start(true, 0, LOOPBACK).unwrap();
+        let mut v = view();
+        load(&mut v, 0, Some("t1"), "Strobe", true);
+        feed(&mut ctl, &v, ms(0));
+        feed(&mut ctl, &v, ms(8_000));
+        assert_eq!(ctl.status().on_air, shown("Strobe", None));
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+        assert_eq!(ctl.status().on_air, None);
+        assert_eq!((ctl.on_air.current(), ctl.since), (None, None));
+        // A new start: the track that was on air before is not shown until it earned it again.
+        ctl.start(true, 0, LOOPBACK).unwrap();
+        assert_eq!(ctl.status().on_air, None);
+        feed(&mut ctl, &v, ms(0));
+        feed(&mut ctl, &v, ms(7_900));
+        assert_eq!(ctl.status().on_air, None);
+        feed(&mut ctl, &v, ms(8_000));
+        assert_eq!(ctl.status().on_air, shown("Strobe", None));
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+    }
+
+    #[test]
+    fn the_overlay_address_names_only_hosts_that_answer() {
+        let lan = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20));
+        let any = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+        // Every interface: this computer by loopback, and the LAN address for a second PC.
+        assert_eq!(overlay_hosts(any, lan), (Some(LOOPBACK), Some(lan)));
+        // Every interface but no network (the LAN guess fell back to loopback): one address.
+        assert_eq!(overlay_hosts(any, LOOPBACK), (Some(LOOPBACK), None));
+        // Loopback only: nothing answers on the LAN.
+        assert_eq!(overlay_hosts(LOOPBACK, LOOPBACK), (Some(LOOPBACK), None));
+        // One LAN address only: loopback does not answer.
+        assert_eq!(overlay_hosts(lan, lan), (None, Some(lan)));
+        let v6: IpAddr = "::1".parse().unwrap();
+        assert_eq!(overlay_hosts(v6, v6), (Some(v6), None));
+    }
+
+    #[test]
+    fn only_a_taken_fixed_port_falls_back_to_a_free_one() {
+        use std::io::{Error, ErrorKind};
+        let cfg = |port| RemoteConfig {
+            bind: LOOPBACK,
+            port,
+            party_open: true,
+        };
+        // What the opener was asked for, in order.
+        let asked = RefCell::new(Vec::new());
+        let open = |fail: Option<ErrorKind>| {
+            let asked = &asked;
+            move |c: RemoteConfig| {
+                asked.borrow_mut().push(c.port);
+                match fail {
+                    Some(kind) if c.port != 0 => Err(Error::from(kind)),
+                    _ => Ok(c.port),
+                }
+            }
+        };
+        // Free: taken as asked, no second try.
+        assert_eq!(
+            open_with_fallback(cfg(47_831), open(None)).unwrap(),
+            (47_831, false)
+        );
+        assert_eq!(asked.take(), [47_831]);
+        // In use, or kept by the system (Windows: access denied): any free port, and it says so.
+        for taken in [ErrorKind::AddrInUse, ErrorKind::PermissionDenied] {
+            assert_eq!(
+                open_with_fallback(cfg(47_831), open(Some(taken))).unwrap(),
+                (0, true)
+            );
+            assert_eq!(asked.take(), [47_831, 0], "{taken:?}");
+        }
+        // Any other failure stays a failure: no second try.
+        for other in [
+            ErrorKind::AddrNotAvailable,
+            ErrorKind::InvalidInput,
+            ErrorKind::Other,
+        ] {
+            let err = open_with_fallback(cfg(47_831), open(Some(other))).unwrap_err();
+            assert_eq!(err.kind(), other);
+            assert_eq!(asked.take(), [47_831]);
+        }
+        // "Any free port" that fails has nothing to fall back to.
+        let never =
+            |_: RemoteConfig| -> std::io::Result<u16> { Err(Error::from(ErrorKind::AddrInUse)) };
+        assert_eq!(
+            open_with_fallback(cfg(0), never).unwrap_err().kind(),
+            ErrorKind::AddrInUse
+        );
+        // The fallback itself failing is the error the DJ gets.
+        let both =
+            |_: RemoteConfig| -> std::io::Result<u16> { Err(Error::from(ErrorKind::AddrInUse)) };
+        assert!(open_with_fallback(cfg(47_831), both).is_err());
+        assert!(port_is_taken(&Error::from(ErrorKind::AddrInUse)));
+        assert!(!port_is_taken(&Error::from(ErrorKind::AddrNotAvailable)));
+    }
+
+    #[test]
+    fn a_start_on_a_busy_loopback_port_falls_back_and_says_so_and_a_free_one_does_not() {
+        // Another program holds the port for the whole test.
+        let holder = std::net::TcpListener::bind((LOOPBACK, 0)).unwrap();
+        let busy = holder.local_addr().unwrap().port();
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        ctl.start(true, busy, LOOPBACK).unwrap();
+        let s = ctl.status();
+        assert!(
+            s.running && s.port_fallback,
+            "started, and says the port changed"
+        );
+        let port = s.port.unwrap();
+        assert!(port != busy && port != 0);
+        // Every address names the port that answers, not the one asked for.
+        for url in [
+            &s.url_overlay,
+            &s.url_controller,
+            &s.url_viewer,
+            &s.url_guest,
+        ] {
+            let url = url.as_deref().unwrap();
+            assert!(
+                url.starts_with(&format!("http://127.0.0.1:{port}/")),
+                "{url}"
+            );
+        }
+        assert!(
+            socket(
+                ctl.server.as_ref().unwrap(),
+                &s.overlay_token.unwrap(),
+                "obs"
+            )
+            .is_ok(),
+            "the fallback port serves the overlay"
+        );
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+        assert!(!ctl.status().port_fallback, "off: nothing to report");
+        // A fixed port that is free is taken as asked. The port comes from a server that just
+        // released it; should another test grab it in between (seen as a fallback), try again.
+        let mut granted = None;
+        for _ in 0..5 {
+            ctl.start(true, 0, LOOPBACK).unwrap();
+            let free = ctl.status().port.unwrap();
+            assert!(!ctl.status().port_fallback, "port 0 never falls back");
+            drop(ctl.stop::<Mock>(None, Instant::now()));
+            ctl.start(true, free, LOOPBACK).unwrap();
+            let s = ctl.status();
+            drop(ctl.stop::<Mock>(None, Instant::now()));
+            if !s.port_fallback {
+                granted = Some((free, s.port));
+                break;
+            }
+            assert_ne!(
+                s.port,
+                Some(free),
+                "a fallback is never on the port asked for"
+            );
+        }
+        let (asked, got) = granted.expect("a free fixed port was granted without a fallback");
+        assert_eq!(got, Some(asked));
+        drop(holder);
+    }
+
+    #[test]
+    fn the_overlay_code_is_kept_between_starts_validated_and_rotated_alone() {
+        let mut ctl = Ctl::default();
+        let _pump = fake_pump(&mut ctl);
+        assert_eq!(rotate_overlay(&mut ctl), Err(NOT_RUNNING.to_string()));
+        let saved = "00112233445566778899aabbccddeeff";
+        ctl.start_with(true, 0, LOOPBACK, Some(saved.into()))
+            .unwrap();
+        let s = ctl.status();
+        let port = s.port.unwrap();
+        assert_eq!(s.overlay_token.as_deref(), Some(saved));
+        assert_eq!(
+            s.url_overlay.as_deref(),
+            Some(format!("http://127.0.0.1:{port}/now?t={saved}").as_str())
+        );
+        assert_eq!(s.url_overlay_lan, None, "bound to loopback: no LAN address");
+        for role_url in [&s.url_controller, &s.url_viewer, &s.url_guest] {
+            assert!(!role_url.as_deref().unwrap().contains(saved));
+        }
+        // A second start while running changes nothing (not even with another code).
+        ctl.start_with(
+            true,
+            0,
+            LOOPBACK,
+            Some("ffffffffffffffffffffffffffffffff".into()),
+        )
+        .unwrap();
+        assert_eq!(ctl.status(), s);
+        // The code opens the overlay and nothing else does.
+        let server = ctl.server.as_ref().unwrap();
+        let mut obs = socket(server, saved, "obs").unwrap();
+        assert_eq!(
+            next_text(&mut obs),
+            r#"{"type":"on_air","title":null,"artist":null}"#
+        );
+        assert_eq!(
+            socket(server, "00112233445566778899aabbccddeef0", "x").unwrap_err(),
+            "HTTP/1.1 401 Unauthorized"
+        );
+        // New code: only the overlay address changes, the overlay is disconnected, a phone is not.
+        let mut ph = phone(ctl.server.as_ref().unwrap(), "phone");
+        rotate_overlay(&mut ctl).unwrap();
+        let after = ctl.status();
+        let fresh = after.overlay_token.clone().unwrap();
+        assert_ne!(fresh, saved);
+        assert!(decks_remote::is_token(&fresh));
+        assert_eq!(
+            after.url_overlay.as_deref(),
+            Some(format!("http://127.0.0.1:{port}/now?t={fresh}").as_str())
+        );
+        assert_eq!(
+            (&after.url_controller, &after.url_viewer, &after.url_guest),
+            (&s.url_controller, &s.url_viewer, &s.url_guest)
+        );
+        let server = ctl.server.as_ref().unwrap();
+        let end = Instant::now() + Duration::from_secs(20);
+        while server.clients().iter().any(|c| c.overlay) && Instant::now() < end {
+            std::thread::sleep(ms(10));
+        }
+        let left: Vec<(String, bool)> = server
+            .clients()
+            .into_iter()
+            .map(|c| (c.id, c.overlay))
+            .collect();
+        assert_eq!(left, [("phone".to_string(), false)]);
+        assert_eq!(
+            socket(server, saved, "obs").unwrap_err(),
+            "HTTP/1.1 401 Unauthorized",
+            "the old code is refused"
+        );
+        say(
+            &mut ph,
+            r#"{"type":"command","command":{"cmd":"play","deck":0}}"#,
+        );
+        let end = Instant::now() + Duration::from_secs(20);
+        let mut cmds = Vec::new();
+        while cmds.is_empty() && Instant::now() < end {
+            cmds = server.drain_commands_from();
+            std::thread::sleep(ms(10));
+        }
+        assert_eq!(cmds.len(), 1, "the phone still controls");
+        // Off and on again with the code the status gave: the same address as before.
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+        assert_eq!(ctl.status().overlay_token, None);
+        ctl.start_with(true, 0, LOOPBACK, Some(fresh.clone()))
+            .unwrap();
+        assert_eq!(ctl.status().overlay_token.as_deref(), Some(fresh.as_str()));
+        drop(ctl.stop::<Mock>(None, Instant::now()));
+        // A code that is not a code is not taken over; none given = a fresh one each start.
+        let mut seen = Vec::new();
+        for given in [
+            None,
+            None,
+            Some(""),
+            Some("short"),
+            Some("00112233445566778899AABBCCDDEEFF"),
+            Some("00112233445566778899aabbccddee\r\n"),
+        ] {
+            ctl.start_with(true, 0, LOOPBACK, given.map(str::to_string))
+                .unwrap();
+            let t = ctl.status().overlay_token.unwrap();
+            assert!(decks_remote::is_token(&t), "{given:?} -> {t}");
+            assert_ne!(Some(t.as_str()), given);
+            assert!(!seen.contains(&t), "a fresh code every time");
+            seen.push(t);
+            drop(ctl.stop::<Mock>(None, Instant::now()));
+        }
     }
 }

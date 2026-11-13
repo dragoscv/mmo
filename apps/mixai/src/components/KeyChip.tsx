@@ -34,6 +34,7 @@ export function KeyChip({
     against,
     className,
     title,
+    verdict,
 }: {
     /** Camelot label ("8A"); null / unknown renders a neutral dash chip. */
     keyName: string | null | undefined;
@@ -41,10 +42,17 @@ export function KeyChip({
     against?: string | null;
     className?: string;
     title?: string;
+    /**
+     * The compatibility verdict to show instead of the chip's own (`keyMatch`): for a caller
+     * that judges keys by another rule and must not contradict itself on the same row (the
+     * co-pilot ranks by the transition crate's key score). `null` = no mark. Left out: the
+     * chip judges by itself, as everywhere else.
+     */
+    verdict?: KeyMatch | null;
 }) {
     const t = useT();
     const color = keyColor(keyName);
-    const match = against ? keyMatch(keyName, against) : null;
+    const match = verdict !== undefined ? verdict : against ? keyMatch(keyName, against) : null;
     const label = !keyName
         ? t("deck.unknownKey")
         : match
