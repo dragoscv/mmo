@@ -1,6 +1,6 @@
 # Crate, favourite and cue sync through the MMO Server: design proposal (WP19-28)
 
-Status: **proposal, waiting for owner decisions** (2026-11-12). Nothing in this document is built.
+Status: **decided by the owner on 2026-11-13** (section 9 records the answers). Nothing in this document is built yet.
 Scope chosen by the owner on 2026-11-12: full two-way sync, cue points included.
 
 The facts in section 1 were read from the code on 2026-11-12 (a read-only survey, nothing was run). Where this
@@ -220,7 +220,7 @@ Contract chain: every new route goes through `server/openapi.yaml`, `openapi:che
 | Track added to a crate on A, crate reordered on B | Both: the new entry sits where its order key puts it |
 | The same entry moved on A and on B | Later move wins |
 | Crate renamed on A and on B | Later name wins |
-| Crate deleted on A, track added on B | The later of the two wins; a delete is applied after a snapshot |
+| Crate deleted on A, track added on B | The later of the two wins; a delete is applied after a snapshot. A deleted crate goes to a 30-day trash and can be restored from any device (owner, 2026-11-13) |
 | Favourite set on A, cleared on B | Later change wins |
 | Grid changed on A and on B | Later grid wins as a whole (a grid is one object) |
 | A track's file is not known to the server | Its data stays local and waits; it is re-linked by the rule in D2 |
@@ -232,11 +232,11 @@ weeks of agent work with reviews.
 
 | Phase | Content | Effort | Done means |
 |---|---|---|---|
-| 1 | Server: `quick_hash` at scan / ingest + backfill job, cue table (and grid table if chosen), favourite `PUT`, revisions + tombstones, `GET / POST /library/changes`, hub event, OpenAPI + generated models, playlist-entry changes reported | M | Route tests on a real SQLite file incl. the conflict table above; a backfill run on the dev server's library with timings; `openapi:check` green |
+| 1 | Server: `quick_hash` at scan / ingest + backfill job, cue table + grid table, favourite `PUT`, revisions + tombstones, `GET / POST /library/changes`, hub event, OpenAPI + generated models, playlist-entry changes reported, plus the cloud relay of cues (owner: phase 1, so the cloud `cuepoints` table gains an end column and a loop is one row) with its production migration run only on the owner's explicit go-ahead | M to L | Route tests on a real SQLite file incl. the conflict table above; a backfill run on the dev server's library with timings; the relay proved against the cloud's apply path; `openapi:check` green |
 | 2 | Decks desktop: cues, cue loops (and grid edits) kept on the server per track, loaded with the track; "Starred" already works | S to M | Set cues on one dev instance, reload: still there; second instance loads the same track: same cues; server off: the app still plays and catches up after |
 | 3 | MixAI Music: star button on Android and iOS (WP17-86) | S | Star on the phone, the track is in the desktop Favourites within 5 s |
 | 4 | Compose + Swift Decks: pairing with the server, decks-library schema v4, the pure sync module, first-sync merge with preview, crates and cues both ways, "Starred" crate | L | Two devices + the server: the conflict table as an automated test over the pure module, then live on two real devices; snapshots taken before destructive pulls; protect lock holds incoming changes |
-| 5 | Desktop crates panel (the desktop has no crates today), relay of cues to the cloud (end column in the cloud table = a production migration, needs explicit consent) | M | Separate decisions when phase 4 is done |
+| 5 | Desktop crates panel (the desktop has no crates today); the cloud relay moved into phase 1, so this phase keeps only the panel and the "Starred" view on the desktop | M | Separate decisions when phase 4 is done |
 
 ## 7. Risks and open points
 
@@ -248,6 +248,9 @@ weeks of agent work with reviews.
   wrong clock can win or lose unfairly. Accepted for cues and crates (the loser is kept where it matters, D4).
 - decks-library schema v4 is a migration of a user's library: it runs behind the existing "snapshot before a
   schema change" and needs a down-path test (restore of the snapshot on the old schema).
+- The cloud relay decided for phase 1 changes a production table (`cuepoints`): the migration is prepared and
+  reviewed with the rest, but it is RUN only when the owner says so, with a backup first (the Deploy/DB rules of
+  this repo). Until then the relay writes to the server only.
 - The Compose and Swift apps cannot be compiled on the build PC used for Decks desktop; phase 4 needs the Mac
   build VM and Android devices.
 - Order keys can grow after many inserts at one spot; the server rewrites a crate's keys when one passes
@@ -264,19 +267,21 @@ weeks of agent work with reviews.
 - **Whole-file SHA-256 as the key**: already the cloud's key, but it needs a full read of every file on every
   device (minutes on a phone with a large library) and exists on the server only after analysis.
 
-## 9. Questions for the owner
+## 9. Decisions (owner, 2026-11-13)
 
-1. Hub: the MMO Server (recommended) or the cloud?
-2. Track identity: quick content hash added to the server (recommended), whole-file SHA-256, or only the
-   server's id (desktop only)?
-3. Scope of "cue points": hot cues, memory cues, loops and cue loops only, or also beatgrid edits
-   (recommended: include grids; a cue is only as good as the grid it was snapped to, and the desktop loses
-   grid edits on reload today)?
-4. Two devices claim the same hot cue slot: keep the loser as a memory cue (recommended), drop it, or ask the
-   DJ at the next start?
-5. Deleting a crate: everywhere after a snapshot (recommended), or deletes never travel?
-6. Order of the phases: desktop persistence first (recommended: smallest step that fixes a daily annoyance),
-   phone star first, or the Compose / Swift sync first?
-7. The first sync of a device with existing data: merge with a preview (recommended), or let the DJ pick one
-   side to keep?
-8. Relay of cues to the cloud: later, as phase 5 (recommended), or in phase 1 (needs a production migration)?
+Asked with the document open; the recommended option was taken everywhere except the last one.
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Hub | **The MMO Server** is the hub; the cloud feed stays what it is |
+| 2 | Track identity | **Quick content hash** on both sides, with a re-link offered and confirmed when a hash changes (a re-tag, another format) |
+| 3 | Scope of "cue points" | **Hot cues, memory cues, loops, cue loops AND hand-edited beatgrids** (analysis results are not synced) |
+| 4 | Two devices, one hot cue slot | **The loser becomes a memory cue** labelled with its old slot |
+| 5 | Deleting a crate | **30-day trash on the server**, restorable from any device, still snapshotting before a delete is applied |
+| 6 | Order of the phases | **Desktop first** (cue persistence), then the phone star (WP17-86), then Compose / Swift |
+| 7 | First sync of a device with data | **Merge with a preview** before anything is written |
+| 8 | Cues in the cloud | **In phase 1** (not phase 5): the relay goes in with the server work, so the cloud `cuepoints` table gains an end column (a loop is one row). The production migration on that table is run only with the owner's explicit go-ahead, separately |
+
+What these change in the document: phase 1 is larger (the cloud relay and its table change move into it) and phase 5
+keeps only the desktop crates panel; the crate delete is a trash rather than a hard delete; grids are in scope, so
+the grid table in section 4 is not optional; and the first sync of section 5 ("merge") is a preview the DJ confirms.
