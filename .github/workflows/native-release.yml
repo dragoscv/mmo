@@ -385,7 +385,7 @@ jobs:
                     -allowProvisioningUpdates || true
 
             - name: Upload iOS archive
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v7
               with:
                   name: ios-archive
                   path: |

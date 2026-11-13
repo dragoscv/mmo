@@ -269,7 +269,7 @@ jobs:
                   draft: true
 
             - name: Upload workflow artifacts
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v7
               with:
                   name: mixai-decks-${{ needs.preflight.outputs.version }}-${{ matrix.label }}
                   path: |

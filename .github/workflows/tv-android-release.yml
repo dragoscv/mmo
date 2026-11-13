@@ -45,7 +45,7 @@ jobs:
           if [ -z "$TV_KEYSTORE_B64" ]; then echo "::notice::TV_KEYSTORE_B64 absent — release APK will be unsigned"; fi
           ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mixai-tv-apks
           path: |
