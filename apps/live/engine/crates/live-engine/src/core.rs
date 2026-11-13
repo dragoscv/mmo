@@ -1536,6 +1536,68 @@ mod tests {
         println!("largest step across a scene change:\n{report:#?}");
     }
 
+    /// A scene change that lands while the monitor crossfade is still moving, and a toggle that
+    /// lands while the crossfade of a previous one is moving: neither may step the monitor bus.
+    /// The case matters because `Monitor::swap` sends the old chain straight to garbage when the
+    /// crossfade has not settled, so the source changes under a ramp that is not at an end.
+    #[test]
+    fn untuned_toggle_and_scene_change_may_overlap_without_a_click() {
+        let input: Vec<f32> = sine(220.0, 2 * 25600);
+        // 128-frame blocks: the crossfade is 480 samples, so gaps of 0..3 blocks overlap it.
+        let mut report = Vec::new();
+        for gap in [0usize, 1, 2, 3] {
+            for (from, to) in [
+                ("Ballad Hall", "Pop Polish"),
+                ("Pop Polish", "Harmony Stack"),
+            ] {
+                // Option off, switched on at block 200, scene changed `gap` blocks later.
+                let mut core = core_with(from, false);
+                let (mut main, mut mon) = (Vec::new(), Vec::new());
+                for (k, blk) in input.chunks(128).enumerate() {
+                    if k == 200 {
+                        let cmd = Command::SetMonitorChain {
+                            chain: Some(untuned_chain(from, 100)),
+                        };
+                        core.apply(cmd, &mut |_g| {});
+                    }
+                    if k == 200 + gap {
+                        let chain = preset(to).build(48000.0, 128, 100).unwrap().chain;
+                        let monitor = untuned_chain(to, 100);
+                        core.apply(Command::SwapChains { chain, monitor }, &mut |_g| {});
+                    }
+                    let (a, b) = render_block(&mut core, blk);
+                    main.extend(a);
+                    mon.extend(b);
+                    core.take_finished_tail();
+                }
+                assert!(
+                    mon.iter().all(|x| x.is_finite()),
+                    "gap {gap}, {from} -> {to}"
+                );
+                // The toggle is at sample 25 600; look from 1 s before it to the end. What is
+                // asserted is the MONITOR against the MAIN, not an absolute bound: while the
+                // crossfade has barely started the monitor bus IS the main chain, so it inherits
+                // the main bus's own step at a hard chain swap (0.2579 on Pop Polish -> Harmony
+                // Stack, pre-existing and only bounded for Ballad Hall -> Speech in
+                // `untuned_scene_change_does_not_click`). The point here is that the monitor's own
+                // crossfade and scene swap never add a step the main bus does not already have.
+                let (main, mon) = (max_step(&main[24000..]), max_step(&mon[24000..]));
+                report.push(format!(
+                    "toggle at 25600, {from} -> {to} {gap} block(s) later: monitor {mon:.4}, main {main:.4}"
+                ));
+                assert!(
+                    mon <= main + 0.01,
+                    "monitor stepped more than main:\n{report:#?}"
+                );
+                assert!(mon < 0.30, "monitor stepped:\n{report:#?}");
+            }
+        }
+        // Shown with `-- --nocapture`.
+        println!(
+            "largest step when a scene change lands inside the monitor crossfade:\n{report:#?}"
+        );
+    }
+
     /// The monitor tail belongs to the monitor bus: after a scene change the ears still get the
     /// old reverb, as the audience does.
     #[test]
