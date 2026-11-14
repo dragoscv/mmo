@@ -93,7 +93,7 @@ either value is above 0.1 dB, which means the signal after the faders was too ho
 
 `set_mix {monitor_untuned: true}` feeds the **monitor** bus from a second chain instead of the main one: the same
 inserts, parameters, order and enabled flags, minus every pitch effect (`autotune`, `harmonizer`). The ears get
-the voice without the shifter's latency (256 samples, 5.3 ms) plus everything else — EQ, compressor, de-esser,
+the voice without the shifter's latency plus everything else — EQ, compressor, de-esser,
 reverb, delay — while the main bus (FOH, stream, recording) keeps the full chain with correction and harmonies,
 sample for sample unchanged. `monitor_dry`, the monitor gain, `mute`, `bypass`, the latency click and the safety
 stage keep working on the monitor bus exactly as before.

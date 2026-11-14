@@ -116,7 +116,8 @@ flowchart LR
   1 = dry only; the singer can keep a dry reference while the audience hears the full chain.
 - **monitor chain** (`monitor_untuned`, "tuned only for the audience") — an optional second chain that feeds the
   monitor bus: the same inserts, parameters, order and enabled flags as the main chain, minus the pitch effects
-  (`autotune`, `harmonizer`), so the ears do not pay the shifter's 256 samples (5.3 ms) while the main bus keeps
+  (`autotune`, `harmonizer`), so the ears do not pay the shifter's latency (1 sample with the autotune's default
+  path, 256 with the classic one, and 256 per harmonizer) while the main bus keeps
   the full chain. It is built and edited on the control thread, charges nothing while the option is off, and its
   effects have their own state (its reverb is not the main chain's reverb). A 10 ms crossfade moves the monitor
   bus between the two sources; a scene change gives the monitor its own tail, so the ears get no click and no

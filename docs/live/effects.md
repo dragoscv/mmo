@@ -35,7 +35,7 @@ Units: `0–1` = fraction shown as a percentage in the UI; `:1` = compression ra
 | [`eq`](#eq) | HPF + low shelf + 2 peaks + high shelf | 0 | 0 |
 | [`deesser`](#deesser) | Split-band / wide de-esser | 0 | 0 |
 | [`compressor`](#compressor) | Soft-knee feed-forward compressor | 0 | 0 |
-| [`autotune`](#autotune) | Pitch correction | 256 samples (5.3 ms @ 48 kHz) | 0 |
+| [`autotune`](#autotune) | Pitch correction | 1 sample with `fast` `auto`/`on` (the default, at every pitch since 2026-11-14); 256 (5.3 ms @ 48 kHz) with `off` or with `formant` on | 0 |
 | [`harmonizer`](#harmonizer) | 4-voice harmonizer | 256 samples | 0 |
 | [`saturator`](#saturator) | Tape / tube / soft clip | 0 | 0 |
 | [`doubler`](#doubler) | ADT doubler | 0 | 0.06 s |
