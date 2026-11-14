@@ -121,6 +121,11 @@ flowchart LR
   effects have their own state (its reverb is not the main chain's reverb). A 10 ms crossfade moves the monitor
   bus between the two sources; a scene change gives the monitor its own tail, so the ears get no click and no
   reverb cut that the audience does not get.
+  Measured on the simulated device (2026-11-13, release binary, `Pop Polish`, the engine's own CPU time per
+  second of audio, so the reading does not depend on what else the machine is doing): **5.3 % of one core with
+  the option off, 5.6 % with it on** — one more chain costs about 0.03 s of CPU per 10 s of audio. The
+  simulated device processes silence, so both figures are a floor and the difference is a lower bound; a voice
+  makes both chains do more work per sample.
 - `bypass` blends every bus to the dry input (instant safe mode); `mute` silences every bus; both ramp 10 ms.
 - The **safety limiter** is the last stage of each bus and is not an insert: nothing can remove or disable it,
   and bypass, the dry monitor blend and the latency click go through it. Zero latency, stereo-linked, instant

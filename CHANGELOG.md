@@ -131,6 +131,10 @@ endpoint volume/mute and says which part of the loop failed. Docs updated (`docs
 remote-protocol}.md`). Not done: the latency-budget UI, the ASIO build, and the live measurement on the
 owner's rig (the numbers above are from unit tests, not from the interface).
 
+Cost of the second chain, measured on the release binary through the engine's own CPU time (so the figure does
+not depend on what else the machine is doing): **5.3 % of one core with the option off, 5.6 % with it on** —
+about 0.03 s of CPU per 10 s of audio. The simulated device processes silence, so both are a floor.
+
 ## The web build no longer eats the machine's memory (web 3.6.1, 2026-11-12)
 
 `next build` grew to ~100 GB of memory and left the machine with 8 GB free (and sometimes
