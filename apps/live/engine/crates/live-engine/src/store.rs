@@ -21,29 +21,63 @@ pub struct Store {
     dir: PathBuf,
 }
 
-/// Pairing tokens handed to clients, written once on the first start and reused afterwards so a
-/// restart of the engine process does not unpair every phone and watch. Empty fields are replaced
-/// with fresh tokens (a first run, or a file written by an older version).
+/// One device pairing as it is written to disk: the token a phone, watch or browser uses, the role
+/// it grants and the label the human list shows. One per device, so a single lost phone can be
+/// revoked without unpairing the rest of the band.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoredPairing {
+    pub token: String,
+    /// `viewer` | `performer` | `controller`.
+    pub role: String,
+    #[serde(default)]
+    pub label: String,
+}
+
+/// Pairing state written once on the first start and reused afterwards, so a restart of the engine
+/// process does not unpair every device.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoredTokens {
     #[serde(default)]
-    pub viewer: String,
-    #[serde(default)]
-    pub performer: String,
-    #[serde(default)]
-    pub controller: String,
+    pub pairings: Vec<StoredPairing>,
     #[serde(default)]
     pub osc_performer: String,
     #[serde(default)]
     pub osc_controller: String,
+    /// Legacy shape (one token per role), what every version before the per-device change wrote.
+    /// Read once and turned into pairings, so an existing install does not have to be re-paired;
+    /// never written back.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub viewer: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub performer: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub controller: String,
 }
 
 impl StoredTokens {
-    /// `true` when every field carries a token (a fresh, usable set).
-    pub fn complete(&self) -> bool {
-        !self.viewer.is_empty()
-            && !self.performer.is_empty()
-            && !self.controller.is_empty()
+    /// The device pairings, migrating the per-role tokens of an older file the first time.
+    pub fn devices(&self) -> Vec<StoredPairing> {
+        if !self.pairings.is_empty() {
+            return self.pairings.clone();
+        }
+        [
+            ("viewer", &self.viewer),
+            ("performer", &self.performer),
+            ("controller", &self.controller),
+        ]
+        .into_iter()
+        .filter(|(_, token)| !token.is_empty())
+        .map(|(role, token)| StoredPairing {
+            token: token.clone(),
+            role: role.into(),
+            label: String::new(),
+        })
+        .collect()
+    }
+
+    /// `true` when the file is usable as it is (at least one device and both OSC keys).
+    pub fn ready(&self) -> bool {
+        !self.devices().is_empty()
             && !self.osc_performer.is_empty()
             && !self.osc_controller.is_empty()
     }
@@ -256,21 +290,41 @@ mod tests {
         assert!(st.load_mix().is_none());
 
         let t = StoredTokens {
-            viewer: "aa".into(),
-            performer: "bb".into(),
-            controller: "cc".into(),
+            pairings: vec![
+                StoredPairing {
+                    token: "aa".into(),
+                    role: "controller".into(),
+                    label: "my phone".into(),
+                },
+                StoredPairing {
+                    token: "bb".into(),
+                    role: "viewer".into(),
+                    label: String::new(),
+                },
+            ],
             osc_performer: "dd".into(),
             osc_controller: "ee".into(),
+            ..Default::default()
         };
         st.save_tokens(&t).unwrap();
         assert_eq!(st.load_tokens(), Some(t.clone()));
-        assert!(t.complete());
-        // A set with an empty field is not usable: the host then generates fresh tokens.
-        let short = StoredTokens {
-            viewer: String::new(),
-            ..t
+        assert!(t.ready());
+        assert_eq!(t.devices().len(), 2);
+        // A file written before pairings were per device: one token per role, migrated on read.
+        let legacy = StoredTokens {
+            viewer: "v".into(),
+            performer: "p".into(),
+            controller: "c".into(),
+            osc_performer: "op".into(),
+            osc_controller: "oc".into(),
+            ..Default::default()
         };
-        assert!(!short.complete());
+        assert!(legacy.ready());
+        let migrated = legacy.devices();
+        assert_eq!(migrated.len(), 3);
+        assert_eq!(migrated[2].role, "controller");
+        // Nothing usable: the host then mints fresh tokens.
+        assert!(!StoredTokens::default().ready());
 
         let mix = MixState {
             main_db: -3.5,

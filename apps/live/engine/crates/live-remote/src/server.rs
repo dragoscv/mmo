@@ -23,6 +23,8 @@ use crate::token::{ct_eq, new_token};
 
 pub const DEFAULT_PORT: u16 = 17920;
 pub const MAX_CLIENTS: usize = 32;
+/// Device pairings the server will hold at once (a band is not a stadium; this is a backstop).
+pub const MAX_PAIRINGS: usize = 64;
 /// Raw TCP connections (HTTP + WebSocket) open at once, counted in `accept_loop` before a thread is
 /// spawned: `MAX_CLIENTS` is only checked after the upgrade, so without this a flood of half-open
 /// connections would spawn a thread each.
@@ -43,7 +45,7 @@ pub struct RemoteConfig {
     pub engine_name: String,
     /// Reuse these tokens instead of generating fresh ones (the host keeps them on disk so a
     /// restart does not unpair every client). `None`, or a set with an empty field, means fresh.
-    pub tokens: Option<Pairing>,
+    pub secrets: Option<TokenSet>,
 }
 
 impl Default for RemoteConfig {
@@ -53,16 +55,39 @@ impl Default for RemoteConfig {
             port: DEFAULT_PORT,
             osc: false,
             engine_name: "MixAI Live".into(),
-            tokens: None,
+            secrets: None,
         }
     }
 }
 
-/// The tokens a server hands out: one per role, plus the two OSC keys (performer, controller).
-/// Supplied to [`RemoteConfig`] to reuse a previous run's tokens, and read back to persist them.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// One **device** pairing: the token a single phone, watch or browser uses, the role it grants and
+/// the label the human list shows. Revoking one leaves every other device paired.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Pairing {
-    pub tokens: [String; 3],
+    pub id: u64,
+    pub token: String,
+    pub role: Role,
+    #[serde(default)]
+    pub label: String,
+    /// Milliseconds since the server started when it was minted (0 for the ones seeded at start).
+    pub created_ms: u64,
+}
+
+/// A pairing to seed the server with, before it has an id.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SeedPairing {
+    pub token: String,
+    pub role: Role,
+    #[allow(dead_code)]
+    pub label: String,
+}
+
+/// What the host keeps on disk and hands back at start: the device pairings and the two OSC keys
+/// (performer, controller — separate, because a control-surface layout that embeds a key is a file
+/// people export and share).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TokenSet {
+    pub pairings: Vec<SeedPairing>,
     pub osc_keys: [String; 2],
 }
 
@@ -77,6 +102,15 @@ pub struct Incoming {
     pub control: Control,
 }
 
+/// An authenticated connection: the device pairing it presented, the token it used and the id it
+/// claimed. One value, so the connection loop does not take six arguments.
+struct Client {
+    id: String,
+    pairing: u64,
+    token: String,
+    conn: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ClientInfo {
     pub id: String,
@@ -87,16 +121,29 @@ pub struct ClientInfo {
 
 const ROLES: [Role; 3] = [Role::Viewer, Role::Performer, Role::Controller];
 
-fn role_index(r: Role) -> usize {
-    match r {
-        Role::Viewer => 0,
-        Role::Performer => 1,
-        Role::Controller => 2,
+/// Parse a role name (`viewer` | `performer` | `controller`), as it is written to disk and on the
+/// wire.
+pub fn role_from(name: &str) -> Option<Role> {
+    match name {
+        "viewer" => Some(Role::Viewer),
+        "performer" => Some(Role::Performer),
+        "controller" => Some(Role::Controller),
+        _ => None,
+    }
+}
+
+/// The name of a role, the inverse of [`role_from`].
+pub fn role_name(role: Role) -> &'static str {
+    match role {
+        Role::Viewer => "viewer",
+        Role::Performer => "performer",
+        Role::Controller => "controller",
     }
 }
 
 struct Shared {
-    tokens: [String; 3],
+    /// One token per device. Empty means nothing is paired yet.
+    pairings: Vec<Pairing>,
     /// OSC keys: performer, controller. Separate from the pairing tokens because control-surface
     /// layouts that embed them are files people export and share.
     osc_keys: [String; 2],
@@ -113,6 +160,9 @@ pub(crate) struct Inner {
     state_rev: AtomicU64,
     meters_rev: AtomicU64,
     token_rev: AtomicU64,
+    /// Bumped when the pairing list changes, so controllers get a fresh `devices` frame.
+    devices_rev: AtomicU64,
+    next_pairing: AtomicU64,
     stop: AtomicBool,
     next_conn: AtomicU64,
     started: Instant,
@@ -165,6 +215,51 @@ impl Inner {
     pub(crate) fn stopped(&self) -> bool {
         self.stop.load(Ordering::SeqCst)
     }
+
+    /// Mint a pairing for one more device. `None` when the list is full.
+    fn add_pairing(&self, role: Role, label: &str) -> Option<Pairing> {
+        let p = {
+            let mut s = self.lock();
+            if s.pairings.len() >= MAX_PAIRINGS {
+                return None;
+            }
+            let p = Pairing {
+                id: self.next_pairing.fetch_add(1, Ordering::SeqCst),
+                token: new_token(),
+                role,
+                label: label.trim().chars().take(40).collect(),
+                created_ms: self.started.elapsed().as_millis() as u64,
+            };
+            s.pairings.push(p.clone());
+            p
+        };
+        self.devices_rev.fetch_add(1, Ordering::SeqCst);
+        Some(p)
+    }
+
+    /// Revoke one device; its clients are dropped on the next token check. `None` revokes all.
+    /// Returns how many were revoked.
+    fn revoke_pairings(&self, id: Option<u64>) -> usize {
+        let removed = {
+            let mut s = self.lock();
+            let before = s.pairings.len();
+            match id {
+                Some(id) => s.pairings.retain(|p| p.id != id),
+                None => s.pairings.clear(),
+            }
+            before - s.pairings.len()
+        };
+        if removed > 0 {
+            self.token_rev.fetch_add(1, Ordering::SeqCst);
+            self.devices_rev.fetch_add(1, Ordering::SeqCst);
+        }
+        removed
+    }
+
+    /// The pairing list as a JSON array (what a controller is shown).
+    pub(crate) fn pairings_json(&self) -> String {
+        serde_json::to_string(&self.lock().pairings).unwrap_or_else(|_| "[]".into())
+    }
 }
 
 pub struct RemoteServer {
@@ -192,23 +287,48 @@ impl RemoteServer {
         let listener = TcpListener::bind((config.bind, config.port))?;
         listener.set_nonblocking(true)?;
         let addr = listener.local_addr()?;
-        // Reuse a supplied set only if it is complete; otherwise generate fresh tokens.
-        let pairing = match config.tokens {
-            Some(p)
-                if p.tokens.iter().all(|t| !t.is_empty())
-                    && p.osc_keys.iter().all(|t| !t.is_empty()) =>
-            {
-                p
+        // Seed the device pairings from disk; when nothing is paired, mint one per role, which is
+        // what the `ready` line and the pairing URLs hand out.
+        let mut pairings: Vec<Pairing> = Vec::new();
+        let mut osc_keys = [String::new(), String::new()];
+        let mut next = 1u64;
+        if let Some(set) = config.secrets {
+            osc_keys = set.osc_keys;
+            for s in set.pairings {
+                if s.token.is_empty() || pairings.len() >= MAX_PAIRINGS {
+                    continue;
+                }
+                pairings.push(Pairing {
+                    id: next,
+                    token: s.token,
+                    role: s.role,
+                    label: s.label,
+                    created_ms: 0,
+                });
+                next += 1;
             }
-            _ => Pairing {
-                tokens: [new_token(), new_token(), new_token()],
-                osc_keys: [new_token(), new_token()],
-            },
-        };
+        }
+        for role in ROLES {
+            if !pairings.iter().any(|p| p.role == role) {
+                pairings.push(Pairing {
+                    id: next,
+                    token: new_token(),
+                    role,
+                    label: String::new(),
+                    created_ms: 0,
+                });
+                next += 1;
+            }
+        }
+        for k in &mut osc_keys {
+            if k.is_empty() {
+                *k = new_token();
+            }
+        }
         let inner = Arc::new(Inner {
             shared: Mutex::new(Shared {
-                tokens: pairing.tokens,
-                osc_keys: pairing.osc_keys,
+                pairings,
+                osc_keys,
                 hello: json!({ "engine_name": config.engine_name }),
                 state: "null".into(),
                 meters: String::new(),
@@ -221,6 +341,8 @@ impl RemoteServer {
             state_rev: AtomicU64::new(0),
             meters_rev: AtomicU64::new(0),
             token_rev: AtomicU64::new(1),
+            devices_rev: AtomicU64::new(1),
+            next_pairing: AtomicU64::new(next),
             stop: AtomicBool::new(false),
             next_conn: AtomicU64::new(1),
             started: Instant::now(),
@@ -275,17 +397,49 @@ impl RemoteServer {
         self.osc_port
     }
 
+    /// The token the pairing URLs hand out for a role: the first device paired on it.
     pub fn token(&self, role: Role) -> String {
-        self.inner.lock().tokens[role_index(role)].clone()
+        self.inner
+            .lock()
+            .pairings
+            .iter()
+            .find(|p| p.role == role)
+            .map(|p| p.token.clone())
+            .unwrap_or_default()
     }
 
-    /// The tokens in use, to write down so the next start reuses them.
-    pub fn pairing(&self) -> Pairing {
+    /// Every device pairing (what a controller lists, and what the human revokes by id).
+    pub fn pairings(&self) -> Vec<Pairing> {
+        self.inner.lock().pairings.clone()
+    }
+
+    /// The pairings and OSC keys, to write down so the next start reuses them.
+    pub fn token_set(&self) -> TokenSet {
         let s = self.inner.lock();
-        Pairing {
-            tokens: s.tokens.clone(),
+        TokenSet {
+            pairings: s
+                .pairings
+                .iter()
+                .map(|p| SeedPairing {
+                    token: p.token.clone(),
+                    role: p.role,
+                    label: p.label.clone(),
+                })
+                .collect(),
             osc_keys: s.osc_keys.clone(),
         }
+    }
+
+    /// Mint a pairing for one more device: the token is what its QR carries, and revoking it later
+    /// leaves every other device paired. `None` when the list is full.
+    pub fn add_pairing(&self, role: Role, label: &str) -> Option<Pairing> {
+        self.inner.add_pairing(role, label)
+    }
+
+    /// Revoke one device. Its clients are disconnected on the next token check. `false` when the id
+    /// is not paired (already revoked).
+    pub fn revoke_pairing(&self, id: u64) -> bool {
+        self.inner.revoke_pairings(Some(id)) > 0
     }
 
     /// OSC key of a role (`None` when OSC is off, and for viewers: OSC only sends controls).
@@ -299,12 +453,21 @@ impl RemoteServer {
         }
     }
 
-    /// Rotate a role's token (and its OSC key); clients paired with the old one are disconnected.
+    /// Rotate a role: revoke **every** device paired on it and hand out one fresh token (the
+    /// "unpair everyone on this role" the CLI has always had). A single device is revoked by id
+    /// through [`revoke_pairing`](Self::revoke_pairing). The role's OSC key rotates with it.
     pub fn rotate_token(&self, role: Role) -> String {
         let t = new_token();
         {
             let mut s = self.inner.lock();
-            s.tokens[role_index(role)] = t.clone();
+            s.pairings.retain(|p| p.role != role);
+            s.pairings.push(Pairing {
+                id: self.inner.next_pairing.fetch_add(1, Ordering::SeqCst),
+                token: t.clone(),
+                role,
+                label: String::new(),
+                created_ms: self.inner.started.elapsed().as_millis() as u64,
+            });
             match role {
                 Role::Viewer => {}
                 Role::Performer => s.osc_keys[0] = new_token(),
@@ -312,6 +475,7 @@ impl RemoteServer {
             }
         }
         self.inner.token_rev.fetch_add(1, Ordering::SeqCst);
+        self.inner.devices_rev.fetch_add(1, Ordering::SeqCst);
         t
     }
 
@@ -507,14 +671,15 @@ fn handle(mut stream: TcpStream, peer: SocketAddr, inner: Arc<Inner>) -> io::Res
     if !http::same_origin(&head) {
         return http::respond(&mut stream, "403 Forbidden", "text/plain", "origin");
     }
-    let (role, token, conn, client) = {
+    let (role, who) = {
         let mut s = inner.lock();
-        let role = head.param("t").and_then(|t| {
-            ROLES
-                .into_iter()
-                .find(|r| ct_eq(&s.tokens[role_index(*r)], t))
+        let found = head.param("t").and_then(|t| {
+            s.pairings
+                .iter()
+                .find(|p| ct_eq(&p.token, t))
+                .map(|p| (p.role, p.id, p.token.clone()))
         });
-        let Some(role) = role else {
+        let Some((role, pairing, token)) = found else {
             drop(s);
             return http::respond(&mut stream, "401 Unauthorized", "text/plain", "token");
         };
@@ -538,12 +703,20 @@ fn handle(mut stream: TcpStream, peer: SocketAddr, inner: Arc<Inner>) -> io::Res
             },
         );
         s.replies.insert(conn, VecDeque::new());
-        (role, s.tokens[role_index(role)].clone(), conn, client)
+        (
+            role,
+            Client {
+                id: client,
+                pairing,
+                token,
+                conn,
+            },
+        )
     };
-    let result = session(stream, raw, &inner, role, &token, conn, &client);
+    let result = session(stream, raw, &inner, role, &who);
     let mut s = inner.lock();
-    s.clients.remove(&conn);
-    s.replies.remove(&conn);
+    s.clients.remove(&who.conn);
+    s.replies.remove(&who.conn);
     result
 }
 
@@ -554,10 +727,30 @@ fn is_timeout(e: &tungstenite::Error) -> bool {
 /// What a client message turned into.
 #[derive(Debug, PartialEq)]
 pub(crate) enum Parsed {
-    Subscribe { meters: bool, hz: u32 },
+    Subscribe {
+        meters: bool,
+        hz: u32,
+    },
     Ping(Value),
-    Control { id: Option<u32>, control: Control },
-    Bad { id: Option<u32>, message: String },
+    Control {
+        id: Option<u32>,
+        control: Control,
+    },
+    /// Mint a pairing for one more device (controller only). Answered by the `devices` frame.
+    Pair {
+        id: Option<u32>,
+        role: String,
+        label: String,
+    },
+    /// Revoke one device by id, or every device when `device` is absent (controller only).
+    Unpair {
+        id: Option<u32>,
+        device: Option<u64>,
+    },
+    Bad {
+        id: Option<u32>,
+        message: String,
+    },
 }
 
 pub(crate) fn parse_client(text: &str) -> Parsed {
@@ -581,6 +774,23 @@ pub(crate) fn parse_client(text: &str) -> Parsed {
                 .clamp(1, 30) as u32,
         },
         Some("ping") => Parsed::Ping(v.get("t").cloned().unwrap_or(Value::Null)),
+        Some("pair") => Parsed::Pair {
+            id,
+            role: v
+                .get("role")
+                .and_then(Value::as_str)
+                .unwrap_or("performer")
+                .to_string(),
+            label: v
+                .get("label")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+        },
+        Some("unpair") => Parsed::Unpair {
+            id,
+            device: v.get("device").and_then(Value::as_u64),
+        },
         Some(_) => match serde_json::from_value::<Control>(v) {
             Ok(control) => Parsed::Control { id, control },
             Err(e) => Parsed::Bad {
@@ -600,9 +810,7 @@ fn session(
     raw: Vec<u8>,
     inner: &Inner,
     role: Role,
-    token: &str,
-    conn: u64,
-    client: &str,
+    who: &Client,
 ) -> io::Result<()> {
     let cfg = WebSocketConfig::default()
         .max_message_size(Some(MAX_MESSAGE))
@@ -623,7 +831,7 @@ fn session(
             "role".into(),
             serde_json::to_value(role).unwrap_or(Value::Null),
         );
-        m.insert("client".into(), client.into());
+        m.insert("client".into(), Value::from(who.id.as_str()));
         // OSC keys go only to devices that may send controls, and only when OSC is on.
         if role >= Role::Performer
             && let Some(port) = inner.osc_port.get()
@@ -639,6 +847,7 @@ fn session(
     send(&mut ws, hello.to_string()).map_err(io_err)?;
     let mut seen_state = 0u64;
     let mut seen_meters = inner.meters_rev.load(Ordering::SeqCst);
+    let mut seen_devices = 0u64;
     let mut meters_on = false;
     let mut meters_every = Duration::from_millis(33);
     let mut meters_last = Instant::now();
@@ -654,11 +863,29 @@ fn session(
         let trev = inner.token_rev.load(Ordering::SeqCst);
         if trev != token_rev {
             token_rev = trev;
-            if !ct_eq(&inner.lock().tokens[role_index(role)], token) {
+            // Still paired? A revoked device (or a rotated role) is dropped on the spot.
+            let paired = inner
+                .lock()
+                .pairings
+                .iter()
+                .any(|p| p.id == who.pairing && ct_eq(&p.token, &who.token));
+            if !paired {
                 let _ = ws.close(None);
                 let _ = ws.flush();
                 return Ok(());
             }
+        }
+        let drev = inner.devices_rev.load(Ordering::SeqCst);
+        if role == Role::Controller && drev != seen_devices {
+            seen_devices = drev;
+            send(
+                &mut ws,
+                format!(
+                    "{{\"type\":\"devices\",\"devices\":{}}}",
+                    inner.pairings_json()
+                ),
+            )
+            .map_err(io_err)?;
         }
         let srev = inner.state_rev.load(Ordering::SeqCst);
         if srev != seen_state {
@@ -678,7 +905,7 @@ fn session(
         let pending: Vec<String> = inner
             .lock()
             .replies
-            .get_mut(&conn)
+            .get_mut(&who.conn)
             .map(|q| q.drain(..).collect())
             .unwrap_or_default();
         for r in pending {
@@ -721,8 +948,8 @@ fn session(
                             send(&mut ws, e.to_string()).map_err(io_err)?;
                         } else {
                             inner.push_incoming(Incoming {
-                                conn,
-                                client: client.into(),
+                                conn: who.conn,
+                                client: who.id.clone(),
                                 role,
                                 id,
                                 control,
@@ -732,6 +959,33 @@ fn session(
                     Parsed::Bad { id, message } => {
                         let e = json!({ "type": "error", "id": id, "code": "bad_request", "message": message });
                         send(&mut ws, e.to_string()).map_err(io_err)?;
+                    }
+                    Parsed::Pair {
+                        id,
+                        role: want,
+                        label,
+                    } => {
+                        let answer = if role < Role::Controller {
+                            json!({ "type": "error", "id": id, "code": "forbidden", "message": "this device cannot pair devices" })
+                        } else if let Some(r) = role_from(&want) {
+                            match inner.add_pairing(r, &label) {
+                                Some(p) => json!({ "type": "ack", "id": id, "pairing": p.id }),
+                                None => {
+                                    json!({ "type": "error", "id": id, "code": "too_many", "message": "too many paired devices" })
+                                }
+                            }
+                        } else {
+                            json!({ "type": "error", "id": id, "code": "bad_request", "message": format!("unknown role `{want}`") })
+                        };
+                        send(&mut ws, answer.to_string()).map_err(io_err)?;
+                    }
+                    Parsed::Unpair { id, device } => {
+                        let answer = if role < Role::Controller {
+                            json!({ "type": "error", "id": id, "code": "forbidden", "message": "this device cannot unpair devices" })
+                        } else {
+                            json!({ "type": "ack", "id": id, "revoked": inner.revoke_pairings(device) })
+                        };
+                        send(&mut ws, answer.to_string()).map_err(io_err)?;
                     }
                 }
             }

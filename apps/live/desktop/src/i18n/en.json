@@ -205,7 +205,13 @@
         "performerHint": "Song parts, mix, bypass, mute, tap tempo",
         "viewerHint": "Read-only meters and setlist",
         "copy": "Copy link",
-        "copied": "Link copied"
+        "copied": "Link copied",
+        "devices": "Paired devices",
+        "role": "Role",
+        "label": "Name (this phone, the TV…)",
+        "addDevice": "Pair a device",
+        "revoke": "Unpair",
+        "unlabelled": "Unnamed"
     },
     "settings": {
         "title": "Settings",

@@ -22,7 +22,11 @@ desktop UI uses `127.0.0.1` with the `controller` token from the local config fi
 
 Pairing is by QR code: `mixai-live://pair?host=<ip>&port=17920&t=<token>&name=<engine>` (also printed as an
 `http://<ip>:17920/?t=<token>` link for the web remote). Tokens are 128-bit random hex, compared in constant
-time, rotatable. Roles:
+time. **One token per device**, not per role: the host seeds one per role at start (so the printed QR codes keep
+working), and a controller mints one for each phone, watch or browser with `pair` — so a single lost device is
+revoked with `unpair` without unpairing the rest of the band, and both survive a restart (`tokens.json`).
+`rotate_token(role)` — the CLI's "unpair everyone on this role" — revokes every device on the role and hands out
+one fresh token. Roles:
 
 | Role | May |
 |---|---|
@@ -53,6 +57,7 @@ matching `ack` or `error`.
 | `state` | `state: SessionState` | after `hello`, and after every change (debounced 30 ms) |
 | `meters` | `in_peak, in_rms, out_peak:[l,r], out_rms:[l,r], gr:[dB per insert], dsp_load, dsp_load_max, xruns, clipped, safety_gr:[main dB, monitor dB], chain_latency_samples, monitor_chain_latency_samples, tune: {freq, midi, cents, target, correction_cents} \| null, latency_probe: "idle"\|"running"\|{"done_ms":x}\|"failed"` | 30 Hz to clients that sent `subscribe` with `meters:true` (watches: 10 Hz with `meters_hz`) |
 | `ack` | `id` | command applied |
+| `devices` | `devices: [{ id, token, role, label, created_ms }]` | to `controller` clients after `hello` and after every pairing change (`pair`, `unpair`, a role rotation) — the token of each paired device, so one can be revoked by `id` |
 | `error` | `id?, code, message` | codes: `unauthorized`, `forbidden`, `bad_request`, `unknown_insert`, `unknown_param`, `unknown_preset`, `unknown_fx`, `chain_full`, `no_setlist`, `factory_preset`, `unknown_binding`, `rate_limited` |
 
 `SessionState` (additive since engine 0.1.0+midi): `preset, chain, mix, setlist, position, presets, factory_presets, modified_presets` (factory presets overridden by a user copy — only these can be reverted),
@@ -79,6 +84,8 @@ types are described in [MIDI control](midi.md).
 | `next` / `prev` | — | performer |
 | `tap_tempo` | — (the server averages taps and sets every delay `bpm`) | performer |
 | `panic` | — (silences everything and clears the effect tails; **latched** — send it again to recover, and `set_mix {mute:false}` cannot while it is latched; `state.mix.panic` says which way it is) | performer |
+| `pair` | `role` (`viewer`/`performer`/`controller`), `label` (<= 40 chars) — mints a token for one more device; the ack carries its `pairing` id and the `devices` frame that follows carries the token | controller |
+| `unpair` | `device: <id>` (omit to unpair every device) — revokes now: the clients using it are disconnected and the `devices` frame is republished. Ack carries `revoked: <n>` | controller |
 | `latency_probe` | — | controller |
 | `midi_learn` | `target: MidiTarget \| null` (null cancels) — the next CC / note binds to it | controller |
 | `midi_unbind` | `index` into `state.midi.map.bindings` | controller |

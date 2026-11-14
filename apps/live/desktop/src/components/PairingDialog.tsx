@@ -1,7 +1,7 @@
 /** Pairing: controller/performer/viewer URLs as QR codes (SVG from Rust) + "allow phones on the network". */
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Copy } from "lucide-react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Switch } from "@mmo/ui";
 import { useT } from "../i18n";
 import { api } from "../lib/tauri";
@@ -58,9 +58,13 @@ export function PairingDialog() {
     const open = useStore((s) => s.panel === "pair");
     const openPanel = useStore((s) => s.openPanel);
     const start = useStore((s) => s.start);
+    const devices = useStore((s) => s.proto.devices);
+    const send = useStore((s) => s.send);
     const lan = useStore((s) => s.settings.lan);
     const status = useStore((s) => s.status);
     const setLan = useStore((s) => s.setLan);
+    const [role, setRole] = useState<RoleKey>("performer");
+    const [label, setLabel] = useState("");
     const live = !!start?.lan;
 
     return (
@@ -86,6 +90,63 @@ export function PairingDialog() {
                 ) : (
                     <p className="rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">{t("pair.localOnly")}</p>
                 )}
+                {/* Pairing is per device: each line is one phone/watch/browser, and revoking one
+                    leaves the rest of the band paired. */}
+                {live && devices && devices.length > 0 ? (
+                    <section className="rounded-xl border p-3" aria-label={t("pair.devices")}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="me-auto text-sm font-medium">{t("pair.devices")}</h3>
+                            <select
+                                aria-label={t("pair.role")}
+                                className="h-8 rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                                value={role}
+                                onChange={(e) => setRole(e.target.value as RoleKey)}
+                            >
+                                <option value="performer">{t("pair.performer")}</option>
+                                <option value="controller">{t("pair.controller")}</option>
+                                <option value="viewer">{t("pair.viewer")}</option>
+                            </select>
+                            <input
+                                aria-label={t("pair.label")}
+                                placeholder={t("pair.label")}
+                                className="h-8 w-40 rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                                value={label}
+                                maxLength={40}
+                                onChange={(e) => setLabel(e.target.value)}
+                            />
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="active:scale-[0.97]"
+                                onClick={() => {
+                                    send({ type: "pair", role, label: label.trim() });
+                                    setLabel("");
+                                }}
+                            >
+                                <Plus /> {t("pair.addDevice")}
+                            </Button>
+                        </div>
+                        <ul className="mt-2 flex flex-col divide-y">
+                            {devices.map((d) => (
+                                <li key={d.id} className="flex items-center gap-3 py-1.5 text-sm">
+                                    <span className="w-24 shrink-0 font-medium">{t(`pair.${d.role}`)}</span>
+                                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                                        {d.label || t("pair.unlabelled")}
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="active:scale-[0.97]"
+                                        onClick={() => send({ type: "unpair", device: d.id })}
+                                        aria-label={`${t("pair.revoke")}: ${d.label || d.role}`}
+                                    >
+                                        <Trash2 /> {t("pair.revoke")}
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                ) : null}
             </DialogContent>
         </Dialog>
     );

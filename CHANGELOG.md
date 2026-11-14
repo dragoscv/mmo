@@ -38,6 +38,22 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — pairing is per device, and one lost phone can be revoked (WP21-19 part 5, 2026-11-14)
+
+Pairing used to hand out **one token per role**: every phone scanning the performer code shared it, so the only
+way to unpair a lost one was to rotate the whole role — which re-paired the entire band. The engine now keeps
+**one pairing per device** (its token, role, label and when it was minted). The host still seeds one per role at
+start, so the printed QR codes keep working, and a controller mints more over the protocol: `pair` names the role
+and a label, the ack carries the new pairing's id, and a `devices` frame follows with its token. `unpair` revokes
+exactly one device — its clients are disconnected on the next token check and everyone else keeps playing;
+`unpair` with no id, and the CLI's `rotate_token(role)`, still revoke a whole role. The list is written to
+`tokens.json` (a per-role file from an older install is migrated on read, so nobody has to re-scan), and the
+desktop's pairing dialog now lists the devices with an Unpair button and a "pair a device" form.
+
+Proven end to end: a controller sees the list on connect; a performer is refused; a minted pairing's token brings
+up a second client; revoking exactly it drops that socket and leaves the list otherwise intact. Engine workspace
+219 tests, clippy `-D warnings` clean; desktop typecheck 0, 39 tests, i18n parity 328 keys, production build green.
+
 ## MixAI Live — the fixed safety bar, Stage mode and the pitch ribbon (WP21-20 part 1, 2026-11-14)
 
 The performance screen now carries a **safety bar** that is on screen the whole time: bypass, mute and a latched

@@ -11,10 +11,11 @@
 //! The streams are opened INSIDE the control thread and never leave it, so the host does not
 //! depend on `cpal::Stream` being `Send` on every platform.
 
-use crate::server::Pairing;
+use crate::server::{SeedPairing, TokenSet, role_from, role_name};
 use crate::{RemoteConfig, RemoteServer, discovery::Announcer, meters_json, server_error_code};
 use live_engine::{
-    Command, Control, IoConfig, Meters, Role, RunningInfo, Session, Store, io, store::StoredTokens,
+    Command, Control, IoConfig, Meters, Role, RunningInfo, Session, Store, io,
+    store::{StoredPairing, StoredTokens},
 };
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -315,20 +316,30 @@ fn run(
     if cfg.start_muted {
         pending.extend(session.set_mix(|m| m.mute = true));
     }
-    // Reuse the pairing tokens from the last run when they are complete, so a restart keeps every
-    // phone and watch paired instead of handing out new codes.
+    // Reuse the device pairings from the last run, so a restart keeps every phone and watch paired
+    // instead of handing out new codes.
     let saved = cfg
         .store
         .as_ref()
         .and_then(|s| s.load_tokens())
-        .filter(StoredTokens::complete);
+        .filter(StoredTokens::ready);
     let server = match RemoteServer::start(RemoteConfig {
         bind: cfg.bind,
         port: cfg.port,
         osc: cfg.osc,
         engine_name: cfg.name.clone(),
-        tokens: saved.map(|t| Pairing {
-            tokens: [t.viewer, t.performer, t.controller],
+        secrets: saved.map(|t| TokenSet {
+            pairings: t
+                .devices()
+                .into_iter()
+                .filter_map(|p| {
+                    role_from(&p.role).map(|role| SeedPairing {
+                        token: p.token,
+                        role,
+                        label: p.label,
+                    })
+                })
+                .collect(),
             osc_keys: [t.osc_performer, t.osc_controller],
         }),
     }) {
@@ -341,18 +352,13 @@ fn run(
         }
     };
     if let Some(st) = &cfg.store {
-        let p = server.pairing();
-        let t = StoredTokens {
-            viewer: p.tokens[0].clone(),
-            performer: p.tokens[1].clone(),
-            controller: p.tokens[2].clone(),
-            osc_performer: p.osc_keys[0].clone(),
-            osc_controller: p.osc_keys[1].clone(),
-        };
+        let t = tokens_to_store(server.token_set());
         if let Err(e) = st.save_tokens(&t) {
             warnings.push(format!("could not save the pairing tokens: {e}"));
         }
     }
+    let mut last_tokens = server.token_set();
+    let mut tokens_at = Instant::now();
     server.set_hello(serde_json::json!({
         "sample_rate": running.info.sample_rate,
         "buffer_frames": running.info.buffer_frames,
@@ -504,12 +510,43 @@ fn run(
             dirty = false;
             last_save = Instant::now();
         }
+        // A device paired or revoked over the protocol: write the list down.
+        if tokens_at.elapsed() >= SAVE_EVERY {
+            tokens_at = Instant::now();
+            let now = server.token_set();
+            if now != last_tokens {
+                last_tokens = now.clone();
+                if let Some(st) = &cfg.store
+                    && let Err(e) = st.save_tokens(&tokens_to_store(now))
+                {
+                    log::warn!("saving the pairing tokens: {e}");
+                }
+            }
+        }
     }
     // Leave the mix where the user left it.
     if let Some(st) = &cfg.store
         && let Err(e) = st.save_mix(&session.mix)
     {
         log::warn!("saving the mix on exit: {e}");
+    }
+}
+
+/// What the store keeps about the pairings (ids are the server's business, not the file's).
+fn tokens_to_store(set: TokenSet) -> StoredTokens {
+    StoredTokens {
+        pairings: set
+            .pairings
+            .iter()
+            .map(|p| StoredPairing {
+                token: p.token.clone(),
+                role: role_name(p.role).to_string(),
+                label: p.label.clone(),
+            })
+            .collect(),
+        osc_performer: set.osc_keys[0].clone(),
+        osc_controller: set.osc_keys[1].clone(),
+        ..Default::default()
     }
 }
 
@@ -590,7 +627,12 @@ mod tests {
         let saved = store
             .load_tokens()
             .expect("the tokens are written on start");
-        assert!(saved.complete(), "a full set is saved");
+        assert!(saved.ready(), "a full set is saved");
+        assert_eq!(
+            saved.devices().len(),
+            3,
+            "one pairing per role to start with"
+        );
         first.stop();
 
         let mut second =

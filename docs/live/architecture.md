@@ -238,9 +238,11 @@ controllers, MIDI bindings and the setlist keep pointing at the same inserts, an
 `EngineHost::restarts()` and `last_restart()` report how often and why (`serve` prints a line on stderr); when
 the device never comes back the error names the reason and the number of attempts.
 
-The engine also **keeps state on disk**, so a whole process restart behaves: the pairing tokens (`tokens.json`,
-reused when complete, so an app restart does not unpair clients), the mix (`mix.json`, written at most every
-500 ms and again on exit) and — as before — presets, the setlist and the MIDI map. Layout: [storage](presets.md#storage).
+The engine also **keeps state on disk**, so a whole process restart behaves: the **device pairings**
+(`tokens.json`: one token per phone, watch or browser, so an app restart does not unpair clients and one lost
+device can be revoked on its own — see [the protocol](remote-protocol.md#auth-and-roles)), the mix (`mix.json`,
+written at most every 500 ms and again on exit) and — as before — presets, the setlist and the MIDI map. Layout:
+[storage](presets.md#storage).
 
 ## Crate map
 

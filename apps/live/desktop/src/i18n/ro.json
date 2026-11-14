@@ -205,7 +205,13 @@
         "performerHint": "Părți de cântec, mix, ocolire, mut, tempo",
         "viewerHint": "Doar citire: indicatoare și listă",
         "copy": "Copiază linkul",
-        "copied": "Link copiat"
+        "copied": "Link copiat",
+        "devices": "Dispozitive împerecheate",
+        "role": "Rol",
+        "label": "Nume (telefonul acesta, televizorul…)",
+        "addDevice": "Împerechează un dispozitiv",
+        "revoke": "Dezîmperechează",
+        "unlabelled": "Fără nume"
     },
     "settings": {
         "title": "Setări",

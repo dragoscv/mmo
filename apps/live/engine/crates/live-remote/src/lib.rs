@@ -14,7 +14,10 @@ pub mod server;
 pub mod token;
 
 pub use host::{ControlError, ControlHandle, EngineHost, HostConfig, HostError, HostReady};
-pub use server::{ClientInfo, DEFAULT_PORT, Incoming, Pairing, RemoteConfig, RemoteServer, lan_ip};
+pub use server::{
+    ClientInfo, DEFAULT_PORT, Incoming, MAX_PAIRINGS, Pairing, RemoteConfig, RemoteServer,
+    SeedPairing, TokenSet, lan_ip, role_from, role_name,
+};
 
 pub const PROTOCOL_VERSION: u32 = 1;
 

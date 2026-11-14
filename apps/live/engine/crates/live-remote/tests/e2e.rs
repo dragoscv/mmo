@@ -14,7 +14,7 @@ fn server() -> RemoteServer {
         port: 0,
         osc: false,
         engine_name: "Test".into(),
-        tokens: None,
+        secrets: None,
     })
     .unwrap()
 }
@@ -25,7 +25,7 @@ fn osc_server() -> RemoteServer {
         port: 0,
         osc: true,
         engine_name: "Test".into(),
-        tokens: None,
+        secrets: None,
     })
     .unwrap()
 }
@@ -341,12 +341,23 @@ fn health_and_catalogue_over_http() {
     }
 }
 
-/// A host that keeps its tokens on disk hands them to the server: a restart keeps every client
-/// paired. An incomplete set (a first run, or a file from an older version) is replaced instead.
+/// A host that keeps its pairings on disk hands them to the server, so a restart keeps every device
+/// paired; and one device can be revoked without touching the others.
 #[test]
-fn supplied_tokens_are_reused_or_replaced() {
-    let p = live_remote::Pairing {
-        tokens: ["viewer".into(), "performer".into(), "controller".into()],
+fn supplied_pairings_are_reused_and_one_can_be_revoked() {
+    let set = live_remote::TokenSet {
+        pairings: vec![
+            live_remote::SeedPairing {
+                token: "controller-1".into(),
+                role: Role::Controller,
+                label: "laptop".into(),
+            },
+            live_remote::SeedPairing {
+                token: "viewer-1".into(),
+                role: Role::Viewer,
+                label: "tv".into(),
+            },
+        ],
         osc_keys: ["osc-p".into(), "osc-c".into()],
     };
     let s = RemoteServer::start(RemoteConfig {
@@ -354,23 +365,33 @@ fn supplied_tokens_are_reused_or_replaced() {
         port: 0,
         osc: false,
         engine_name: "Test".into(),
-        tokens: Some(p.clone()),
+        secrets: Some(set),
     })
     .unwrap();
-    assert_eq!(s.pairing(), p);
-    assert_eq!(s.token(Role::Viewer), "viewer");
-    assert_eq!(s.token(Role::Controller), "controller");
+    // Both seeded tokens work, and the missing role got one so the pairing URLs still point
+    // somewhere.
+    assert_eq!(s.token(Role::Controller), "controller-1");
+    assert_eq!(s.token(Role::Viewer), "viewer-1");
+    assert_ne!(s.token(Role::Performer), "");
+    assert_eq!(s.pairings().len(), 3);
 
-    let fresh = RemoteServer::start(RemoteConfig {
-        bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
-        port: 0,
-        osc: false,
-        engine_name: "Test".into(),
-        tokens: Some(live_remote::Pairing::default()),
-    })
-    .unwrap();
-    assert_ne!(fresh.token(Role::Viewer), "");
-    assert_ne!(fresh.pairing(), live_remote::Pairing::default());
+    // Mint one more device and revoke exactly it.
+    let extra = s
+        .add_pairing(Role::Performer, "second phone")
+        .expect("room");
+    assert_eq!(s.pairings().len(), 4);
+    assert_eq!(extra.label, "second phone");
+    assert!(s.revoke_pairing(extra.id));
+    assert!(
+        !s.revoke_pairing(extra.id),
+        "revoking twice is not an error, just false"
+    );
+    assert_eq!(s.pairings().len(), 3);
+    assert_eq!(
+        s.token(Role::Viewer),
+        "viewer-1",
+        "the others are untouched"
+    );
 }
 
 /// A control flood must not be able to take the panic button away: PANIC is exempt from the
@@ -455,5 +476,98 @@ fn many_short_connections_do_not_exhaust_the_cap() {
     assert!(
         ok,
         "the connection cap leaked and the server stopped answering"
+    );
+}
+
+/// Pairing is per device now: a controller mints one for a new phone, sees the list, and revoking
+/// that one device drops only its socket — the other devices keep their tokens.
+#[test]
+fn a_controller_pairs_and_revokes_one_device() {
+    use std::io::ErrorKind::{TimedOut, WouldBlock};
+
+    let s = server();
+    let mut session = Session::new(48000.0, 128);
+    session.load_preset("Natural Vocal").unwrap();
+    let mut c = connect(&s, &s.token(Role::Controller)).unwrap();
+    wait_for("pair-hello", &mut c, &s, &mut session, |m| {
+        m["type"] == "hello"
+    });
+    // The list arrives on connect: one seeded pairing per role.
+    let d = wait_for("devices-on-connect", &mut c, &s, &mut session, |m| {
+        m["type"] == "devices"
+    });
+    assert_eq!(d["devices"].as_array().unwrap().len(), 3);
+
+    // A performer may not mint one.
+    let mut perf = connect(&s, &s.token(Role::Performer)).unwrap();
+    wait_for("perf-hello", &mut perf, &s, &mut session, |m| {
+        m["type"] == "hello"
+    });
+    perf.send(Message::text(r#"{"type":"pair","role":"viewer","id":3}"#))
+        .unwrap();
+    let e = wait_for("pair-forbidden", &mut perf, &s, &mut session, |m| {
+        m["type"] == "error"
+    });
+    assert_eq!(e["code"], "forbidden");
+
+    // A controller mints a device and the whole list comes back.
+    c.send(Message::text(
+        r#"{"type":"pair","role":"performer","label":"guitar phone","id":1}"#,
+    ))
+    .unwrap();
+    let ack = wait_for("pair-ack", &mut c, &s, &mut session, |m| {
+        m["type"] == "ack" && m["id"] == 1
+    });
+    let new_id = ack["pairing"].as_u64().expect("the ack names the pairing");
+    let d = wait_for("devices-after-pair", &mut c, &s, &mut session, |m| {
+        m["type"] == "devices" && m["devices"].as_array().unwrap().len() == 4
+    });
+    let token = d["devices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["label"] == "guitar phone")
+        .and_then(|p| p["token"].as_str())
+        .expect("the new pairing is listed with its token")
+        .to_string();
+
+    // That token pairs the new device...
+    let mut phone = connect(&s, &token).unwrap();
+    wait_for("phone-hello", &mut phone, &s, &mut session, |m| {
+        m["type"] == "hello"
+    });
+
+    // ... and revoking exactly it drops that socket, leaving the controller alone.
+    c.send(Message::text(format!(
+        r#"{{"type":"unpair","device":{new_id},"id":2}}"#
+    )))
+    .unwrap();
+    let ack = wait_for("unpair-ack", &mut c, &s, &mut session, |m| {
+        m["type"] == "ack" && m["id"] == 2
+    });
+    assert_eq!(ack["revoked"], 1);
+    let t0 = Instant::now();
+    let mut closed = false;
+    while t0.elapsed() < Duration::from_secs(3) {
+        pump(&s, &mut session);
+        match phone.read() {
+            Ok(Message::Close(_))
+            | Err(tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed) => {
+                closed = true;
+                break;
+            }
+            Ok(_) => {}
+            Err(tungstenite::Error::Io(e)) if matches!(e.kind(), WouldBlock | TimedOut) => {}
+            Err(_) => {
+                closed = true;
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(closed, "the revoked device must be disconnected");
+    assert!(
+        !s.pairings().iter().any(|p| p.id == new_id),
+        "it is gone from the list"
     );
 }

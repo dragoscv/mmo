@@ -62,6 +62,15 @@ describe("parseServer", () => {
 });
 
 describe("reduce", () => {
+    it("keeps the paired-device list the engine sends to controllers", () => {
+        const s = reduce(initialProtocol, {
+            type: "devices",
+            devices: [{ id: 4, token: "abc", role: "performer", label: "guitar phone", created_ms: 120 }],
+        });
+        expect(s.devices?.[0]?.label).toBe("guitar phone");
+        expect(s.devices?.[0]?.role).toBe("performer");
+    });
+
     it("flags a newer protocol as incompatible", () => {
         const s = reduce(initialProtocol, { type: "hello", protocol: 2, version: "9", role: "controller", engine_name: "x" });
         expect(s.incompatible).toBe(true);

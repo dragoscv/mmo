@@ -191,6 +191,7 @@ export interface Hello {
 export type ServerMsg =
     | ({ type: "hello" } & Hello)
     | { type: "state"; state: SessionState }
+    | { type: "devices"; devices: Device[] }
     | ({ type: "meters" } & Meters)
     | { type: "ack"; id: number | null }
     | { type: "error"; id?: number | null; code: string; message: string }
@@ -216,6 +217,8 @@ export type ClientMsg =
     | { type: "prev" }
     | { type: "tap_tempo" }
     | { type: "panic" }
+    | { type: "pair"; role: string; label?: string }
+    | { type: "unpair"; device?: number }
     | { type: "latency_probe" }
     | { type: "midi_learn"; target: MidiTarget | null }
     | { type: "midi_unbind"; index: number }
@@ -311,9 +314,21 @@ export interface ProtoError {
     message: string;
 }
 
+/** One paired device: the token it uses, the role it grants and the label the list shows. */
+export interface Device {
+    id: number;
+    token: string;
+    role: "viewer" | "performer" | "controller";
+    label: string;
+    /** Milliseconds after the server started when it was minted (0 for the seeded ones). */
+    created_ms: number;
+}
+
 export interface ProtocolState {
     hello: Hello | null;
     state: SessionState | null;
+    /** Paired devices, sent to controllers only; `null` until the engine says. */
+    devices: Device[] | null;
     /** True when the engine speaks a newer protocol than this app ("update the app"). */
     incompatible: boolean;
     lastError: ProtoError | null;
@@ -324,6 +339,7 @@ export interface ProtocolState {
 export const initialProtocol: ProtocolState = {
     hello: null,
     state: null,
+    devices: null,
     incompatible: false,
     lastError: null,
     pending: [],
@@ -340,6 +356,8 @@ export function reduce(s: ProtocolState, msg: ServerMsg): ProtocolState {
             // Never go back in time: an optimistic local edit carries the same revision until confirmed.
             if (s.state && msg.state.revision < s.state.revision) return s;
             return { ...s, state: msg.state };
+        case "devices":
+            return { ...s, devices: msg.devices };
         case "ack":
             return msg.id == null ? s : { ...s, pending: s.pending.filter((p) => p !== msg.id) };
         case "error": {
