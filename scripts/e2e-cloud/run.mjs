@@ -94,11 +94,12 @@ const target = own.get("target");
 let mode;
 let baseUrl = "";
 if (target === "vm-prod") mode = "vm-prod";
+else if (target === "vm-live") mode = "vm-live";
 else if (/^https?:\/\//.test(target ?? "")) {
     mode = "remote";
     baseUrl = target.replace(/\/$/, "");
 } else if (!own.get("attach")) {
-    console.error('e2e:cloud: --target must be a URL or "vm-prod"');
+    console.error('e2e:cloud: --target must be a URL, "vm-prod" (web) or "vm-live" (desktop console)');
     process.exit(2);
 }
 if (!own.get("cmd") && !pw.some((a) => a.startsWith("--reporter"))) pw.push("--reporter=list,html,json");
@@ -256,12 +257,13 @@ async function launch() {
     // real index is never touched. external/ (vendored model repos) is not needed by apps/web.
     git(["read-tree", "HEAD"]);
     git(["add", "--all", "--", "."]);
-    // Only apps/web + packages/* + scripts are used on the VM. public/samples (932 MB of WAVs, only
+    // Only apps/web (+ apps/live/desktop for --target vm-live) + packages/* + scripts are used on the
+    // VM. public/samples (932 MB of WAVs, only
     // manifest.json is read at build/runtime by the tested routes) and data/{generated,downloads}
     // made the bundle 840 MB → ~2 min of tar + upload per run.
     // (two calls: an :(exclude) pathspec applies to every pattern of the same command)
     // docs/ stays: apps/web prebuild `sync:learn` copies docs/ into the app.
-    git(["rm", "-r", "-f", "--cached", "--quiet", "--ignore-unmatch", "--", "external", "infra", "server", ":(glob)apps/**", ":(exclude,glob)apps/web/**"]);
+    git(["rm", "-r", "-f", "--cached", "--quiet", "--ignore-unmatch", "--", "external", "infra", "server", ":(glob)apps/**", ":(exclude,glob)apps/web/**", ":(exclude,glob)apps/live/desktop/**"]);
     git(["rm", "-r", "-f", "--cached", "--quiet", "--ignore-unmatch", "--", "apps/web/public/samples", "apps/web/data/generated", "apps/web/data/downloads"]);
     const manifest = "apps/web/public/samples/manifest.json";
     if (existsSync(join(ROOT, manifest))) git(["add", "-f", "--", manifest]);

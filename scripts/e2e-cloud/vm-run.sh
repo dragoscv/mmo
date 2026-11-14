@@ -92,7 +92,11 @@ as_runner "cd apps/web && echo \"pnpm \$(pnpm --version) at \$(command -v pnpm),
 as_runner "pnpm config set store-dir /home/runner/.pnpm-store" || true
 # Per-app lockfiles (shared-workspace-lockfile=false): web + every package web consumes via tsconfig paths.
 INST_FAIL=0
-for d in apps/web packages/*; do
+DIRS="apps/web packages/*"
+# The desktop console (--target vm-live) has no workspace deps of its own: it installs and builds
+# standalone, resolving @mmo/ui through the tsconfig/vite alias into packages/ui.
+[ "$MODE" = "vm-live" ] && DIRS="$DIRS apps/live/desktop"
+for d in $DIRS; do
   [ -f "$W/$d/pnpm-lock.yaml" ] || continue
   as_runner "cd $d && pnpm install --frozen-lockfile --prefer-offline --reporter=silent" > "/tmp/install-$(basename "$d").log" 2>&1 &
 done
@@ -137,6 +141,22 @@ if [ "$MODE" = "vm-prod" ]; then
   echo
   # 127.0.0.1, not localhost: playwright.config only spawns `pnpm dev` for http://localhost URLs.
   export PLAYWRIGHT_BASE_URL=http://127.0.0.1:13789
+  phase server
+elif [ "$MODE" = "vm-live" ]; then
+  # The desktop console, built and served as a plain web app: the Tauri-only calls fail (and are
+  # caught), so this renders the shell, the panels and the modes — not the live engine data.
+  as_runner "cd apps/live/desktop && pnpm build" > /tmp/build-live.log 2>&1
+  rc=$?
+  tail -n 12 /tmp/build-live.log
+  [ "$rc" = "0" ] || { echo "✗ desktop build failed ($rc)"; exit 1; }
+  phase build
+  as_runner "cd apps/live/desktop && nohup pnpm exec vite preview --port 13790 --strictPort --host 127.0.0.1 > /tmp/vite-live.log 2>&1 &"
+  ok=0
+  for _ in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:13790/ && ok=1 && break; sleep 2; done
+  [ "$ok" = "1" ] || { echo "✗ vite preview is not serving :13790"; tail -n 40 /tmp/vite-live.log; exit 1; }
+  export LIVE_BASE_URL=http://127.0.0.1:13790
+  # 127.0.0.1, not localhost: playwright.config only spawns `pnpm dev` for http://localhost URLs.
+  export PLAYWRIGHT_BASE_URL=http://127.0.0.1:13790
   phase server
 else
   export PLAYWRIGHT_BASE_URL="$BASE_URL"
