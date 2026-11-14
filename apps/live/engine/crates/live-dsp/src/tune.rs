@@ -712,6 +712,65 @@ mod tests {
         assert_eq!(chain(1.0, 0.0), 256, "formant on, fast off: classic");
     }
 
+    /// What a partial `mix` does on a low note. The dry tap follows the active shifter's declared
+    /// delay (one sample for the fast path, 256 for the classic one), so if a path's output arrives
+    /// at a different phase than that delay implies, half of each should cancel. Measured
+    /// 2026-11-14: with the classic path at 110 Hz `mix` 0.5 comes out at 0.0386 against 0.2828 for
+    /// either side alone — 17 dB down, a setting that nearly mutes a male voice. At 220 Hz and above
+    /// the classic path does not do this and neither does the fast path anywhere, so the test pins
+    /// the fast path at every pitch and the low-pitch classic numbers as measured.
+    #[test]
+    fn a_partial_mix_does_not_cancel() {
+        let level = |f0: f32, mode: f32, mix: f32| {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(2, 0.0);
+            t.set_param(3, 0.5);
+            t.set_param(6, mix); // mix
+            t.set_param(7, 0.25);
+            t.set_param(9, mode);
+            let long = sine(f0, 48000.0, 3 * 48000, 0.4);
+            let mut out = Vec::with_capacity(long.len());
+            for chunk in long.chunks(480) {
+                let (mut l, mut r) = (chunk.to_vec(), chunk.to_vec());
+                t.process(&mut l, &mut r);
+                out.extend_from_slice(&l);
+            }
+            rms(&out[48000..])
+        };
+        let mut cancelled: Vec<(f32, &str, f32)> = Vec::new();
+        for f0 in [110.0f32, 220.0, 440.0] {
+            for (name, mode) in [("classic", 0.0f32), ("fast", 2.0)] {
+                let (dry, half, wet) = (
+                    level(f0, mode, 0.0),
+                    level(f0, mode, 0.5),
+                    level(f0, mode, 1.0),
+                );
+                println!(
+                    "{f0:.0} Hz {name}: mix 0 {dry:.4}, mix 0.5 {half:.4}, mix 1 {wet:.4} ({:.1} dB)",
+                    20.0 * (half / dry.min(wet)).log10()
+                );
+                if half < 0.5 * dry.min(wet) {
+                    cancelled.push((f0, name, half));
+                }
+            }
+        }
+        // The fast path is the one that could be asked to take over low notes, so it must be clean
+        // everywhere; the classic path's low-pitch cancellation is recorded, not asserted away.
+        assert!(
+            !cancelled.iter().any(|(_, name, _)| *name == "fast"),
+            "the period-synchronous path cancels at a partial mix: {cancelled:?}"
+        );
+        assert!(
+            cancelled.len() <= 1,
+            "a partial mix now cancels in more cases than the recorded 110 Hz classic one: {cancelled:?}"
+        );
+        if cancelled.is_empty() {
+            println!(
+                "the classic path no longer cancels at a partial mix: the recorded defect is gone"
+            );
+        }
+    }
+
     /// The other half of the threshold at ~187.5 Hz: what each path costs in delay on a low note.
     /// Measured in the steady state, because the attack of a note is not representative — the
     /// period-synchronous path falls back to its one-sample delay until the detector has a period,

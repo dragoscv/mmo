@@ -48,6 +48,19 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — a half mix nearly mutes a low voice (2026-11-14)
+
+Measuring whether the period-synchronous path could take over low notes turned up a defect that has nothing to
+do with the choice: on the classic shifter, at 110 Hz, a `mix` of 0.5 comes out **17.3 dB below** either side
+alone (0.0386 against 0.2828 RMS on a 110 Hz tone with a +25 cent transpose). The dry tap sits at the classic
+path's fixed 256 samples while a grain restart at that pitch anchors the wet path near antiphase, so the two
+nearly cancel. Above 187.5 Hz the same measurement lands at −2.9…−3.2 dB, which is simply what mixing two sines
+costs, and the period-synchronous path is at −3.1 dB at 110 Hz too. For a singer with a low voice that means a
+half mix is close to silence today; `fast` set to `on` avoids it, and `tune::tests::a_partial_mix_does_not_cancel`
+pins the fast path as clean at every pitch while recording the classic case. The fix on the classic path is a dry
+tap that follows a grain anchored at the current pitch instead of a fixed delay — a design change, not a tweak,
+so it is now a measured, documented defect rather than an unexplained sound.
+
 ## MixAI Live — what the fast pitch mode is worth at 110 Hz, and a setting that was ignored (2026-11-14)
 
 The `fast` choice shipped with a line at ~187.5 Hz: below it `auto` keeps the classic granular shifter, above

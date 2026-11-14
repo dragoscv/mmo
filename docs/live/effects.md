@@ -183,11 +183,21 @@ every 128 samples (2.7 ms at 48 kHz).
   (+4.8 ms, `tune::tests::the_fast_path_costs_delay_on_a_low_note`), which is why `auto` keeps the classic one
   on low notes. Setting `fast` to `on` trades that delay for the correction. Neither path has been measured on
   a real voice below 187.5 Hz.
+  **A partial `mix` nearly mutes a low note on the classic path.** Measured 2026-11-14 on a 110 Hz tone with a
+  +25 cent transpose: `mix` 0.5 comes out 17.3 dB below either side alone (0.0386 against 0.2828 RMS), because
+  the dry tap sits at the classic path's fixed 256 samples while a grain restart at that pitch anchors the wet
+  path near antiphase. At 220 and 440 Hz the same measurement lands at −2.9…−3.2 dB, which is what mixing two
+  sines costs, and the period-synchronous path is at −3.1 dB at 110 Hz as well
+  (`tune::tests::a_partial_mix_does_not_cancel`). So on a male voice a half mix is not a half mix: it is close
+  to silence, and `fast = on` avoids it entirely.
 - `retune` is the glide time to the target: ~0.5 ms is the hard "robot" effect, 40–100 ms sounds natural.
 - `humanize` leaves small deviations alone: deviations under `30 × humanize` cents are not corrected and
   correction fades in smoothly over the next 30 cents (vibrato and scoops survive). `sticky` (cents) keeps the
   previous target note unless the new nearest note is closer by more than this, so vibrato does not flip notes.
-- `amount` scales the correction, `mix` blends with the dry signal, `transpose` shifts the target.
+- `amount` scales the correction, `mix` blends with the dry signal, `transpose` shifts the target. On the
+  classic shifter a partial `mix` cancels badly below 187.5 Hz (17 dB at 110 Hz, see the shifter notes above):
+  the dry tap cannot follow a grain that is anchored near antiphase at that pitch. `fast` on/auto is the way
+  around it today.
 - After 200 ms of unvoiced input the target resets (no stuck notes between phrases).
 - A song's `key` (setlist) is applied to `key`/`scale` on recall ([presets](presets.md#key-strings)).
 - Publishes `TuneStatus` (input pitch, target MIDI note, correction in cents) for the tuner display.
