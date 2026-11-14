@@ -5,7 +5,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, UdpSocket};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -23,6 +23,10 @@ use crate::token::{ct_eq, new_token};
 
 pub const DEFAULT_PORT: u16 = 17920;
 pub const MAX_CLIENTS: usize = 32;
+/// Raw TCP connections (HTTP + WebSocket) open at once, counted in `accept_loop` before a thread is
+/// spawned: `MAX_CLIENTS` is only checked after the upgrade, so without this a flood of half-open
+/// connections would spawn a thread each.
+pub const MAX_CONNS: usize = 64;
 pub const MAX_PENDING: usize = 512;
 pub const MAX_MSGS_PER_SEC: u32 = 200;
 pub const MAX_MESSAGE: usize = 16 * 1024;
@@ -114,6 +118,8 @@ pub(crate) struct Inner {
     started: Instant,
     /// Set once when the OSC socket is bound.
     osc_port: OnceLock<u16>,
+    /// Open raw TCP connections, guarded by `ConnGuard`.
+    conns: AtomicUsize,
 }
 
 impl Inner {
@@ -219,6 +225,7 @@ impl RemoteServer {
             next_conn: AtomicU64::new(1),
             started: Instant::now(),
             osc_port: OnceLock::new(),
+            conns: AtomicUsize::new(0),
         });
         let mut threads = Vec::new();
         let i2 = inner.clone();
@@ -408,15 +415,32 @@ fn accept_loop(listener: TcpListener, inner: Arc<Inner>) {
     while !inner.stopped() {
         match listener.accept() {
             Ok((stream, peer)) => {
+                // Cap before spawning a thread: the WebSocket cap is checked only after the
+                // upgrade, so a flood of raw connections would otherwise spawn a thread each.
+                if inner.conns.load(Ordering::SeqCst) >= MAX_CONNS {
+                    drop(stream);
+                    continue;
+                }
+                inner.conns.fetch_add(1, Ordering::SeqCst);
                 let i2 = inner.clone();
                 let _ = std::thread::Builder::new()
                     .name("live-remote-conn".into())
                     .spawn(move || {
+                        let _guard = ConnGuard(i2.clone());
                         let _ = handle(stream, peer, i2);
                     });
             }
             Err(_) => std::thread::sleep(POLL),
         }
+    }
+}
+
+/// Keeps the open-connection count honest even when `handle` returns early with an error.
+struct ConnGuard(Arc<Inner>);
+
+impl Drop for ConnGuard {
+    fn drop(&mut self) {
+        self.0.conns.fetch_sub(1, Ordering::SeqCst);
     }
 }
 

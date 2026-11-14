@@ -3,8 +3,14 @@
 
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::time::{Duration, Instant};
 
 pub const MAX_HEAD: usize = 8 * 1024;
+
+/// How long a client has to send a complete request head. The socket's per-read timeout alone is
+/// not a bound: a client sending one byte just before each timeout would otherwise hold a
+/// connection (and its thread) open indefinitely.
+pub const HEAD_DEADLINE: Duration = Duration::from_secs(5);
 
 pub const PAGE_REMOTE: &str = include_str!("../assets/remote.html");
 /// Byte copy of `packages/design-tokens/dist/tokens.plain.css` (drift-tested in `tests/assets.rs`).
@@ -58,9 +64,21 @@ pub fn parse_head(buf: &[u8]) -> Result<Head, String> {
 }
 
 pub fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
+    read_head_within(stream, HEAD_DEADLINE)
+}
+
+/// [`read_head`] with an explicit deadline (tests use a short one).
+pub fn read_head_within(stream: &mut TcpStream, deadline: Duration) -> io::Result<Vec<u8>> {
+    let started = Instant::now();
     let mut buf = Vec::with_capacity(1024);
     let mut chunk = [0u8; 1024];
     loop {
+        if started.elapsed() > deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "request head took too long",
+            ));
+        }
         let n = stream.read(&mut chunk)?;
         if n == 0 {
             return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "closed"));
@@ -169,5 +187,41 @@ mod tests {
         .unwrap();
         assert!(!same_origin(&evil));
         assert!(static_route("/etc/passwd").is_none());
+    }
+
+    /// A client that dribbles its request head one byte at a time passes every per-read timeout,
+    /// so only a total deadline stops it. Without one, a single client could hold a connection
+    /// (and its thread) for as long as it wanted.
+    #[test]
+    fn a_dribbled_head_is_cut_at_the_deadline() {
+        use std::net::{TcpListener, TcpStream};
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut client = TcpStream::connect(addr).unwrap();
+        let (mut server, _) = listener.accept().unwrap();
+        server
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
+
+        // One byte every 20 ms: every read succeeds, so only the total deadline can stop the loop.
+        let writer = std::thread::spawn(move || {
+            for _ in 0..60 {
+                if client.write_all(b"X").is_err() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        });
+        let t0 = Instant::now();
+        let err = read_head_within(&mut server, Duration::from_millis(300)).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::TimedOut, "got {err}");
+        assert!(
+            t0.elapsed() < Duration::from_secs(2),
+            "it must fail at the deadline, took {:?}",
+            t0.elapsed()
+        );
+        drop(server);
+        let _ = writer.join();
     }
 }

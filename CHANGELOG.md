@@ -38,6 +38,18 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the control server stops being cheap to abuse (WP21-19 part 4, 2026-11-14)
+
+Two ways to hold the engine's control server open without ever asking it for anything are closed. **64 raw
+connections** are now the cap, counted in the accept loop *before* a thread is spawned — the 32-client limit was
+checked only after the WebSocket upgrade, so a flood of half-open connections spawned a thread each. And a
+**complete request head must arrive within 5 s**: the per-read socket timeout alone let a client that dribbled one
+byte just before each timeout hold a connection, and its thread, indefinitely.
+
+Both are proven: the leak test opens the cap plus twenty more connections and insists the server still answers
+(a leaking counter would refuse everyone forever), and the slow-head test dribbles a byte every 20 ms and is cut
+at the deadline rather than at each read. Engine workspace green: 217 tests, clippy `-D warnings` clean.
+
 ## MixAI Live — measuring no longer stops the show, and controls stop lying offline (WP21-19 part 3, 2026-11-14)
 
 "Measure latency" used to stop the running engine to take the device, and nothing started it again: the app was

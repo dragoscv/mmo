@@ -33,6 +33,10 @@ time, rotatable. Roles:
 Limits: 32 clients, 16 KiB per message, 200 messages/s per client (excess dropped with an `error`), cross-origin
 WebSocket upgrades refused unless the `Origin` matches the engine host.
 
+At most **64 raw connections** are open at once (counted before a thread is spawned, so a flood of half-open
+connections cannot exhaust the machine), and a complete request head must arrive within **5 s** of connecting —
+a client that dribbles it a byte at a time is cut at the deadline, not merely at each read.
+
 `panic` is exempt from that per-second cap (and is never evicted from the queue when a client floods the
 server), so a flood cannot take the panic button away; the OSC path exempts it the same way.
 

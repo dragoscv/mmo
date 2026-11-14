@@ -422,3 +422,38 @@ fn a_flood_does_not_eat_the_panic() {
     assert!(panic_acked, "the panic must get through the flood");
     assert!(session.mix.panic, "the panic is latched in the state");
 }
+
+/// Raw connections are capped before a thread is spawned, so the count must not leak: after far
+/// more short-lived connections than the cap, the server must still answer.
+#[test]
+fn many_short_connections_do_not_exhaust_the_cap() {
+    use std::io::{Read as _, Write as _};
+
+    let s = server();
+    for _ in 0..(live_remote::server::MAX_CONNS + 20) {
+        let t = TcpStream::connect(("127.0.0.1", s.port())).unwrap();
+        drop(t);
+    }
+    let mut ok = false;
+    for _ in 0..40 {
+        let Ok(mut t) = TcpStream::connect(("127.0.0.1", s.port())) else {
+            std::thread::sleep(Duration::from_millis(50));
+            continue;
+        };
+        t.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        if write!(t, "GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").is_err() {
+            continue;
+        }
+        let mut body = String::new();
+        let _ = t.read_to_string(&mut body);
+        if body.starts_with("HTTP/1.1 200") {
+            ok = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(
+        ok,
+        "the connection cap leaked and the server stopped answering"
+    );
+}
