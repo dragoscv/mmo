@@ -24,6 +24,17 @@ describe("shortcuts", () => {
         expect(shortcutFor({ key: " ", repeat: true }, page)).toBeNull();
     });
 
+    it("opens the latency budget with L, but never while typing", () => {
+        const page = { tag: "div", role: null, editable: false };
+        expect(shortcutFor({ key: "l" }, page)).toBe("latency");
+        expect(shortcutFor({ key: "L" }, page)).toBe("latency");
+        // A text field owns it, and so does a modifier combination.
+        expect(shortcutFor({ key: "l" }, { tag: "input", role: null, editable: false })).toBeNull();
+        expect(shortcutFor({ key: "l" }, { tag: "div", role: null, editable: true })).toBeNull();
+        expect(shortcutFor({ key: "l", ctrlKey: true }, page)).toBeNull();
+        expect(shortcutFor({ key: "l", repeat: true }, page)).toBeNull();
+    });
+
     it("toggles from the current mix", () => {
         const mix = {
             input_db: 0,

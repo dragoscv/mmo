@@ -62,6 +62,12 @@
         "budgetDeclaredEars": "Declared for the ears",
         "budgetMeasured": "Measured round trip",
         "budgetRest": "Driver, OS and routing",
+        "latencyOverlay": {
+            "title": "Latency budget",
+            "close": "Close the latency budget",
+            "noMeasurement": "Not measured yet: run the probe in Setup and this line appears.",
+            "hint": "Key L opens this. Declared is what the engine controls; the measured round trip comes back through the loopback, and the difference is the driver, the OS and the routing."
+        },
         "start": "Start",
         "starting": "Starting the engine…",
         "cancel": "Cancel"

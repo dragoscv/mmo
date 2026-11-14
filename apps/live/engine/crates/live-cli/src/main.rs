@@ -21,6 +21,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 mod midi_in;
+mod routes;
 
 #[derive(Parser)]
 #[command(
@@ -69,6 +70,11 @@ enum Cmd {
         device: String,
         #[arg(long, default_value_t = 48_000)]
         rate: u32,
+    },
+    /// Compare the routes this machine offers on what each DECLARES (no loopback needed).
+    Routes {
+        #[command(flatten)]
+        dev: DevArgs,
     },
     /// Process live until Ctrl+C (or --seconds), printing meters every second.
     Run {
@@ -247,6 +253,16 @@ fn run(cli: Cli) -> Result<(), String> {
         Cmd::Periods { device, rate } => {
             let p = io::device_periods(&device, rate).map_err(|e| e.to_string())?;
             println!("{}", serde_json::to_string_pretty(&p).unwrap_or_default());
+        }
+        Cmd::Routes { dev } => {
+            let cfg = io_config(&dev)?;
+            let routes = routes::collect(&cfg);
+            let out = serde_json::json!({
+                "requested": { "rate": cfg.sample_rate, "buffer_frames": cfg.buffer_frames },
+                "routes": routes.iter().map(routes::Route::to_json).collect::<Vec<_>>(),
+                "measured": "none: a round trip needs a loopback, run `latency` for that",
+            });
+            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
         }
         Cmd::Presets => {
             println!(

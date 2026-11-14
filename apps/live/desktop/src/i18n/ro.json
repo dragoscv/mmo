@@ -62,6 +62,12 @@
         "budgetDeclaredEars": "Declarat pentru urechi",
         "budgetMeasured": "Dus-întors măsurat",
         "budgetRest": "Driver, sistem și rutare",
+        "latencyOverlay": {
+            "title": "Buget de latență",
+            "close": "Închide bugetul de latență",
+            "noMeasurement": "Încă nemăsurat: rulează proba din Configurare și linia apare aici.",
+            "hint": "Tasta L deschide panoul. „Declarat\" e ce controlează motorul; dus-întorsul măsurat vine prin buclă, iar diferența este driverul, sistemul și rutarea."
+        },
         "start": "Pornește",
         "starting": "Pornesc motorul…",
         "cancel": "Anulează"

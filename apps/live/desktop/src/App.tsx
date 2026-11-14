@@ -5,6 +5,7 @@ import { useThemePrefs } from "@mmo/ui/theme";
 import { Chain } from "./components/Chain";
 import { Header } from "./components/Header";
 import { InsertDetail } from "./components/InsertDetail";
+import { LatencyOverlay } from "./components/LatencyOverlay";
 import { LevelMeters } from "./components/Meters";
 import { MixStrip } from "./components/MixStrip";
 import { Notices } from "./components/Notices";
@@ -27,8 +28,10 @@ function useShortcuts() {
             const action = shortcutFor(e, targetInfo(document.activeElement));
             if (!action) return;
             if (action === "escape") {
-                // Dialogs handle Esc themselves; on the main screen it closes the detail panel.
-                if (!s.panel && s.selectedInsert != null) s.selectInsert(null);
+                // Dialogs handle Esc themselves; on the main screen it closes the budget peek
+                // first, then the detail panel.
+                if (!s.panel && s.latencyOverlay) s.toggleLatencyOverlay(false);
+                else if (!s.panel && s.selectedInsert != null) s.selectInsert(null);
                 return;
             }
             if (s.panel) return;
@@ -37,6 +40,7 @@ function useShortcuts() {
             else if (action === "prev") s.send({ type: "prev" });
             else if (action === "next") s.send({ type: "next" });
             else if (action === "tap") s.send({ type: "tap_tempo" });
+            else if (action === "latency") s.toggleLatencyOverlay();
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
@@ -47,6 +51,7 @@ export function App() {
     const init = useStore((s) => s.init);
     const loaded = useStore((s) => s.settingsLoaded);
     const panel = useStore((s) => s.panel);
+    const latencyOverlay = useStore((s) => s.latencyOverlay);
     const { prefs } = useThemePrefs();
     const osReduced = useReducedMotion();
     const reduced = prefs.motion === "reduced" || !!osReduced;
@@ -61,6 +66,7 @@ export function App() {
         <MotionConfig reducedMotion={reduced ? "always" : "never"}>
             <LayoutGroup>
                 <div className="grid h-full grid-cols-[minmax(0,1fr)_20rem] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3 p-3">
+                    {latencyOverlay ? <LatencyOverlay /> : null}
                     <div className="col-span-2">
                         <Header />
                     </div>

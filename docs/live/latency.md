@@ -94,6 +94,25 @@ controller sends `latency_probe` and reads `meters.latency_probe` (`{"done_ms": 
 A `--buffer` below the device minimum is raised to it; `info.notes` says which period and sample format the
 driver really runs.
 
+### Choosing a route: `routes`
+
+`mixai-live-engine routes [device options]` compares the routes on what each one **declares**, which needs no
+cable and no measurement: every figure is either read from a driver (the endpoint's period limits) or from a
+setting (the buffer, Voicemeeter's own buffer sizes), and each row says which of the two it is (`source`:
+`device`, `voicemeeter`, `assumed`). Run on the reference rig on 2026-11-14, `--buffer 128`:
+
+| Route | Declared | Where the figure comes from |
+|---|---:|---|
+| WASAPI Exclusive | 9.00 ms | the device's own minimum: 128 was asked, the driver runs 144 × 3 |
+| WASAPI (shared) | 30.00 ms | the Windows mixer's default period (480 × 3); the mixer adds buffering this does not count |
+| Voicemeeter Insert | 10.67 ms | Voicemeeter's buffer twice (256 input + 256 A1), nothing queued between streams |
+| ASIO | 8.00 ms | the request (128 × 3): an ASIO driver's real buffer is not readable without opening it |
+
+Read it as a chooser, not as the answer: the *measured* figure for a route comes from `latency` through a real
+loopback, and only that one is the truth about it. On the run above the exclusive route is the cheapest
+declared path, and the insert route costs more than ASIO only because Voicemeeter runs at 256 frames; a smaller
+Voicemeeter buffer (`voicemeeter --save --buffer wdm=160`) moves that row down.
+
 - **ASIO build**: `cargo build --release --manifest-path apps/live/engine/Cargo.toml -p live-cli --features asio`.
   cpal's ASIO backend needs the Steinberg ASIO SDK (see cpal's ASIO setup notes: `CPAL_ASIO_DIR`, LLVM/clang
   for bindgen). **Licence**: the ASIO SDK is dual GPLv3 / proprietary Steinberg licence, which is why it is an

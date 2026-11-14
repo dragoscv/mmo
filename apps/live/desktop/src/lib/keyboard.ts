@@ -1,10 +1,11 @@
 /**
- * Global shortcuts: Space = bypass, M = mute, ←/→ = prev/next part, T = tap, Esc = close panels.
- * Ignored while typing or while a focused control (slider, select, button) owns the key.
+ * Global shortcuts: Space = bypass, M = mute, ←/→ = prev/next part, T = tap, L = latency budget,
+ * Esc = close panels. Ignored while typing or while a focused control (slider, select, button) owns
+ * the key.
  */
 import type { MixState } from "./protocol";
 
-export type ShortcutAction = "bypass" | "mute" | "prev" | "next" | "tap" | "escape";
+export type ShortcutAction = "bypass" | "mute" | "prev" | "next" | "tap" | "latency" | "escape";
 
 export interface KeyLike {
     key: string;
@@ -42,6 +43,7 @@ export function shortcutFor(e: KeyLike, target: TargetInfo | null): ShortcutActi
     const k = e.key.toLowerCase();
     if (k === "m") return "mute";
     if (k === "t") return "tap";
+    if (k === "l") return "latency";
     return null;
 }
 

@@ -30,6 +30,11 @@ interface Store {
     panel: Panel;
     selectedInsert: number | null;
     notices: Notice[];
+    /** The latency budget panel is open (key `L`). It is a peek, not a mode: nothing is paused. */
+    latencyOverlay: boolean;
+    /** The last round trip the probe measured, or null. Kept here so the budget can be read after
+     *  the setup wizard is closed (the wizard itself keeps no state between opens). */
+    measuredRoundTripMs: number | null;
 
     init(): Promise<void>;
     startEngine(config: EngineConfig): Promise<boolean>;
@@ -39,6 +44,8 @@ interface Store {
     /** Like `send`, but coalesces rapid updates with the same key (knob drags) to one per frame. */
     sendCoalesced(key: string, msg: ClientMsg): void;
     openPanel(p: Panel): void;
+    toggleLatencyOverlay(open?: boolean): void;
+    setMeasuredRoundTrip(ms: number | null): void;
     selectInsert(id: number | null): void;
     notify(kind: Notice["kind"], key: string, vars?: Notice["vars"]): void;
     dismiss(id: number): void;
@@ -109,6 +116,8 @@ export const useStore = create<Store>((set, get) => {
         panel: null,
         selectedInsert: null,
         notices: [],
+        latencyOverlay: false,
+        measuredRoundTripMs: null,
 
         async init() {
             if (!isTauri()) {
@@ -187,7 +196,14 @@ export const useStore = create<Store>((set, get) => {
         },
 
         openPanel(panel) {
-            set({ panel });
+            // Opening a dialog closes the budget peek: nothing may sit on top of a modal.
+            set({ panel, latencyOverlay: false });
+        },
+        toggleLatencyOverlay(open) {
+            set((s) => ({ latencyOverlay: open ?? !s.latencyOverlay }));
+        },
+        setMeasuredRoundTrip(measuredRoundTripMs) {
+            set({ measuredRoundTripMs });
         },
 
         selectInsert(selectedInsert) {

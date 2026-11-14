@@ -127,6 +127,7 @@ export function SetupWizard() {
     const settings = useStore((s) => s.settings);
     const status = useStore((s) => s.status);
     const engine = useStore((s) => s.start);
+    const setMeasuredRoundTrip = useStore((s) => s.setMeasuredRoundTrip);
     const meters = useMeterSample(4);
     const startEngine = useStore((s) => s.startEngine);
     const currentPreset = useStore((s) => s.proto.state?.preset);
@@ -235,7 +236,10 @@ export function SetupWizard() {
         setError(null);
         setLatency(null);
         try {
-            setLatency(await api.measureLatency(c));
+            const result = await api.measureLatency(c);
+            setLatency(result);
+            // The overlay on the performance screen reads the same figure.
+            setMeasuredRoundTrip(result.round_trip_ms);
         } catch (e) {
             setError(t("errors.latency", { message: e instanceof Error ? e.message : String(e) }));
         } finally {

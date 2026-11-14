@@ -20,6 +20,7 @@ Build features (forwarded to cpal): `asio` (Windows ASIO, needs the Steinberg SD
 | [`run`](#run) | Process live until Ctrl+C (or `--seconds`), printing meters every second |
 | [`latency`](#latency) | Measure the real round trip with a click train (needs a loopback) |
 | [`checkup`](#checkup) | Read-only: what outside the engine adds delay or breaks low buffers, as JSON |
+| [`routes`](#routes) | Compare the routes on what each DECLARES (no loopback needed), as JSON |
 | [`voicemeeter`](#voicemeeter) | What the local Voicemeeter runs; `--save` / `--buffer` / `--load` change it |
 | [`render`](#render) | Process a WAV file offline through a preset |
 | [`serve`](#serve) | Run the engine with the control server (desktop UI, web remote, phones) |
@@ -151,6 +152,28 @@ Windows only, read-only: what outside the engine adds delay or breaks small buff
 this system); `value` is the machine-readable reading per id and `detail` the sentence shown to a person.
 `voicemeeter_owns_device` is the one finding that is not a Windows setting: an interface held by Voicemeeter
 cannot be opened exclusively by the engine.
+
+## routes
+
+```text
+mixai-live-engine routes [device options]
+```
+
+The routes this machine offers, compared on what each one **declares** — no cable, no measurement. Each row
+carries where its figure comes from (`source`: `device` = read from the driver's period limits, `voicemeeter` =
+read from Voicemeeter's configuration, `assumed` = the request, because the driver's real buffer cannot be read
+without opening it), its three buffer terms and their sum, and the endpoint's period limits when they were read.
+`measured_ms` is always null: a measured round trip comes from [`latency`](#latency) through a real loopback.
+
+```json
+{ "requested": { "rate": 48000, "buffer_frames": 128 },
+  "routes": [ { "host": "WASAPI Exclusive", "terms": { "input_period_frames": 144, "cushion_frames": 144,
+                 "output_period_frames": 144, "declared_ms": 9.0 }, "source": "device",
+                 "note": "the device's minimum is 144 frames, so a request of 128 runs at 144" } ],
+  "measured": "none: a round trip needs a loopback, run `latency` for that" }
+```
+
+See [latency.md](latency.md#choosing-a-route-routes) for the full table on the reference rig and how to read it.
 
 ## voicemeeter
 

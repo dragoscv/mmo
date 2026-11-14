@@ -48,6 +48,23 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — the latency budget on the performance screen, and a route comparison (2026-11-14)
+
+The budget is no longer one dialog deep. **Key `L`** opens it over the performance screen: each stage the engine
+controls (input period, the frames queued between input and output, output period, the effect chain for the
+audience and for the ears) beside the round trip the probe measured, with the difference named *driver, OS and
+routing*. It pauses nothing, Escape closes it, it closes itself when a dialog opens, and the probe result
+survives the setup wizard — the first piece of the fixed safety bar the Stage Console direction calls for.
+
+`mixai-live-engine routes` answers the other half of "which route should I use" without any cable: it lists every
+route this machine offers with **what each one declares** and where each figure comes from (`device` = read from
+the driver's period limits, `voicemeeter` = read from Voicemeeter's configuration, `assumed` = the request,
+because an ASIO driver's real buffer is not readable without opening it). On the reference rig with
+`--buffer 128`: Exclusive **9.00 ms** (the driver's own 144-frame minimum), shared **30.00 ms** (the mixer's
+480-frame period), Voicemeeter Insert **10.67 ms** (256 in + 256 out of Voicemeeter's own buffer), ASIO
+**8.00 ms** (assumed). A measured figure never appears in that table: a round trip needs the loopback and comes
+from `latency`.
+
 ## MixAI Live — a pedal and the phone remote can use the monitor option (2026-11-13)
 
 The "tuned only for the audience" option is now reachable from every control surface, not just the protocol:
