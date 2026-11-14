@@ -2167,4 +2167,74 @@ mod tests {
             );
         }
     }
+
+    /// A measurement, not a check: what the period-synchronous voice paths cost, as the time
+    /// `render` takes for 10 s of audio. Each A/B switches one parameter: the autotune's `fast`
+    /// between the classic path (0) and the period-synchronous one (2), and the harmonizer's
+    /// `formant` between its period-synchronous voices (0) and its classic ones (1 — that side also
+    /// pays for the LPC colouring, so it bounds the change from above rather than isolating it).
+    /// Run it optimised:
+    /// `cargo test --release -p live-engine --lib voice_path_cpu_cost -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "measurement: prints render times for the classic and period-synchronous voice paths"]
+    fn voice_path_cpu_cost() {
+        let input = voice(10 * 48000);
+        let (mut ml, mut mr, mut ol, mut or) = (
+            vec![0.0; 128],
+            vec![0.0; 128],
+            vec![0.0; 128],
+            vec![0.0; 128],
+        );
+        // preset, effect, parameter index (spec order), value for the classic side, value for the
+        // period-synchronous side.
+        let cases: [(&str, &str, usize, f32, f32); 2] = [
+            ("Pop Polish", "autotune", 9, 0.0, 2.0),
+            ("Harmony Stack", "harmonizer", 4, 0.0, 1.0),
+        ];
+        for (name, fx, index, a, b) in cases {
+            let chain = preset(name).build(48000.0, 128, 1).unwrap().chain;
+            let id = chain
+                .inserts
+                .iter()
+                .find(|i| i.kind.id() == fx)
+                .unwrap_or_else(|| panic!("{name} has no {fx}"))
+                .id;
+            let mut time = |value: f32| {
+                let mut core = core_with(name, false);
+                core.apply(
+                    Command::SetParam {
+                        insert: id,
+                        index,
+                        value,
+                    },
+                    &mut |_g| {},
+                );
+                let t0 = std::time::Instant::now();
+                for blk in input.chunks(128) {
+                    core.render(
+                        blk,
+                        blk,
+                        Buses {
+                            main_l: &mut ml,
+                            main_r: &mut mr,
+                            mon_l: &mut ol,
+                            mon_r: &mut or,
+                        },
+                    );
+                }
+                t0.elapsed().as_secs_f64() * 1000.0
+            };
+            // Best of five, alternating, so a busy machine skews both sides the same way.
+            let (mut classic, mut synchronous) = (f64::INFINITY, f64::INFINITY);
+            for _ in 0..5 {
+                classic = classic.min(time(a));
+                synchronous = synchronous.min(time(b));
+            }
+            println!(
+                "{name} ({fx}, param {index}): render of 10 s of audio in 128-frame blocks: \
+                 {a} {classic:.1} ms, {b} {synchronous:.1} ms ({:+.0} %)",
+                (synchronous / classic - 1.0) * 100.0
+            );
+        }
+    }
 }

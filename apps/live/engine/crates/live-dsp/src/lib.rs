@@ -31,7 +31,8 @@ pub use pitch::{PitchInfo, Scale};
 pub use processor::Processor;
 pub use tune::{Autotune, Harmonizer, TuneStatus, Tuner};
 
-#[cfg(test)]
+// See live-engine's `lib.rs`: the type is debug-only (`assert_no_alloc`'s default feature set).
+#[cfg(all(test, debug_assertions))]
 #[global_allocator]
 static ALLOC: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
 

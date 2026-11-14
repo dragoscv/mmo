@@ -127,6 +127,16 @@ flowchart LR
   the option off, 5.6 % with it on** — one more chain costs about 0.03 s of CPU per 10 s of audio. The
   simulated device processes silence, so both figures are a floor and the difference is a lower bound; a voice
   makes both chains do more work per sample.
+- **The voice paths, measured on 2026-11-14** (release test build, in-process render of 10 s of audio in
+  128-frame blocks, best of five alternating runs, so the reading does not depend on what else the machine is
+  doing; `cargo test --release -p live-engine --lib voice_path_cpu_cost -- --ignored --nocapture`):
+  `Pop Polish` (an autotune) renders in **804.1 ms** with the classic path and **864.6 ms** with the
+  period-synchronous one (**+8 %**, ~0.6 % of real time per voice — and that side pays for both paths, because
+  the switch keeps the outgoing one running through the 10 ms crossfade). `Harmony Stack` (an autotune and a
+  four-voice harmonizer) renders in **2583.2 ms** with the period-synchronous voices against **2549.0 ms** with
+  the classic ones plus the LPC colouring that comes with `formant` on (**−1 %**, i.e. the new path costs about
+  what the colouring it displaces costs). Neither figure is a regression to worry about on stage; the numbers
+  are printed by that ignored measurement, which is the one to re-run after touching a shifter.
 - `bypass` blends every bus to the dry input (instant safe mode); `mute` silences every bus; both ramp 10 ms.
 - The **safety limiter** is the last stage of each bus and is not an insert: nothing can remove or disable it,
   and bypass, the dry monitor blend and the latency click go through it. Zero latency, stereo-linked, instant

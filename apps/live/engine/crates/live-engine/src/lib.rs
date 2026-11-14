@@ -23,6 +23,10 @@ pub use preset::{Preset, Setlist, Song, SongPart, factory};
 pub use session::{Session, SessionError, SessionState};
 pub use store::Store;
 
-#[cfg(test)]
+// `assert_no_alloc::AllocDisabler` exists in debug builds only (its default `warn_debug` feature
+// gates it on `debug_assertions`), so the allocator is declared exactly where it exists: without the
+// `debug_assertions` term `cargo test --release` does not compile on Windows, which is the profile
+// the two ignored measurements (`untuned_cpu_cost`, `voice_path_cpu_cost`) ask for.
+#[cfg(all(test, debug_assertions))]
 #[global_allocator]
 static ALLOC: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;

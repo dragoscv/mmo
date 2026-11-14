@@ -48,6 +48,25 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — what the new voice path costs, and a measurement run that could not compile (2026-11-14)
+
+Adding a second path to a hot audio loop deserves a number, so it got one: an in-process render of 10 s of
+audio in 128-frame blocks, release build, best of five alternating runs, printed by an ignored measurement
+(`voice_path_cpu_cost`). `Pop Polish` (an autotune) renders in **804.1 ms** with the classic path and
+**864.6 ms** with the period-synchronous one (**+8 %**, about 0.6 % of real time per voice — that side pays for
+both shifters, because the switch keeps the outgoing one running through the crossfade). `Harmony Stack` (an
+autotune and a four-voice harmonizer) renders in **2583.2 ms** with the period-synchronous voices against
+**2549.0 ms** with the classic ones plus the LPC colouring `formant` brings (**−1 %**): the new voices cost about
+what the colouring they displace costs, so the harmony change is not a CPU regression.
+
+Getting that number exposed a defect in the test setup itself: the engine and DSP crates declare
+`assert_no_alloc`'s global allocator under `#[cfg(test)]`, but that type exists in **debug builds only** (its
+default `warn_debug` feature gates it on `debug_assertions`), so `cargo test --release` — the exact command the
+two ignored measurements in the code tell you to run — did not compile on Windows. The allocator is now declared
+under `#[cfg(all(test, debug_assertions))]`, which is where the type exists and what the crate's own design
+intends (in release the checks are inert); both measurements run, and the debug suite still has the no-allocation
+assertions.
+
 ## MixAI Live — the harmony voices stop being rough on low notes (2026-11-14)
 
 Measuring the harmonizer the way the autotune was measured turned up a worse version of the same defect. One
