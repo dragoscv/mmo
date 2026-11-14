@@ -48,6 +48,24 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — the ASIO licence, read from the source (WP21-27, 2026-11-14)
+
+The ASIO tier has been buildable locally for a day; until now what it obliges was known only from Steinberg's
+public FAQ, and the agreement itself had not been read. It ships inside the SDK package, and reading it changed
+three things. First, the licensee is a **Company or Organization** with a separate technical contact — the form
+has no line for a private person, whatever the FAQ suggests — so the name that signs is a decision, not a
+formality. Second, the terms are better than assumed in one respect (royalty-free, unlimited term, no notary)
+and stricter in another: the licence is effective only on **both** signatures, a preview or beta SDK may not be
+published at all, and the logo may be used under the licence rather than before it. Third, the obligations name
+the logo (or, where space forbids, the attribution text) on every product website page, in all documentation, on
+the imprint, and in **the dialog that enables ASIO** — manual activation means the configuring dialog is the
+surface, not a splash screen, which in this app is the host picker of the setup step. Two attribution strings
+exist and they are not identical (the agreement's and the guidelines'), so the longer one plus the registered
+sign satisfies both. Both documents, the field list as the form words it, the surface-by-surface landing and a
+ready draft mail are gathered in `docs/live/asio-agreement.md`, linked from the latency guide and the docs index;
+the tracker row now carries what reading it settled. Nothing ASIO-related may be distributed — a free beta
+included — until the countersigned PDF comes back.
+
 ## MixAI Live — every route measured in one command, and two ASIO facts (2026-11-14)
 
 The declared figures said which route *should* be cheapest; nothing yet made the measured ones comparable.

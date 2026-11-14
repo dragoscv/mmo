@@ -54,10 +54,13 @@ or recording:
 | [midi.md](midi.md) | MIDI ports, bindings (`midi.json`), MIDI learn, program change |
 | [remote-protocol.md](remote-protocol.md) | Control protocol v1 (HTTP, WebSocket, OSC, mDNS, roles) |
 | [ffi.md](ffi.md) | Phone engine (`live-ffi`): API, Android/iOS integration, Null test host, measured latency |
+| [asio-agreement.md](asio-agreement.md) | The Steinberg ASIO licence: fields to fill, obligations mapped to surfaces, what is blocked until countersignature |
 | [voice-conversion.md](voice-conversion.md) | Design: realtime voice conversion, consent, watermark — planned |
 | [plugins.md](plugins.md) | Design: sandboxed plugin host — planned |
 
 ## Licensing
 
 Engine crates are MIT OR Apache-2.0; the desktop app crate will be AGPL-3.0 (ADR-0007). The ASIO backend is an
-opt-in build feature because the Steinberg ASIO SDK is GPLv3/proprietary ([latency guide](latency.md#windows)).
+opt-in build feature because the Steinberg ASIO SDK is GPLv3/proprietary ([latency guide](latency.md#windows));
+the state of the proprietary agreement, the fields it asks for and the obligations it carries are on the
+[ASIO licence page](asio-agreement.md).

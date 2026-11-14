@@ -159,8 +159,10 @@ Voicemeeter buffer (`voicemeeter --save --buffer wdm=160`) moves that row down.
    7. Do not ship the binary (or a beta) before both signatures are on the agreement; the repository stores no
      SDK file, so CI cannot build this tier at all.
   - **Before any ASIO build leaves this PC** (decided 2026-11-12, tracker WP21-27; terms as read on Steinberg's
-    pinned "ASIO SDK Proprietary Licensing FAQ" of 2026-10-21 — the agreement PDF and the ASIO Usage Guidelines
-    are the binding texts and were not read here):
+    pinned "ASIO SDK Proprietary Licensing FAQ" of 2026-10-21, and since 2026-11-14 the binding texts
+    themselves, which ship inside the SDK — the agreement 2.0.5 (SDK 2.3.4 – 15.10.2025) and its annex, the
+    ASIO Usage Guidelines; the fields to fill, what each obligation lands on and the two attribution strings
+    are on the [ASIO licence page](asio-agreement.md)):
     1. A closed-source product that talks to ASIO drivers needs the proprietary agreement, hosts included. It is
       royalty-free (no application, yearly, per-product or per-unit fee) and one agreement covers every product
       of the licensee.
