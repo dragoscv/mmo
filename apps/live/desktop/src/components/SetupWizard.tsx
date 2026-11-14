@@ -4,7 +4,7 @@
  */
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { Activity, Loader2, Play, RefreshCw, Sparkles } from "lucide-react";
+import { Activity, Loader2, Play, RefreshCw, SlidersHorizontal, Sparkles } from "lucide-react";
 import {
     Badge,
     Button,
@@ -36,7 +36,7 @@ import {
     type DeviceInfo,
     type DevicesResponse,
 } from "../lib/routing";
-import { api, isTauri, type EngineConfig, type LatencyResult } from "../lib/tauri";
+import { api, isTauri, type EngineConfig, type LatencyResult, type RoutesResult } from "../lib/tauri";
 import { latencyBudget } from "../lib/latency-budget";
 import { useMeterSample } from "../lib/meter-bus";
 import { useStore } from "../store";
@@ -137,6 +137,8 @@ export function SetupWizard() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [latency, setLatency] = useState<LatencyResult | null>(null);
+    const [routes, setRoutes] = useState<RoutesResult | null>(null);
+    const [comparing, setComparing] = useState(false);
     const [measuring, setMeasuring] = useState(false);
     const [draft, setDraft] = useState<Draft>(() => {
         const d = settings.device;
@@ -244,6 +246,22 @@ export function SetupWizard() {
             setError(t("errors.latency", { message: e instanceof Error ? e.message : String(e) }));
         } finally {
             setMeasuring(false);
+        }
+    };
+
+    /// What each route on this machine declares. Read-only: it opens nothing and plays nothing, so a
+    /// running engine is left alone (unlike the probe, which needs the device to itself).
+    const compare = async () => {
+        const c = config();
+        if (!c) return;
+        setComparing(true);
+        setError(null);
+        try {
+            setRoutes(await api.compareRoutes(c));
+        } catch (e) {
+            setError(t("errors.latency", { message: e instanceof Error ? e.message : String(e) }));
+        } finally {
+            setComparing(false);
         }
     };
 
@@ -385,6 +403,33 @@ export function SetupWizard() {
                                 <Activity /> {measuring ? t("setup.measuring") : t("setup.measure")}
                             </Button>
                             <p className="text-xs text-muted-foreground">{t("setup.measureHint")}</p>
+                            <div className="mt-1 flex items-center gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => void compare()} disabled={!inDev || !outDev || comparing} loading={comparing}>
+                                    <SlidersHorizontal /> {t("setup.compareRoutes")}
+                                </Button>
+                                <span className="text-xs text-muted-foreground">{t("setup.compareRoutesHint")}</span>
+                            </div>
+                            {routes ? (
+                                <table className="mt-1 w-full text-xs tabular-nums">
+                                    <caption className="sr-only">{t("setup.compareRoutes")}</caption>
+                                    <thead>
+                                        <tr className="text-start text-muted-foreground">
+                                            <th scope="col" className="text-start font-medium">{t("setup.routesThRoute")}</th>
+                                            <th scope="col" className="text-end font-medium">{t("setup.routesThDeclared")}</th>
+                                            <th scope="col" className="text-start font-medium ps-2">{t("setup.routesThSource")}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {routes.routes.map((r) => (
+                                            <tr key={r.host} title={r.note}>
+                                                <th scope="row" className="text-start font-normal">{r.host}</th>
+                                                <td className="text-end">{r.terms.declared_ms.toFixed(2)} ms</td>
+                                                <td className="ps-2 text-muted-foreground">{t(`setup.routesSource.${r.source}`)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : null}
                             {latency ? (
                                 <p className="text-sm font-medium tabular-nums" role="status">
                                     {t("setup.measured", { ms: latency.round_trip_ms.toFixed(1), nominal: latency.nominal_ms.toFixed(1) })}

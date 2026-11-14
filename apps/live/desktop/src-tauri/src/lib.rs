@@ -21,6 +21,7 @@ pub fn run() {
             engine::stop_engine,
             engine::engine_status,
             engine::measure_latency,
+            engine::compare_routes,
             engine::fx_catalogue,
             qr::pairing_qr,
             config::load_settings,

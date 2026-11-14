@@ -12,6 +12,8 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 const SIDECAR: &str = "mixai-live-engine";
 const READY_TIMEOUT: Duration = Duration::from_secs(20);
 const LATENCY_TIMEOUT: Duration = Duration::from_secs(25);
+/// The routes command reads driver properties; it never waits for audio.
+const ROUTES_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Audio + server settings for `serve` / `latency` (mirrors the CLI flags).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -137,6 +139,13 @@ impl EngineConfig {
 
     pub fn latency_args(&self) -> Vec<String> {
         let mut a = vec!["latency".to_string()];
+        a.extend(self.device_args());
+        a
+    }
+
+    /// What each route on this machine declares (read-only; nothing is opened, no loopback needed).
+    pub fn routes_args(&self) -> Vec<String> {
+        let mut a = vec!["routes".to_string()];
         a.extend(self.device_args());
         a
     }
@@ -281,6 +290,21 @@ pub async fn list_devices(app: AppHandle, host: Option<String>) -> Result<Value,
     }
     let out = run_once(&app, args, Duration::from_secs(15)).await?;
     serde_json::from_str(&out).map_err(|e| format!("bad devices JSON: {e}"))
+}
+
+/// What each route on this machine declares, for the setup step's chooser.
+///
+/// Unlike `measure_latency` this opens nothing and plays nothing, so a running engine is left alone: the
+/// numbers are read from the driver's period limits and from Voicemeeter's configuration.
+#[tauri::command]
+pub async fn compare_routes(
+    app: AppHandle,
+    _state: State<'_, EngineState>,
+    config: EngineConfig,
+) -> Result<Value, String> {
+    config.validate()?;
+    let out = run_once(&app, config.routes_args(), ROUTES_TIMEOUT).await?;
+    serde_json::from_str(&out).map_err(|e| format!("bad routes JSON: {e}"))
 }
 
 #[tauri::command]

@@ -65,6 +65,10 @@ because an ASIO driver's real buffer is not readable without opening it). On the
 **8.00 ms** (assumed). A measured figure never appears in that table: a round trip needs the loopback and comes
 from `latency`.
 
+The setup step has the same table behind **Compare routes**, which is read-only — it opens nothing and plays
+nothing, so it can be consulted while the engine is running, unlike the probe (which needs the device to itself).
+Each row says which figure came from where: *the driver*, *Voicemeeter*, or *the request (not readable)*.
+
 ## MixAI Live — a pedal and the phone remote can use the monitor option (2026-11-13)
 
 The "tuned only for the audience" option is now reachable from every control surface, not just the protocol:

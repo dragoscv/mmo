@@ -50,6 +50,16 @@
         "applyRecommended": "Use recommended",
         "measure": "Measure real latency",
         "measureHint": "Needs a loopback: connect the output back to the input (cable, a Voicemeeter strip, or speaker into the mic). The live engine stops while it measures.",
+        "compareRoutes": "Compare routes",
+        "compareRoutesHint": "What each route declares, without touching the audio",
+        "routesThRoute": "Route",
+        "routesThDeclared": "Declared",
+        "routesThSource": "Figure read from",
+        "routesSource": {
+            "device": "the driver",
+            "voicemeeter": "Voicemeeter",
+            "assumed": "the request (not readable)"
+        },
         "measuring": "Measuring…",
         "measured": "Round trip {{ms}} ms (engine estimate {{nominal}} ms)",
         "budgetTitle": "Latency budget",

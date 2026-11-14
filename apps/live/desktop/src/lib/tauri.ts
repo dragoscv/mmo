@@ -41,6 +41,30 @@ export interface Settings {
     lan: boolean;
 }
 
+/** One route's declared latency, as `mixai-live-engine routes` reports it. */
+export interface RouteTerms {
+    input_period_frames: number;
+    cushion_frames: number;
+    output_period_frames: number;
+    declared_ms: number;
+}
+
+export interface DeclaredRoute {
+    host: string;
+    device: string | null;
+    terms: RouteTerms;
+    /** Where the figure comes from: the driver, Voicemeeter's configuration, or the request. */
+    source: "device" | "voicemeeter" | "assumed";
+    note: string;
+    /** Always null here: a measured round trip needs a loopback (see `measureLatency`). */
+    measured_ms: number | null;
+}
+
+export interface RoutesResult {
+    requested: { rate: number; buffer_frames: number };
+    routes: DeclaredRoute[];
+}
+
 export interface LatencyResult {
     round_trip_ms: number;
     nominal_ms: number;
@@ -65,6 +89,7 @@ export const api = {
     stopEngine: () => call<void>("stop_engine"),
     engineStatus: () => call<EngineStatus>("engine_status"),
     measureLatency: (config: EngineConfig) => call<LatencyResult>("measure_latency", { config }),
+    compareRoutes: (config: EngineConfig) => call<RoutesResult>("compare_routes", { config }),
     fxCatalogue: () => call<unknown>("fx_catalogue"),
     pairingQr: (url: string) => call<string>("pairing_qr", { url }),
     loadSettings: () => call<Settings>("load_settings"),
