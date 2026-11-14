@@ -128,15 +128,26 @@ flowchart LR
   simulated device processes silence, so both figures are a floor and the difference is a lower bound; a voice
   makes both chains do more work per sample.
 - **The voice paths, measured on 2026-11-14** (release test build, in-process render of 10 s of audio in
-  128-frame blocks, best of five alternating runs, so the reading does not depend on what else the machine is
-  doing; `cargo test --release -p live-engine --lib voice_path_cpu_cost -- --ignored --nocapture`):
-  `Pop Polish` (an autotune) renders in **804.1 ms** with the classic path and **864.6 ms** with the
-  period-synchronous one (**+8 %**, ~0.6 % of real time per voice — and that side pays for both paths, because
-  the switch keeps the outgoing one running through the 10 ms crossfade). `Harmony Stack` (an autotune and a
-  four-voice harmonizer) renders in **2583.2 ms** with the period-synchronous voices against **2549.0 ms** with
-  the classic ones plus the LPC colouring that comes with `formant` on (**−1 %**, i.e. the new path costs about
-  what the colouring it displaces costs). Neither figure is a regression to worry about on stage; the numbers
-  are printed by that ignored measurement, which is the one to re-run after touching a shifter.
+  128-frame blocks, best of five alternating runs; `cargo test --release -p live-engine --lib
+  voice_path_cpu_cost -- --ignored --nocapture`). First measurement, then the same binary re-measured after the
+  fix below, back to back so the two runs are comparable:
+
+  | Chain (what the case changes) | before | after |
+  |---|---|---|
+  | `Pop Polish`, classic granular shifter | 788.3 ms | 860.3 ms |
+  | `Pop Polish`, period-synchronous shifter | 843.8 ms (**+7 %**) | 667.2 ms (**−22 %**) |
+  | `Harmony Stack`, period-synchronous voices | 3339.7 ms | 1174.2 ms |
+  | `Harmony Stack`, classic voices + `formant` LPC | 3409.3 ms | 2868.4 ms |
+
+  The first reading said the period-synchronous path cost more, and the reason was in the switch: while the
+  crossfade is *settled* (`mode == 1.0`) the classic shifter was still ticked every sample and its output thrown
+  away, so the fast path paid for both shifters. It is now ticked only while the crossfade actually moves, and
+  brought up to date from the dry history (`prime_classic`) when the crossfade back starts — so switching still
+  does not step (`switching_back_to_the_classic_shifter_does_not_click`). That is why the fast path is now
+  **cheaper** than the classic one rather than 7 % dearer, and why the harmonizer's voices dropped by two thirds
+  (four classic voices were being ticked and discarded). The numbers are printed by that ignored measurement,
+  which is the one to re-run after touching a shifter — and the machine has to be the same for both readings, or
+  they are not comparable.
 - `bypass` blends every bus to the dry input (instant safe mode); `mute` silences every bus; both ramp 10 ms.
 - The **safety limiter** is the last stage of each bus and is not an insert: nothing can remove or disable it,
   and bypass, the dry monitor blend and the latency click go through it. Zero latency, stereo-linked, instant

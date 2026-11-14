@@ -38,6 +38,23 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the fast pitch path stops paying for the shifter it is not using (2026-11-14)
+
+The measurement that gave the period-synchronous path its price said it was **7 % dearer** than the classic one,
+and the reason was in the switch, not in the shifter: with the crossfade settled (`mode == 1.0`) the classic
+shifter was still ticked on every sample and its output thrown away, so the fast path paid for both. It is now
+ticked only while the crossfade actually moves, and brought back up to date from the dry history
+(`prime_classic`) when the crossfade back starts — so a switch still does not step, which
+`switching_back_to_the_classic_shifter_does_not_click` now pins alongside the existing test for the other
+direction.
+
+Measured back to back in one session (release, best of five alternating runs — the only comparable way to read
+these numbers, since the earlier pair came from a differently loaded machine): `Pop Polish` **843.8 → 667.2 ms**
+with the period-synchronous shifter (**−22 %**, now *cheaper* than the classic path's 860.3 ms, where it used to
+be 7 % dearer), and `Harmony Stack`'s period-synchronous voices **3339.7 → 1174.2 ms** (**−65 %**, four classic
+voices were being ticked and discarded on every sample). Engine workspace green: 218 tests, clippy
+`-D warnings` clean.
+
 ## MixAI Live — the control server stops being cheap to abuse (WP21-19 part 4, 2026-11-14)
 
 Two ways to hold the engine's control server open without ever asking it for anything are closed. **64 raw

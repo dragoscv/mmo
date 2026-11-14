@@ -60,6 +60,10 @@ pub struct Autotune {
     /// Weight of the fast shifter on the wet path, 0 = classic. Ramped over 10 ms so the switch
     /// between two paths with a very different delay does not click.
     mode: Smoothed,
+    /// The classic shifter was not ticked since it last ran: while the fast path is fully in use it
+    /// is idle (ticking it only to throw its output away was the whole cost of the fast path), and
+    /// it is brought up to date from the dry history before the crossfade back starts.
+    classic_stale: bool,
     /// What the last control step decided.
     want_fast: bool,
     scale: Scale,
@@ -88,6 +92,7 @@ impl Autotune {
                 sample_rate,
             ),
             want_fast: v[9] as usize != 0,
+            classic_stale: true,
             scale: Scale::new(v[0] as usize, v[1] as usize),
             stable: None,
             semis: 0.0,
@@ -106,6 +111,22 @@ impl Autotune {
 
     pub fn status(&self) -> TuneStatus {
         self.status
+    }
+
+    /// Bring the classic shifter up to date on the input it missed while the fast path was fully in
+    /// use, by replaying the dry ring (its own input history, oldest first) into it. Only the
+    /// internal state matters, the outputs are discarded, and it runs once per switch, not per
+    /// sample.
+    fn prime_classic(&mut self) {
+        if !self.classic_stale {
+            return;
+        }
+        self.classic_stale = false;
+        let dlen = self.dry.len();
+        for i in 0..dlen {
+            let s = self.dry[(self.dry_w + i) % dlen];
+            let _ = self.shifter.tick(s);
+        }
     }
 
     /// The fast (period-synchronous) shifter is selected.
@@ -222,18 +243,28 @@ impl Processor for Autotune {
             let x = 0.5 * (*a + *b);
             self.yin.push(x);
             let mode = self.mode.next();
-            let wet = if mode > 0.0 {
-                // Both paths run while the crossfade is moving (and only then when the mode is
-                // off), so switching does not step: the classic shifter is 255 samples later.
+            let wet = if mode >= 1.0 {
+                // Fully on the fast path: the classic shifter is not needed until the crossfade
+                // back starts, and ticking it every sample just to discard its output was the
+                // whole cost of the fast path. It is primed again when the crossfade starts.
+                self.classic_stale = true;
+                self.psola.tick(x)
+            } else if mode > 0.0 {
+                // Both paths run while the crossfade is moving, so switching does not step: the
+                // classic shifter is 255 samples later.
+                self.prime_classic();
                 let old = self.shifter.tick(x);
                 let fast = self.psola.tick(x);
                 old + mode * (fast - old)
             } else {
+                self.prime_classic();
                 self.shifter.tick(x)
             };
             // The dry tap follows the active shifter's delay, crossfaded the same way, so the mix
             // knob never combs. `dlen - 1` back = the classic 256 samples, one back = the fast one.
-            let dry = if mode > 0.0 {
+            let dry = if mode >= 1.0 {
+                self.dry[(self.dry_w + dlen - 1) % dlen]
+            } else if mode > 0.0 {
                 let old = self.dry[(self.dry_w + 1) % dlen];
                 let fast = self.dry[(self.dry_w + dlen - 1) % dlen];
                 old + mode * (fast - old)
@@ -253,6 +284,7 @@ impl Processor for Autotune {
         self.shifter.reset();
         self.psola.reset();
         self.dry.fill(0.0);
+        self.classic_stale = true;
         self.stable = None;
         self.semis = self.v[7];
     }
@@ -309,6 +341,10 @@ pub struct Harmonizer {
     psola: [PsolaShifter; HARMONY_VOICES],
     /// Weight of the period-synchronous voices, ramped so a change of path does not click.
     mode: Smoothed,
+    /// The classic voices were not ticked since they last ran: while the period-synchronous path is
+    /// fully in use they are idle, and they are primed from the delay history before the crossfade
+    /// back starts (see `Autotune::prime_classic`).
+    classic_stale: bool,
     want_fast: bool,
     levels: [Smoothed; HARMONY_VOICES],
     dry: Smoothed,
@@ -330,6 +366,7 @@ impl Harmonizer {
             voices: core::array::from_fn(|_| Shifter::new(false)),
             psola: core::array::from_fn(|_| PsolaShifter::new(sample_rate)),
             mode: Smoothed::with_ms(if v[4] > 0.5 { 0.0 } else { 1.0 }, 10.0, sample_rate),
+            classic_stale: true,
             want_fast: v[4] <= 0.5,
             levels: core::array::from_fn(|k| Smoothed::with_ms(v[6 + k * 4], 30.0, sample_rate)),
             dry: Smoothed::with_ms(v[3], 20.0, sample_rate),
@@ -341,6 +378,22 @@ impl Harmonizer {
             // for the classic one, crossfaded by `mode` exactly as the voices are.
             delay: vec![0.0; Shifter::latency() + 1],
             delay_w: 0,
+        }
+    }
+
+    /// See `Autotune::prime_classic`: replay the delay history into every classic voice so the
+    /// crossfade back starts from voices that are up to date, not from a frozen state.
+    fn prime_classic(&mut self) {
+        if !self.classic_stale {
+            return;
+        }
+        self.classic_stale = false;
+        let dlen = self.delay.len();
+        for i in 0..dlen {
+            let s = self.delay[(self.delay_w + i) % dlen];
+            for v in &mut self.voices {
+                let _ = v.tick(s);
+            }
         }
     }
 
@@ -442,10 +495,17 @@ impl Processor for Harmonizer {
             let x = 0.5 * (*a + *b);
             self.yin.push(x);
             let m = self.mode.next();
+            if m < 1.0 {
+                self.prime_classic();
+            } else {
+                self.classic_stale = true;
+            }
             // Delay the lead by the active path's latency so lead + harmonies stay phase-aligned:
             // one sample behind for the period-synchronous voices, `Shifter::latency()` for the
             // classic ones. Crossfaded with the voices, so a change of path never combs.
-            let dl = if m > 0.0 {
+            let dl = if m >= 1.0 {
+                self.delay[(self.delay_w + dlen - 1) % dlen]
+            } else if m > 0.0 {
                 let old = self.delay[(self.delay_w + 1) % dlen];
                 let fast = self.delay[(self.delay_w + dlen - 1) % dlen];
                 old + m * (fast - old)
@@ -459,7 +519,9 @@ impl Processor for Harmonizer {
             let mut or = 0.0;
             for k in 0..HARMONY_VOICES {
                 let lvl = self.levels[k].next();
-                let y = if m > 0.0 {
+                let y = if m >= 1.0 {
+                    self.psola[k].tick(x)
+                } else if m > 0.0 {
                     let old = self.voices[k].tick(x);
                     let fast = self.psola[k].tick(x);
                     old + m * (fast - old)
@@ -485,6 +547,7 @@ impl Processor for Harmonizer {
         }
         self.delay.fill(0.0);
         self.src = None;
+        self.classic_stale = true;
     }
     fn latency(&self) -> usize {
         if self.want_fast {
@@ -952,6 +1015,35 @@ mod tests {
         assert!(
             worst < 4.0 * input_step,
             "switch stepped by {worst:.4}, the sine itself by {input_step:.4}"
+        );
+    }
+
+    /// The other direction: leaving the fast path must not step either. The classic shifter is idle
+    /// while the fast path is fully in use — that was the fast path's whole cost — so it is primed
+    /// from the dry history when the crossfade back starts, and this is the test of that priming.
+    #[test]
+    fn switching_back_to_the_classic_shifter_does_not_click() {
+        let mut t = Autotune::new(48000.0); // `auto`: the period-synchronous path, at every pitch
+        let block = 480; // 10 ms, the crossfade length
+        let long = sine(440.0, 48000.0, block * 40, 0.4);
+        let mut out: Vec<f32> = Vec::new();
+        for (k, chunk) in long.chunks(block).enumerate() {
+            let mut l = chunk.to_vec();
+            let mut r = l.clone();
+            if k == 20 {
+                t.set_param(9, 0.0); // fast = off: the classic shifter comes back
+            }
+            t.process(&mut l, &mut r);
+            out.extend_from_slice(&l);
+        }
+        let worst = out
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max);
+        let input_step = 2.0 * std::f32::consts::PI * 440.0 / 48000.0 * 0.4;
+        assert!(
+            worst < 4.0 * input_step,
+            "switch back stepped by {worst:.4}, the sine itself by {input_step:.4}"
         );
     }
 
