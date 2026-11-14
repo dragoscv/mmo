@@ -761,6 +761,13 @@ impl PsolaShifter {
         }
         // Two or three periods match as well as one: take the one. The bar is set once, before
         // the loop, and capped: it does not grow with the candidates accepted on the way.
+        //
+        // The cap is a behavioural choice, not decoration: measured on a 200 Hz tone with noise at
+        // the signal's own amplitude, removing it changes the period this tracker reports by a
+        // factor of two (484.2 against 238.0 for a true 240) and the output checksum by 0.3 %, on
+        // one noise sequence and not on another. Which of the two is better on a noisy stage was
+        // not measured, so no test pins the cap; `noise_is_not_locked_as_a_period` pins the trust
+        // check above it instead.
         let limit = (GOOD_MUL * best.1 + GOOD_ADD).clamp(GOOD_ABS, WIDE_ABOVE);
         for _ in 0..3 {
             let mut changed = false;
@@ -925,6 +932,53 @@ mod tests {
     use crate::test_util::{rms, sine, voice};
 
     const SR: f32 = 48000.0;
+
+    /// Nothing matches well enough on noise, so the hint is used as it is: nothing may be locked.
+    ///
+    /// The search starts from the hint, so a missing trust check would lock a period that is *close*
+    /// to it - which is why this is asserted on the reported `period`, not on the output: measured
+    /// with the check removed, the reported period became 531.94 for a hint of 360 (and the output
+    /// checksum changed by 9 %), while the code with the check reports the hint itself.
+    #[test]
+    fn noise_is_not_locked_as_a_period() {
+        // Deterministic pseudo-noise: a plain LCG, so the test is the same on every run.
+        let mut seed = 12_345u32;
+        let noise = |seed: &mut u32| {
+            *seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            ((*seed >> 8) as f32 / (1 << 24) as f32) * 2.0 - 1.0
+        };
+        let mut s = PsolaShifter::new(SR);
+        s.set_ratio(1.03); // non-unity, so the period search runs at all
+        let hint = 240.0;
+        s.set_period(hint);
+        let mut peak_in = 0.0f32;
+        let mut peak_out = 0.0f32;
+        for k in 0..48_000 {
+            let x = 0.3 * noise(&mut seed);
+            // The detector hands a new estimate every 128 samples, as `tune.rs` does.
+            if k % 128 == 64 {
+                s.set_period(hint);
+            }
+            peak_in = peak_in.max(x.abs());
+            peak_out = peak_out.max(s.tick(x).abs());
+        }
+        assert_eq!(
+            s.period(),
+            hint,
+            "the hint must be used as it is when nothing matches: reported {:.4}",
+            s.period()
+        );
+        assert!(
+            s.quality() > 0.6,
+            "the fixture must not accidentally be periodic: quality {:.4}",
+            s.quality()
+        );
+        // And nothing blows up on a signal with no period at all.
+        assert!(
+            peak_out < 1.5 * peak_in,
+            "noise came out at {peak_out:.4} from {peak_in:.4}"
+        );
+    }
 
     /// Frequency of a clean tone from its rising zero crossings (linear interpolation).
     fn zero_cross_freq(x: &[f32]) -> f32 {
