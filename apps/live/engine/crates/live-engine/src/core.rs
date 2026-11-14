@@ -558,6 +558,14 @@ impl Core {
         self.mon.chain.is_some() && !self.mon.retiring && self.mon.warm == self.mon.warm_len
     }
 
+    /// Weight of the monitor chain on the monitor bus after the last block (0 = main chain,
+    /// 1 = monitor chain). A test hook: it is how a *fade* can be told from a *cut* without
+    /// guessing a level bound, which depends on the chains involved.
+    #[cfg(test)]
+    pub(crate) fn monitor_blend(&self) -> f32 {
+        self.mon.sel.value()
+    }
+
     /// Apply one command. `garbage` receives boxes that must be freed off the audio thread.
     pub fn apply(&mut self, cmd: Command, garbage: &mut impl FnMut(Garbage)) {
         let [down, up] = self.gain_ramp;
@@ -1486,6 +1494,92 @@ mod tests {
             toggled <= steady * 1.5 + 0.002,
             "largest step with 20 switches {toggled}, without {steady}"
         );
+    }
+
+    /// Switching the option on must be a fade, not a cut: the new chain runs unheard for the
+    /// warm-up, and the ears move to it over the documented 10 ms. Asserted on the crossfade
+    /// WEIGHT (a test hook) rather than on a level bound: a bound depends on the two chains and
+    /// can be met by a cut that happens to land in a quiet moment, while the weight shows directly
+    /// whether intermediate values were ever used.
+    #[test]
+    fn untuned_switch_on_is_a_fade_not_a_cut() {
+        let input = voice(2 * 48000);
+        let mut core = core_with("Pop Polish", false);
+        let mut g = |_g: Garbage| {};
+        // Settle 1 s with the ears on the main chain, then switch the option on.
+        let (mut l, mut r, mut o, mut q) = (
+            vec![0.0; 128],
+            vec![0.0; 128],
+            vec![0.0; 128],
+            vec![0.0; 128],
+        );
+        for blk in input.chunks(128).take(375) {
+            core.render(
+                blk,
+                blk,
+                Buses {
+                    main_l: &mut l,
+                    main_r: &mut r,
+                    mon_l: &mut o,
+                    mon_r: &mut q,
+                },
+            );
+            core.take_finished_tail();
+        }
+        assert_eq!(
+            core.monitor_blend(),
+            0.0,
+            "the ears are on the main chain to start with"
+        );
+        core.apply(
+            Command::SetMonitorChain {
+                chain: Some(untuned_chain("Pop Polish", 1)),
+            },
+            &mut g,
+        );
+        assert_eq!(
+            core.monitor_blend(),
+            0.0,
+            "the new chain starts unheard (50 ms warm-up)"
+        );
+        // 30 blocks = 3840 samples: warm-up 2400 + fade 480 = 2880, so it is over well inside.
+        let mut blends = Vec::new();
+        for blk in input.chunks(128).skip(375).take(30) {
+            core.render(
+                blk,
+                blk,
+                Buses {
+                    main_l: &mut l,
+                    main_r: &mut r,
+                    mon_l: &mut o,
+                    mon_r: &mut q,
+                },
+            );
+            core.take_finished_tail();
+            blends.push(core.monitor_blend());
+        }
+        let partial = blends.iter().filter(|b| **b > 0.0 && **b < 1.0).count();
+        let reached = blends.iter().position(|b| *b >= 1.0);
+        println!(
+            "crossfade weights after the switch: {:?}",
+            &blends[..10.min(blends.len())]
+        );
+        // A 480-sample fade seen at 128-sample block boundaries shows 2 or 3 intermediate weights,
+        // depending on where the warm-up ends inside a block; a cut shows none. The claim that does
+        // not depend on that alignment is `reached` below: the ears cannot be on the new chain
+        // before the 10 ms are up.
+        assert!(
+            partial >= 2,
+            "the ears must move across the fade, not jump: {partial} intermediate weight(s) in {blends:?}"
+        );
+        match reached {
+            Some(at) => assert!(
+                at >= 3,
+                "the fade finished after only {at} block(s): that is a cut, not a 10 ms crossfade"
+            ),
+            None => panic!("the fade never reached the monitor chain: {blends:?}"),
+        }
+        assert!(blends.iter().all(|b| (0.0..=1.0).contains(b)));
     }
 
     /// A scene change with the option on: the monitor bus is held to the bound the main bus is
