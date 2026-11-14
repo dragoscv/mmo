@@ -7,6 +7,7 @@ import { controlKind, type ParamSpec } from "../lib/params";
 import type { InsertState } from "../lib/protocol";
 import { EMPTY_CHAIN, useStore } from "../store";
 import { Knob } from "./Knob";
+import { FxVisual } from "./FxVisual";
 import { GrBar } from "./Meters";
 import { MidiLearnButton, useMidiLearn } from "./MidiLearn";
 import { choiceLabel, fxLabel, paramLabel, valueLabel } from "./fx-labels";
@@ -107,6 +108,10 @@ export function InsertDetail() {
                     className="surface flex min-h-0 flex-col gap-3 rounded-2xl p-4"
                 >
                     <header className="flex items-center gap-3">
+                        {/* The hero visual of the effect: its own shape at the current settings. */}
+                        <div className="h-14 w-24 shrink-0 rounded-lg border bg-card p-1">
+                            <FxVisual fx={insert.fx} params={new Map(insert.params)} />
+                        </div>
                         <h2 className="font-heading text-lg font-semibold">{fxLabel(t, insert.fx)}</h2>
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                             <MidiLearnButton target={{ kind: "enable", fx: insert.fx }} label={t("midi.enableTarget", { fx: fxLabel(t, insert.fx) })} />

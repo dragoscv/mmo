@@ -38,6 +38,24 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — every effect draws its own shape (WP21-20 part 3, 2026-11-14)
+
+The chain used to be a list of names with a gain-reduction bar. Each effect now has a **hero visual**: its own
+drawing, at its current settings, in the insert panel and small on every card in the chain. The gate shows its
+threshold and the signal falling to nothing below it, the compressor its transfer curve against the identity
+line, the EQ the summed response of its four bells plus the high-pass, the de-esser the notch it cuts, the
+autotune its snap steps, the harmonizer the intervals it stacks, the saturator the soft clip its drive asks for,
+the doubler three drifting lines, the chorus its modulation, the delay its fading taps, the reverb its decay
+with the tail filled, the limiter its ceiling. An unknown (newer) effect draws a neutral pass-through rather
+than an empty box.
+
+The geometry is a pure function in `lib/fx-visual.ts` — a 0..100 box, y up, no UI imports — and the component
+only colours it with the design tokens, so the drawing is testable without a browser: every insert has a
+specific shape and none falls through to the neutral one, the drawing moves with the parameters (the
+compressor's rule with `threshold`, the EQ curve with a band gain, the delay's taps, the reverb's tail, the
+limiter's ceiling), and every point stays inside the box. Desktop typecheck 0, 43 tests, i18n parity 329 keys,
+production build green.
+
 ## MixAI Live — the engine has a spectrum now (WP21-20 part 2, 2026-11-14)
 
 The spectrum on the performance screen is the engine's own analysis, not a guess made in the browser. The output

@@ -56,9 +56,15 @@ All four applied in the same pass:
 
 ## Still owed in WP21-20
 
-- A rendered design-critic pass (cloud browser runner) — nothing here has been seen on screen.
-- The spectrum, the hero visual per effect, and the Stage-mode polish (prescription 4).
+- A **rendered** design-critic pass (cloud browser runner) — nothing here has been seen on screen.
 - Mobile/compact widths are not designed: the screen assumes >= 1280 px, which is the stated target.
+
+Delivered since this review was written: the **spectrum** (the engine's own analysis — the callback only taps a
+ring, the FFT runs on the engine's control thread — drawn on a log frequency axis under the ribbon) and the
+**hero visual per effect** (`lib/fx-visual.ts` + `FxVisual.tsx`: the gate's threshold, the compressor's transfer
+curve, the EQ's response, the de-esser's notch, the delay's taps, the reverb's decay, the limiter's ceiling … one
+shape per effect, driven by the insert's parameters, in the insert panel and small on each chain card). Both are
+unit-tested for geometry rather than looked at, which is the same caveat as above.
 
 ## User-intent gap
 

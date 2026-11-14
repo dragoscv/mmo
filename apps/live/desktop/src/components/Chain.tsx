@@ -7,6 +7,7 @@ import { AnimatePresence, Reorder, motion, useReducedMotion } from "motion/react
 import { ChevronLeft, ChevronRight, GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button, Popover, PopoverContent, PopoverTrigger, Switch, cn } from "@mmo/ui";
 import { useT } from "../i18n";
+import { FxVisual } from "./FxVisual";
 import type { InsertState } from "../lib/protocol";
 import { EMPTY_CHAIN, useStore } from "../store";
 import { GrBar } from "./Meters";
@@ -64,7 +65,13 @@ function Card({ insert, index, count, onMove }: { insert: InsertState; index: nu
                 />
             </div>
             <button type="button" tabIndex={-1} className="min-h-0 flex-1 text-left" onClick={() => select(selected ? null : insert.id)}>
-                <Summary insert={insert} />
+                <div className="flex h-full flex-col gap-1">
+                    {/* The effect's own shape at its current settings, small; the parameters below. */}
+                    <div className="h-8 w-full opacity-80">
+                        <FxVisual fx={insert.fx} params={new Map(insert.params)} />
+                    </div>
+                    <Summary insert={insert} />
+                </div>
             </button>
             <GrBar index={index} label={`${t("chain.gr")}: ${name}`} />
             <div className="flex items-center justify-between opacity-70 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
