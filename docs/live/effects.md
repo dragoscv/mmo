@@ -155,19 +155,34 @@ every 128 samples (2.7 ms at 48 kHz).
   less than 6 dB over the input in every 100 ms window. Known limit: at the attack of a phrase that follows
   silence the coloured output can overshoot, and the guard then plays the plain output for 50 ms (measured on
   1 of 3 attacks in the phrase test). So with `formant` on, the start of some phrases is not formant-preserved.
-  The planned period-synchronous shifter replaces this path.
+  **`formant` applies to the classic path only** (the LPC colouring lives in the granular shifter), and it
+  used to be dropped silently above 187.5 Hz, where `auto` picks the period-synchronous path. Since
+  2026-11-14 `formant` on keeps `auto` on the classic path — chain latency 256 instead of 1, which is what
+  the setting asks for — while an explicit `fast = on` still wins, and `guard_trips` stays 0 whenever the
+  fast path is in use (`tune::tests::formant_on_keeps_auto_on_the_classic_path`). Open: the
+  period-synchronous path has no colouring of its own, so a formant-corrected low-latency shift is still
+  unavailable.
 - The detector analyses the newest samples of its 1024-sample history (a test on a glide of one octave per
   second allows 9 cents of lag; the first version read the oldest part and was 20 cents behind).
-- Shifter accuracy, measured on pure tones on 2026-11-12 (output pitch against input × ratio, ratios 0.8–1.25):
-  with nothing to correct (ratio 1) the pitch is kept exactly (the first version was 6.8 cents flat, measured
-  at 220 Hz); at 220, 330, 440 and 880 Hz the output is within 5.1 cents (tests allow 6).
-  **Known defect: at 110 Hz small corrections are lost.** A correction of ±17 cents (ratio 0.99 / 1.01) comes
-  out at the input pitch; at ±35 cents (0.98 / 1.02) the two estimators disagree (zero crossings: the whole
-  correction lost; spectral peak: 8–16 cents off), so the output is not a clean tone; larger corrections are
-  off too (0.94: +107 cents by zero crossings, +6 by spectral peak; 1.06: +10). Probable cause, not isolated: the
-  period is longer than a 256-sample grain, which is the case below 187.5 Hz — the range of a male voice. Not
-  measured between 110 and 220 Hz, nor on a real voice. The planned period-synchronous shifter has to fix it
-  (an ignored test records the case).
+- Two shifters exist and `fast` chooses between them: the **classic** granular one (256-sample grains) and the
+  **period-synchronous** one (`psola`). `auto` — the default — uses the period-synchronous path from 187.5 Hz
+  up (a period shorter than a grain), and the classic one below. `off` and `on` force one of them.
+- Shifter accuracy of the classic path, measured on pure tones on 2026-11-12 (output pitch against input ×
+  ratio, ratios 0.8–1.25): with nothing to correct (ratio 1) the pitch is kept exactly (the first version was
+  6.8 cents flat, measured at 220 Hz); at 220, 330, 440 and 880 Hz the output is within 5.1 cents (tests allow 6).
+  **Known defect: below 187.5 Hz the classic path loses small corrections.** A correction of ±17 cents
+  (ratio 0.99 / 1.01) comes out at the input pitch; at ±35 cents (0.98 / 1.02) the two estimators disagree
+  (zero crossings: the whole correction lost; spectral peak: 8–16 cents off), so the output is not a clean tone;
+  larger corrections are off too (0.94: +107 cents by zero crossings, +6 by spectral peak; 1.06: +10). Cause:
+  the period is longer than a 256-sample grain, which is the case below 187.5 Hz — the range of a male voice.
+  The period-synchronous path does not have it: on the same 110 Hz tone it lands within 0.5 cents
+  (`psola::tests::applies_small_corrections_at_110_hz`), and through the autotune a +25 cent transpose measured
+  2026-11-14 comes out **+0.01 cents** with `on` against **−25.16 cents** with `auto` (the whole correction
+  lost — `tune::tests::what_auto_costs_on_a_low_note`). What the threshold buys is delay: in the steady state
+  the envelope of the period-synchronous output lags by 287 samples against 57 for the classic path at 110 Hz
+  (+4.8 ms, `tune::tests::the_fast_path_costs_delay_on_a_low_note`), which is why `auto` keeps the classic one
+  on low notes. Setting `fast` to `on` trades that delay for the correction. Neither path has been measured on
+  a real voice below 187.5 Hz.
 - `retune` is the glide time to the target: ~0.5 ms is the hard "robot" effect, 40–100 ms sounds natural.
 - `humanize` leaves small deviations alone: deviations under `30 × humanize` cents are not corrected and
   correction fades in smoothly over the next 30 cents (vibrato and scoops survive). `sticky` (cents) keeps the

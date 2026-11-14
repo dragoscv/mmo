@@ -48,6 +48,26 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — what the fast pitch mode is worth at 110 Hz, and a setting that was ignored (2026-11-14)
+
+The `fast` choice shipped with a line at ~187.5 Hz: below it `auto` keeps the classic granular shifter, above
+it the period-synchronous one. The reason was known (the period-synchronous path sits further behind on a low
+note) but the other side of the trade had never been measured, and the classic path's defect at 110 Hz was only
+recorded as an ignored test. Three runs of the same signal, processed in blocks the way the engine does, now
+price both sides at 110 Hz: a +25 cent transpose comes out **+0.01 cents** with the period-synchronous path and
+**−25.16 cents** with `auto` — the entire correction is lost — while in the steady state the envelope of the
+period-synchronous output lags by 287 samples against 57 for the classic one (+4.8 ms). So the line trades
+about five milliseconds for the correction actually landing, and both figures are pinned by tests
+(`tune::tests::what_auto_costs_on_a_low_note`, `the_fast_path_costs_delay_on_a_low_note`) rather than left to
+memory; `fast = on` already buys the accuracy today for anyone who wants it on low notes.
+
+Reading the same code turned up a setting that was being dropped in silence: `formant` is implemented in the
+classic shifter only, so above 187.5 Hz — where `auto` picks the period-synchronous path — turning `formant` on
+did nothing. `formant` on now keeps `auto` on the classic path (chain latency 256 instead of 1, which is what
+the setting asks for), an explicit `fast = on` still overrides it, and the effects documentation says both that
+and what remains open: the period-synchronous path has no colouring of its own, so a formant-corrected
+low-latency shift is still unavailable.
+
 ## MixAI Live — the ASIO licence, read from the source (WP21-27, 2026-11-14)
 
 The ASIO tier has been buildable locally for a day; until now what it obliges was known only from Steinberg's

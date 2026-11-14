@@ -188,7 +188,11 @@ impl Autotune {
             0 => false,
             2 => true,
             _ => {
-                if period > 0.0 {
+                // `formant` is implemented in the classic shifter only, so with it on `auto` must not
+                // choose a path that would drop it silently (`on` is the user overriding this).
+                if self.v[5] > 0.5 {
+                    self.auto_fast = false;
+                } else if period > 0.0 {
                     // Hysteresis: enter at or below the classic delay, leave only 10 % above it.
                     self.auto_fast = if self.auto_fast {
                         period <= SLOW_PERIOD
@@ -671,6 +675,141 @@ mod tests {
         assert!(
             fast.abs() < 8.0,
             "the fast shifter must land within 8 cents at 110 Hz, got {fast:.2}"
+        );
+    }
+
+    /// `formant` is implemented on the classic path only, so `auto` must not pick a path that would
+    /// ignore it: with `formant` on, a high note stays on the classic shifter (chain latency 256
+    /// against 1), while an explicit `fast = on` still wins. Measured 2026-11-14; before this rule the
+    /// setting was dropped silently above 187.5 Hz.
+    #[test]
+    fn formant_on_keeps_auto_on_the_classic_path() {
+        let chain = |formant: f32, fast: f32| {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(5, formant); // formant
+            t.set_param(9, fast); // off / auto / on
+            let patch = voice(440.0, 20.0, 48000.0, 9600, 0.3);
+            let mut l = patch.clone();
+            let mut r = patch;
+            t.process(&mut l, &mut r);
+            t.latency()
+        };
+        assert_eq!(
+            chain(0.0, 1.0),
+            1,
+            "formant off, auto, 440 Hz: the fast path"
+        );
+        assert_eq!(
+            chain(1.0, 1.0),
+            256,
+            "formant on, auto, 440 Hz: must stay classic"
+        );
+        assert_eq!(
+            chain(1.0, 2.0),
+            1,
+            "formant on, fast on: the explicit choice wins"
+        );
+        assert_eq!(chain(1.0, 0.0), 256, "formant on, fast off: classic");
+    }
+
+    /// The other half of the threshold at ~187.5 Hz: what each path costs in delay on a low note.
+    /// Measured in the steady state, because the attack of a note is not representative — the
+    /// period-synchronous path falls back to its one-sample delay until the detector has a period,
+    /// so a note starting after silence makes it look earlier than it is. Here a 110 Hz tone is
+    /// amplitude-modulated at 30 Hz and the two envelopes are correlated: the lag of the best match
+    /// is the delay, independent of the attack.
+    #[test]
+    fn the_fast_path_costs_delay_on_a_low_note() {
+        let delay = |mode: f32| {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(2, 0.0);
+            t.set_param(3, 0.5);
+            t.set_param(7, 0.25);
+            t.set_param(9, mode);
+            let n = 4 * 48000;
+            let mut x = Vec::with_capacity(n);
+            for i in 0..n {
+                let time = i as f32 / 48000.0;
+                let am = 1.0 + 0.4 * (std::f32::consts::TAU * 30.0 * time).cos();
+                x.push(0.4 * am * (std::f32::consts::TAU * 110.0 * time).sin());
+            }
+            let mut l = x.clone();
+            let mut r = x.clone();
+            t.process(&mut l, &mut r);
+            // Envelopes: a 32-sample moving RMS of each signal.
+            let env = |s: &[f32]| {
+                let mut e = vec![0.0f32; s.len()];
+                let mut acc = 0.0f32;
+                for i in 0..s.len() {
+                    acc += s[i] * s[i];
+                    if i >= 32 {
+                        acc -= s[i - 32] * s[i - 32];
+                    }
+                    e[i] = (acc / 32.0).sqrt();
+                }
+                e
+            };
+            let (ey, ex) = (env(&l), env(&x));
+            // One second in the middle: the correction has settled and the note is long.
+            let (from, to) = (2 * 48000, 3 * 48000);
+            let mut best = (0.0f32, 0usize);
+            for lag in 0..700usize {
+                let mut dot = 0.0f32;
+                for i in from..to {
+                    dot += ey[i] * ex[i - lag];
+                }
+                if dot > best.0 {
+                    best = (dot, lag);
+                }
+            }
+            best.1 as f32
+        };
+        let (auto, on, off) = (delay(1.0), delay(2.0), delay(0.0));
+        println!("110 Hz, delay of the envelope: auto {auto:.0} samples, on {on:.0}, off {off:.0}");
+        assert!(
+            (auto - off).abs() < 1.0,
+            "auto must be the classic path here too"
+        );
+        // Measured 2026-11-14: 287 against 57, so the fast path is ~4.8 ms further behind in the
+        // steady state. That is what the ~187.5 Hz line buys; the pitch side of the trade is in
+        // `what_auto_costs_on_a_low_note`. Loose bound on purpose: it guards the direction, not a
+        // figure, and the method is envelope correlation, not the phase delay the chain declares.
+        assert!(
+            on - off > 100.0,
+            "the fast path is expected to sit further behind on a low note ({on:.0} against {off:.0}); the reason for the auto threshold disappeared, revisit it"
+        );
+    }
+
+    /// What the shipped default costs on a low note, as one number. `fast` defaults to `auto`, and
+    /// auto keeps the classic shifter below ~187.5 Hz (a period longer than a grain), which is where
+    /// the classic shifter loses small corrections: at 110 Hz a +25 cent transpose comes out at the
+    /// input pitch instead of the target. Measured in three runs of the same signal, processed in
+    /// blocks the way the engine does, so the owner can weigh moving that line. The assertion pins
+    /// the ROUTING (auto must agree with the classic path), not the defect: the day the line moves,
+    /// this test has to be updated deliberately.
+    #[test]
+    fn what_auto_costs_on_a_low_note() {
+        let error_cents = |mode: f32| {
+            let mut t = Autotune::new(48000.0);
+            t.set_param(2, 0.0); // amount: no scale correction, only the transpose below
+            t.set_param(3, 0.5); // retune 40 ms
+            t.set_param(7, 0.25); // +25 cents
+            t.set_param(9, mode); // off / auto / on
+            let long = sine(110.0, 48000.0, 4 * 48000, 0.4);
+            let mut out = Vec::with_capacity(long.len());
+            for chunk in long.chunks(480) {
+                let (mut l, mut r) = (chunk.to_vec(), chunk.to_vec());
+                t.process(&mut l, &mut r);
+                out.extend_from_slice(&l);
+            }
+            let want = 110.0 * 2f32.powf(0.25 / 12.0);
+            1200.0 * (detect(&out) / want).log2()
+        };
+        let (auto, on, off) = (error_cents(1.0), error_cents(2.0), error_cents(0.0));
+        println!("110 Hz +25 cents: auto {auto:+.2} cents off, on {on:+.2}, off {off:+.2}");
+        assert!(
+            (auto - off).abs() < 1.0,
+            "auto must be the classic path at 110 Hz (auto {auto:+.2}, classic {off:+.2}); if the threshold moved, update this test and docs/live/latency.md"
         );
     }
 
