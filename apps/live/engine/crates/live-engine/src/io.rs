@@ -256,6 +256,10 @@ pub struct Running {
     pub commands: rtrb::Producer<Command>,
     pub garbage: rtrb::Consumer<Garbage>,
     pub meters: rtrb::Consumer<Meters>,
+    /// Mono main bus, for the UI spectrum (see [`Running::spectrum`]).
+    tap: rtrb::Consumer<f32>,
+    /// The analyser that drains `tap`; lives here so the FFT never runs on the audio thread.
+    spec: crate::spectrum::Spectrum,
     pub info: RunningInfo,
     alive: Arc<AtomicBool>,
     last_error: Arc<Mutex<Option<String>>>,
@@ -647,6 +651,8 @@ impl Running {
             commands: ends.commands,
             garbage: ends.garbage,
             meters: ends.meters,
+            tap: ends.tap,
+            spec: crate::spectrum::Spectrum::new(),
             info,
             alive,
             last_error,
@@ -710,6 +716,13 @@ impl Running {
         }
         last
     }
+
+    /// The newest UI spectrum, or `None` when nothing new was tapped. Drains the tap ring and runs
+    /// the FFT **here** (the control thread), never in the audio callback.
+    pub fn spectrum(&mut self) -> Option<&[u8; crate::spectrum::BINS]> {
+        self.spec.drain(&mut self.tap);
+        self.spec.fresh().then(|| self.spec.analyse())
+    }
 }
 
 /// Name of the simulated host: no hardware, a real-time clock thread, and the main output fed
@@ -726,6 +739,7 @@ struct Plumbing {
     cmd_rx: rtrb::Consumer<Command>,
     gar_tx: rtrb::Producer<Garbage>,
     met_tx: rtrb::Producer<Meters>,
+    tap_tx: rtrb::Producer<f32>,
     in_tx: rtrb::Producer<f32>,
     in_rx: rtrb::Consumer<f32>,
 }
@@ -734,12 +748,16 @@ pub(crate) struct Ends {
     pub(crate) commands: rtrb::Producer<Command>,
     pub(crate) garbage: rtrb::Consumer<Garbage>,
     pub(crate) meters: rtrb::Consumer<Meters>,
+    pub(crate) tap: rtrb::Consumer<f32>,
 }
 
 fn plumbing(rate: u32, max_block: usize) -> (Plumbing, Ends) {
     let (cmd_tx, cmd_rx) = rtrb::RingBuffer::<Command>::new(1024);
     let (gar_tx, gar_rx) = rtrb::RingBuffer::<Garbage>::new(256);
     let (met_tx, met_rx) = rtrb::RingBuffer::<Meters>::new(64);
+    // The UI spectrum tap: the audio thread copies the mono main bus here and the control thread
+    // does the FFT, so nothing heavier than a ring push happens in the callback.
+    let (tap_tx, tap_rx) = rtrb::RingBuffer::<f32>::new(crate::spectrum::TAP);
     // Mono-or-stereo input ring, interleaved L/R, ~170 ms of capacity.
     let (in_tx, in_rx) = rtrb::RingBuffer::<f32>::new((rate as usize / 6).next_power_of_two() * 2);
     (
@@ -748,6 +766,7 @@ fn plumbing(rate: u32, max_block: usize) -> (Plumbing, Ends) {
             cmd_rx,
             gar_tx,
             met_tx,
+            tap_tx,
             in_tx,
             in_rx,
         },
@@ -755,6 +774,7 @@ fn plumbing(rate: u32, max_block: usize) -> (Plumbing, Ends) {
             commands: cmd_tx,
             garbage: gar_rx,
             meters: met_rx,
+            tap: tap_rx,
         },
     )
 }
@@ -804,6 +824,7 @@ fn output_callback(
         mut cmd_rx,
         mut gar_tx,
         mut met_tx,
+        mut tap_tx,
         in_tx: _,
         mut in_rx,
     } = p;
@@ -869,6 +890,11 @@ fn output_callback(
                 mon_r: &mut or[..frames],
             },
         );
+        // UI spectrum tap: the mono main bus. A display, so a full ring drops the oldest samples
+        // rather than ever blocking the audio thread.
+        for f in 0..frames {
+            let _ = tap_tx.push(0.5 * (ml[f] + mr[f]));
+        }
         data.fill(0.0);
         // A pair routed to ONE channel (`--main 8`) gets the mono mix, not L + R (+6 dB).
         let side = |pair: [usize; 2]| if pair[0] == pair[1] { 0.5 } else { 1.0 };
@@ -1058,6 +1084,8 @@ fn start_native(cfg: &IoConfig, mode: crate::wasapi::Mode) -> Result<Running, Io
         commands: ends.commands,
         garbage: ends.garbage,
         meters: ends.meters,
+        tap: ends.tap,
+        spec: crate::spectrum::Spectrum::new(),
         info: RunningInfo {
             host: native_label(mode).into(),
             input: in_name,
@@ -1252,6 +1280,8 @@ pub fn start(cfg: &IoConfig) -> Result<Running, IoError> {
         commands: ends.commands,
         garbage: ends.garbage,
         meters: ends.meters,
+        tap: ends.tap,
+        spec: crate::spectrum::Spectrum::new(),
         info: RunningInfo {
             host: host.id().name().to_string(),
             input: dev_name(&indev),
@@ -1374,6 +1404,25 @@ mod tests {
     use super::*;
     use crate::{ProbeState, Session};
     use std::collections::VecDeque;
+
+    /// The tap is wired end to end: the simulated device renders, the callback copies the mono main
+    /// bus into the ring, and the control thread produces frames from it. Its loopback is silence,
+    /// so every bin must sit at the floor — which is itself the proof that the mapping is right.
+    #[test]
+    fn the_simulated_device_feeds_the_spectrum_tap() {
+        let cfg = IoConfig {
+            host: Some(NULL_HOST.into()),
+            ..IoConfig::default()
+        };
+        let mut running = start(&cfg).expect("the Null host starts");
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        let bins = running.spectrum().expect("the tap produced a frame");
+        assert_eq!(bins.len(), crate::spectrum::BINS);
+        assert!(
+            bins.iter().all(|b| *b == 0),
+            "the simulated loopback is silence, so every bin is at the floor"
+        );
+    }
 
     /// Deterministic generator, the same sequence on every platform.
     struct Lcg(u64);

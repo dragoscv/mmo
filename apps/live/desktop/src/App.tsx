@@ -13,6 +13,7 @@ import { PitchRibbon } from "./components/PitchRibbon";
 import { PresetsBar, TapTempo } from "./components/Presets";
 import { SafetyBar } from "./components/SafetyBar";
 import { SetlistPanel } from "./components/Setlist";
+import { Spectrum } from "./components/Spectrum";
 import { TunerStrip } from "./components/Tuner";
 import { shortcutFor, targetInfo, toggleFor } from "./lib/keyboard";
 import { setReducedMotion } from "./lib/meter-bus";
@@ -85,6 +86,7 @@ export function App() {
                             <div className="flex min-h-0 flex-col gap-3">
                                 <TunerStrip />
                                 <PitchRibbon />
+                                <Spectrum />
                             </div>
                             <div className="flex min-h-0 flex-col gap-3">
                                 <MixStrip />
@@ -108,6 +110,7 @@ export function App() {
                             <div className="flex min-h-0 flex-col gap-3">
                                 <TunerStrip />
                                 <PitchRibbon />
+                                <Spectrum />
                                 <Chain />
                                 <InsertDetail />
                             </div>

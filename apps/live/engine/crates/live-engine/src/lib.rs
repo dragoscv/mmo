@@ -10,6 +10,7 @@ pub mod midi;
 pub mod preset;
 pub mod sample;
 pub mod session;
+pub mod spectrum;
 pub mod store;
 pub mod voicemeeter;
 #[cfg(windows)]

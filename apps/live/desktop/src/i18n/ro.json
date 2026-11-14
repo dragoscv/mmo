@@ -378,5 +378,8 @@
     "pitch": {
         "title": "Ton",
         "idle": "se așteaptă vocea"
+    },
+    "spectrum": {
+        "title": "Spectru"
     }
 }

@@ -58,6 +58,11 @@ The output callback and everything it calls (`Core`, `Chain`, every `Processor`)
    `assert_no_alloc`.
 2. **No locks.** Three single-producer/single-consumer `rtrb` rings connect the threads; a full ring never
    blocks (the control loop retries a command next tick; meters/garbage pushes are best-effort).
+
+The UI **spectrum** obeys both: the output callback only *copies* the mono main bus into one more ring
+(`spectrum::TAP`), and the FFT — 512 points, Hann window, fixed buffers, in `live-engine/src/spectrum.rs` — runs
+on the **control thread** when the host asks for a frame (`Running::spectrum`, ~15 Hz). A full ring drops the
+oldest samples: it is a display, never a signal path.
 3. **No unbounded work.** Fixed-size buffers sized at construction (`max_block` = max(8 × buffer, 2048) frames
    in device mode), fixed-size arrays for the latency median, tails processed in 256-frame chunks.
 4. **Every gain change is ramped** (`Smoothed`: 10 ms for bypass, mute, monitor-dry and for bus gains going

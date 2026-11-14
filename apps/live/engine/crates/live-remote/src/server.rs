@@ -150,6 +150,8 @@ struct Shared {
     hello: Value,
     state: String,
     meters: String,
+    /// The newest spectrum frame, sent to clients that asked for meters (15 Hz, one byte per bin).
+    spectrum: String,
     incoming: VecDeque<Incoming>,
     replies: HashMap<u64, VecDeque<String>>,
     clients: HashMap<u64, ClientInfo>,
@@ -159,6 +161,8 @@ pub(crate) struct Inner {
     shared: Mutex<Shared>,
     state_rev: AtomicU64,
     meters_rev: AtomicU64,
+    /// Bumped when a fresh spectrum frame is published.
+    spectrum_rev: AtomicU64,
     token_rev: AtomicU64,
     /// Bumped when the pairing list changes, so controllers get a fresh `devices` frame.
     devices_rev: AtomicU64,
@@ -332,6 +336,7 @@ impl RemoteServer {
                 hello: json!({ "engine_name": config.engine_name }),
                 state: "null".into(),
                 meters: String::new(),
+                spectrum: String::new(),
                 incoming: VecDeque::new(),
                 replies: HashMap::new(),
                 clients: HashMap::new(),
@@ -340,6 +345,7 @@ impl RemoteServer {
             // (a `"state": null` frame would wipe client UIs on connect).
             state_rev: AtomicU64::new(0),
             meters_rev: AtomicU64::new(0),
+            spectrum_rev: AtomicU64::new(0),
             token_rev: AtomicU64::new(1),
             devices_rev: AtomicU64::new(1),
             next_pairing: AtomicU64::new(next),
@@ -509,6 +515,12 @@ impl RemoteServer {
     pub fn publish_meters(&self, json: String) {
         self.inner.lock().meters = json;
         self.inner.meters_rev.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Publish a spectrum frame (see `spectrum_json`). Sent to the clients that asked for meters.
+    pub fn publish_spectrum(&self, json: String) {
+        self.inner.lock().spectrum = json;
+        self.inner.spectrum_rev.fetch_add(1, Ordering::SeqCst);
     }
 
     pub fn drain(&self) -> Vec<Incoming> {
@@ -847,6 +859,7 @@ fn session(
     send(&mut ws, hello.to_string()).map_err(io_err)?;
     let mut seen_state = 0u64;
     let mut seen_meters = inner.meters_rev.load(Ordering::SeqCst);
+    let mut seen_spectrum = inner.spectrum_rev.load(Ordering::SeqCst);
     let mut seen_devices = 0u64;
     let mut meters_on = false;
     let mut meters_every = Duration::from_millis(33);
@@ -900,6 +913,16 @@ fn session(
             let m = inner.lock().meters.clone();
             if !m.is_empty() {
                 send(&mut ws, m).map_err(io_err)?;
+            }
+        }
+        // The spectrum rides along with the meters (one byte per bin, ~15 Hz): no second
+        // subscription, and a client that wants only meters can ignore the type.
+        let srev = inner.spectrum_rev.load(Ordering::SeqCst);
+        if meters_on && srev != seen_spectrum {
+            seen_spectrum = srev;
+            let spec = inner.lock().spectrum.clone();
+            if !spec.is_empty() {
+                send(&mut ws, spec).map_err(io_err)?;
             }
         }
         let pending: Vec<String> = inner

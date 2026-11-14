@@ -58,6 +58,12 @@ pub fn meters_json(m: &Meters) -> String {
     .to_string()
 }
 
+/// One spectrum frame: `BINS` bytes, each 0 (the floor, -90 dB) to 255 (0 dB), lowest bin first.
+/// A byte per bin keeps the frame at ~350 bytes of JSON, which a watch on Wi-Fi can take at 15 Hz.
+pub fn spectrum_json(bins: &[u8]) -> String {
+    json!({ "type": "spectrum", "bins": bins }).to_string()
+}
+
 /// Protocol error code for a session error.
 pub fn server_error_code(e: &SessionError) -> &'static str {
     match e {

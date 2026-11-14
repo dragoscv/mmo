@@ -12,7 +12,9 @@
 //! depend on `cpal::Stream` being `Send` on every platform.
 
 use crate::server::{SeedPairing, TokenSet, role_from, role_name};
-use crate::{RemoteConfig, RemoteServer, discovery::Announcer, meters_json, server_error_code};
+use crate::{
+    RemoteConfig, RemoteServer, discovery::Announcer, meters_json, server_error_code, spectrum_json,
+};
 use live_engine::{
     Command, Control, IoConfig, Meters, Role, RunningInfo, Session, Store, io,
     store::{StoredPairing, StoredTokens},
@@ -27,6 +29,9 @@ use std::time::{Duration, Instant};
 const TICK: Duration = Duration::from_millis(5);
 /// How often the mix is written to disk at most (a fader drag sends many changes a second).
 const SAVE_EVERY: Duration = Duration::from_millis(500);
+/// How often the UI spectrum is analysed and published (15 Hz: fast enough to follow a note, cheap
+/// enough for a watch on Wi-Fi).
+const SPECTRUM_EVERY: Duration = Duration::from_millis(66);
 /// Waits before each attempt to reopen the audio device after it failed, then give up.
 const RESTART_BACKOFF_MS: [u64; 10] = [200, 400, 800, 1600, 3200, 5000, 5000, 5000, 5000, 5000];
 /// Engine commands waiting for room in the command ring. Past this the audio callback is not running (stream
@@ -396,6 +401,7 @@ fn run(
     let mut last_rev = u64::MAX;
     let mut dirty = false;
     let mut last_save = Instant::now();
+    let mut spectrum_at = Instant::now();
     while !stop.load(Ordering::SeqCst) {
         std::thread::sleep(TICK);
         let mix_before = session.mix.clone();
@@ -467,6 +473,12 @@ fn run(
             let mut s = lock(&shared);
             s.meters = Some(m);
             s.driver_xruns = running.driver_xruns();
+        }
+        if spectrum_at.elapsed() >= SPECTRUM_EVERY {
+            spectrum_at = Instant::now();
+            if let Some(bins) = running.spectrum() {
+                server.publish_spectrum(spectrum_json(bins));
+            }
         }
         if !running.alive() {
             let reason = running

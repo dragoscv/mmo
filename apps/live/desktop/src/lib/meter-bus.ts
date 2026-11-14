@@ -9,6 +9,10 @@ let latest: Meters | null = null;
 let stamp = 0;
 const subs = new Set<() => void>();
 
+/** The newest spectrum frame: one byte per bin, 0 = the floor (-90 dB), 255 = 0 dB. */
+let spectrum: Uint8Array | null = null;
+let spectrumStamp = 0;
+
 export const meterBus = {
     publish(m: Meters) {
         latest = m;
@@ -24,6 +28,14 @@ export const meterBus = {
     /** ms since the last meters frame (stale meters fall to silence). */
     age(): number {
         return latest ? performance.now() - stamp : Number.POSITIVE_INFINITY;
+    },
+    publishSpectrum(bins: number[]) {
+        spectrum = Uint8Array.from(bins);
+        spectrumStamp = performance.now();
+    },
+    /** The newest spectrum, or `null` when it is stale (the engine stopped sending). */
+    get spectrum(): Uint8Array | null {
+        return spectrumStamp && performance.now() - spectrumStamp < 1500 ? spectrum : null;
     },
 };
 

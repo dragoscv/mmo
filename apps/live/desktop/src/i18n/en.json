@@ -378,5 +378,8 @@
     "pitch": {
         "title": "Pitch",
         "idle": "waiting for a voice"
+    },
+    "spectrum": {
+        "title": "Spectrum"
     }
 }

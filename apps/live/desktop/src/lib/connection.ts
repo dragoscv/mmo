@@ -60,6 +60,8 @@ export class EngineConnection {
         const msg = parseServer(m.data);
         if (!msg) return;
         if (msg.type === "meters") meterBus.publish(msg);
+        // The spectrum is a display too: it goes to the bus, not through React state at 15 Hz.
+        else if (msg.type === "spectrum") meterBus.publishSpectrum(msg.bins);
         else this.ev.onMessage(msg);
     }
 

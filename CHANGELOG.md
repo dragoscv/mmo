@@ -38,6 +38,24 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the engine has a spectrum now (WP21-20 part 2, 2026-11-14)
+
+The spectrum on the performance screen is the engine's own analysis, not a guess made in the browser. The output
+callback only **copies** the mono main bus into one more lock-free ring — the audio thread never runs the maths —
+and a 512-point radix-2 FFT with a Hann window, on fixed buffers and with no twiddle table (so nothing
+allocates), runs on the engine's **control thread** when the host asks for a frame, about fifteen times a second.
+A frame is 128 bins of one byte: 0 is −90 dB and 255 is 0 dB, which keeps it at ~350 bytes instead of 256 floats,
+so a watch on Wi-Fi can take it. Frames ride along with the meters subscription — a client that only wants levels
+ignores the type.
+
+The desktop draws it on a log frequency axis with 100 Hz / 1 kHz / 10 kHz marks, in the same column as the pitch
+ribbon, in the level meters' tokens, and without a React re-render (it goes to the meter bus, as the meters do).
+
+Verified: a 1 kHz tone lands in the right bin and near full scale; silence is the floor; a constant signal is DC
+in bin 0; the FFT of an impulse is flat; the UI's frequency scale agrees with the transform at 200 Hz, 1 kHz and
+4 kHz; and the whole tap → drain → FFT → frame path runs on the simulated device. Engine workspace 225 tests,
+clippy `-D warnings` clean; desktop typecheck 0, 39 tests, i18n parity 329 keys, production build green.
+
 ## MixAI Live — pairing is per device, and one lost phone can be revoked (WP21-19 part 5, 2026-11-14)
 
 Pairing used to hand out **one token per role**: every phone scanning the performer code shared it, so the only

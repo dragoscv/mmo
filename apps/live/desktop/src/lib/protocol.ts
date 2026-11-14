@@ -192,6 +192,7 @@ export type ServerMsg =
     | ({ type: "hello" } & Hello)
     | { type: "state"; state: SessionState }
     | { type: "devices"; devices: Device[] }
+    | { type: "spectrum"; bins: number[] }
     | ({ type: "meters" } & Meters)
     | { type: "ack"; id: number | null }
     | { type: "error"; id?: number | null; code: string; message: string }
@@ -358,6 +359,9 @@ export function reduce(s: ProtocolState, msg: ServerMsg): ProtocolState {
             return { ...s, state: msg.state };
         case "devices":
             return { ...s, devices: msg.devices };
+        case "spectrum":
+            // A display at 15 Hz: it goes to the meter bus, never through React state.
+            return s;
         case "ack":
             return msg.id == null ? s : { ...s, pending: s.pending.filter((p) => p !== msg.id) };
         case "error": {
