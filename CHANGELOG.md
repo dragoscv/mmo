@@ -38,6 +38,17 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the docs say the fast pitch path is the default everywhere (2026-11-14)
+
+Turning `auto` into the period-synchronous shifter at every pitch (the entry below, and the decision it records)
+left three texts describing the old rule: the tracker row for the latency slice still ended with "the fast mode
+is not the default everywhere … the owner should hear both on his rig", the effects page still had a sentence
+calling the threshold "why `auto` keeps the classic one on low notes", and two comments in `tune.rs` placed the
+choice at 110 Hz on `auto` rather than on the shifter each path actually runs. All three were corrected in place,
+and the comment on the ignored `shifter_applies_small_corrections_at_110_hz` now records the outcome WP21-26
+reached: the classic path's small-correction defect is avoided by default, not fixed, because the classic shifter
+is still reachable through `fast = off` and through `formant` on. No behaviour changed.
+
 ## MixAI Live — the latency budget, declared against measured (2026-11-13)
 
 The setup step now shows a **latency budget**: every stage the engine can account for — the input period, the

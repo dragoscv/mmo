@@ -182,9 +182,10 @@ every 128 samples (2.7 ms at 48 kHz).
   2026-11-14 comes out **+0.01 cents** with `on` against **−25.16 cents** with `auto` (the whole correction
   lost — `tune::tests::what_auto_costs_on_a_low_note`). What the threshold buys is delay: in the steady state
   the envelope of the period-synchronous output lags by 287 samples against 57 for the classic path at 110 Hz
-  (+4.8 ms, `tune::tests::the_fast_path_costs_delay_on_a_low_note`), which is why `auto` keeps the classic one
-  on low notes. That estimate is why `auto` used to keep the classic path below 187.5 Hz; it did not survive
-  measurement (`fast` on `auto` selects the period-synchronous one everywhere now). Neither path has been
+  (+4.8 ms, `tune::tests::the_fast_path_costs_delay_on_a_low_note`). That delay is the whole cost of the
+  threshold, and it is why `auto` used to keep the classic path below 187.5 Hz; it did not
+  survive measurement — since 2026-11-14 `auto` selects the period-synchronous one everywhere, because a lost
+  correction and a mix that nearly mutes a low voice are defects, not preferences. Neither path has been
   measured on a real voice below 187.5 Hz.
   **A partial `mix` nearly mutes a low note on the classic path.** Measured 2026-11-14 on a 110 Hz tone with a
   +25 cent transpose: `mix` 0.5 comes out 17.3 dB below either side alone (0.0386 against 0.2828 RMS), because

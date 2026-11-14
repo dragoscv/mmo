@@ -812,8 +812,10 @@ mod tests {
     /// +10). At 220 Hz and above the error stays under 6 cents.
     /// Probable cause, not isolated: the period (436 samples) is longer than a grain
     /// (256), which is the case below 187.5 Hz, the range of a male voice. Not measured between
-    /// 110 and 220 Hz, nor on a real voice. The period-synchronous shifter (tracker WP21-26) has
-    /// to make this test pass; remove the `ignore` then.
+    /// 110 and 220 Hz, nor on a real voice. WP21-26 (2026-11-14) answered this by choosing the
+    /// other shifter instead of fixing this one: `auto`, the default, takes the period-synchronous
+    /// path at every pitch, so this stays ignored while the classic path is still reachable
+    /// (`fast = off`, or `auto` with `formant` on, where the colouring lives).
     #[test]
     #[ignore = "known defect: grains shorter than the period lose small corrections (WP21-26)"]
     fn shifter_applies_small_corrections_at_110_hz() {

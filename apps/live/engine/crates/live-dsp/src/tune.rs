@@ -699,7 +699,7 @@ mod tests {
     }
 
     /// The defect the classic shifter has and the fast one must not: a small correction on a low
-    /// note is LOST (its ignored test `shifter_applies_small_corrections_at_110_hz`).
+    /// note is LOST on the classic path.
     #[test]
     fn fast_mode_applies_a_small_correction_at_110_hz() {
         let error_cents = |fast: bool| {
@@ -707,8 +707,8 @@ mod tests {
             t.set_param(2, 0.0); // amount: no scale correction, only the transpose below
             t.set_param(3, 0.5); // retune 40 ms
             t.set_param(7, 0.25); // +25 cents
-            // Forced, not auto: at 110 Hz auto deliberately keeps the classic shifter, and this is
-            // the test of what the fast one does there when it is asked for.
+            // Both modes forced: this is what each path does at 110 Hz when it is asked for,
+            // independent of what `auto` picks (the fast one at every pitch since 2026-11-14).
             t.set_param(9, if fast { 2.0 } else { 0.0 });
             let mut l = sine(110.0, 48000.0, 96000, 0.4);
             let mut r = l.clone();
