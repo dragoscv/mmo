@@ -1687,6 +1687,11 @@ mod tests {
                 // Stack, pre-existing and only bounded for Ballad Hall -> Speech in
                 // `untuned_scene_change_does_not_click`). The point here is that the monitor's own
                 // crossfade and scene swap never add a step the main bus does not already have.
+                // The absolute bound moved from 0.30 to 0.40 on 2026-11-14: a hard `SwapChains`
+                // step is a property of the two chains' contents, and Pop Polish -> Harmony Stack
+                // went from 0.2579 (measured when the harmony voices ran the classic granular
+                // shifter) to 0.3516 (period-synchronous voices). Monitor and main report the same
+                // figure, which is the invariant this test is for; the bound only catches a new one.
                 let (main, mon) = (max_step(&main[24000..]), max_step(&mon[24000..]));
                 report.push(format!(
                     "toggle at 25600, {from} -> {to} {gap} block(s) later: monitor {mon:.4}, main {main:.4}"
@@ -1695,7 +1700,7 @@ mod tests {
                     mon <= main + 0.01,
                     "monitor stepped more than main:\n{report:#?}"
                 );
-                assert!(mon < 0.30, "monitor stepped:\n{report:#?}");
+                assert!(mon < 0.40, "monitor stepped:\n{report:#?}");
             }
         }
         // Shown with `-- --nocapture`.

@@ -305,6 +305,11 @@ pub struct Harmonizer {
     v: [f32; HARM_N],
     yin: Yin,
     voices: [Shifter; HARMONY_VOICES],
+    /// Period-synchronous voice of each harmony line; the classic `voices` are the other path.
+    psola: [PsolaShifter; HARMONY_VOICES],
+    /// Weight of the period-synchronous voices, ramped so a change of path does not click.
+    mode: Smoothed,
+    want_fast: bool,
     levels: [Smoothed; HARMONY_VOICES],
     dry: Smoothed,
     scale: Scale,
@@ -323,12 +328,17 @@ impl Harmonizer {
             v,
             yin: Yin::new(sample_rate),
             voices: core::array::from_fn(|_| Shifter::new(false)),
+            psola: core::array::from_fn(|_| PsolaShifter::new(sample_rate)),
+            mode: Smoothed::with_ms(if v[4] > 0.5 { 0.0 } else { 1.0 }, 10.0, sample_rate),
+            want_fast: v[4] <= 0.5,
             levels: core::array::from_fn(|k| Smoothed::with_ms(v[6 + k * 4], 30.0, sample_rate)),
             dry: Smoothed::with_ms(v[3], 20.0, sample_rate),
             scale: Scale::new(v[0] as usize, v[1] as usize),
             src: None,
             silence_q: 0,
             q_pos: 0,
+            // Two taps: one sample back for the period-synchronous path, `Shifter::latency()` back
+            // for the classic one, crossfaded by `mode` exactly as the voices are.
             delay: vec![0.0; Shifter::latency() + 1],
             delay_w: 0,
         }
@@ -376,7 +386,23 @@ impl Harmonizer {
             };
             self.voices[k].set_ratio(ratio);
             self.voices[k].control(QUANTUM);
+            self.psola[k].set_ratio(ratio);
         }
+        // The period is one figure for all voices: the source is the same voice.
+        let period = if info.voiced() && info.frequency > 0.0 {
+            self.sr / info.frequency
+        } else {
+            0.0
+        };
+        for p in &mut self.psola {
+            p.set_period(period);
+        }
+        // The classic path is the only one with formant colouring, so `formant` on keeps it; there is
+        // no pitch threshold, because the period-synchronous voices measured within 0.2 cents at every
+        // pitch tried (82-440 Hz, -3 to +12 semitones) while the classic ones were up to 86 cents off
+        // at 82 Hz (tune::tests::harmonizer_voice_pitch_at_low_notes).
+        self.want_fast = self.v[4] <= 0.5;
+        self.mode.set(if self.want_fast { 1.0 } else { 0.0 });
     }
 }
 
@@ -415,8 +441,17 @@ impl Processor for Harmonizer {
             self.q_pos = (self.q_pos + 1) % QUANTUM;
             let x = 0.5 * (*a + *b);
             self.yin.push(x);
-            // Delay the lead by the shifter latency so lead + harmonies stay phase-aligned.
-            let dl = self.delay[(self.delay_w + 1) % dlen];
+            let m = self.mode.next();
+            // Delay the lead by the active path's latency so lead + harmonies stay phase-aligned:
+            // one sample behind for the period-synchronous voices, `Shifter::latency()` for the
+            // classic ones. Crossfaded with the voices, so a change of path never combs.
+            let dl = if m > 0.0 {
+                let old = self.delay[(self.delay_w + 1) % dlen];
+                let fast = self.delay[(self.delay_w + dlen - 1) % dlen];
+                old + m * (fast - old)
+            } else {
+                self.delay[(self.delay_w + 1) % dlen]
+            };
             self.delay[self.delay_w] = x;
             self.delay_w = (self.delay_w + 1) % dlen;
             let d = self.dry.next();
@@ -424,7 +459,13 @@ impl Processor for Harmonizer {
             let mut or = 0.0;
             for k in 0..HARMONY_VOICES {
                 let lvl = self.levels[k].next();
-                let y = self.voices[k].tick(x);
+                let y = if m > 0.0 {
+                    let old = self.voices[k].tick(x);
+                    let fast = self.psola[k].tick(x);
+                    old + m * (fast - old)
+                } else {
+                    self.voices[k].tick(x)
+                };
                 if lvl > 0.0 && self.src.is_some() {
                     ol += y * lvl * pans[k].0;
                     or += y * lvl * pans[k].1;
@@ -439,11 +480,18 @@ impl Processor for Harmonizer {
         for s in &mut self.voices {
             s.reset();
         }
+        for p in &mut self.psola {
+            p.reset();
+        }
         self.delay.fill(0.0);
         self.src = None;
     }
     fn latency(&self) -> usize {
-        Shifter::latency()
+        if self.want_fast {
+            self.psola[0].latency()
+        } else {
+            Shifter::latency()
+        }
     }
 }
 
@@ -520,7 +568,26 @@ impl Processor for Tuner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pitch::MIN_FREQ;
     use crate::test_util::{rms, sine, voice};
+
+    /// Frequency of a clean tone from its rising zero crossings — independent of `detect`, which
+    /// refuses anything below `MIN_FREQ` and can be fooled by a harmonically rich shifter output.
+    fn zero_cross_freq(buf: &[f32]) -> f32 {
+        let (mut first, mut last, mut n) = (None, 0.0f64, 0u32);
+        for i in 1..buf.len() {
+            if buf[i - 1] < 0.0 && buf[i] >= 0.0 {
+                let t = (i - 1) as f64 + f64::from(-buf[i - 1]) / f64::from(buf[i] - buf[i - 1]);
+                first.get_or_insert(t);
+                last = t;
+                n += 1;
+            }
+        }
+        if n < 2 {
+            return 0.0;
+        }
+        (48000.0 * f64::from(n - 1) / (last - first.unwrap_or(0.0))) as f32
+    }
 
     fn detect(buf: &[f32]) -> f32 {
         let mut y = Yin::new(48000.0);
@@ -917,6 +984,95 @@ mod tests {
                 assert!(peak < 0.7, "formant {formant} f0 {f0}: peak {peak}");
             }
         }
+    }
+
+    /// What a harmony voice is actually in tune by, one voice at a time and no dry signal. This is the
+    /// measurement that moved the harmonizer's voices to the period-synchronous path on 2026-11-14: on
+    /// the classic path the two estimators did not even agree at low pitch (82 Hz, +7 semitones: yin
+    /// -5.79 cents, zero crossings +86.19 — a rough, audibly detuned voice), while the same ratios
+    /// through the period-synchronous shifter measured within 0.2 cents on every one of these cases.
+    /// The assertion is that both estimators stay close to the target AND to each other.
+    #[test]
+    fn harmonizer_voice_pitch_at_low_notes() {
+        let err = |f0: f32, interval: f32| {
+            let mut h = Harmonizer::new(48000.0);
+            h.set_param(2, 1.0); // chromatic: the interval is in semitones
+            h.set_param(3, 0.0); // no dry: only the voice sounds
+            h.set_param(5, interval);
+            h.set_param(6, 1.0); // voice 1 at full level
+            for off in [10, 14, 18] {
+                h.set_param(off, 0.0); // voices 2-4 off
+            }
+            let long = sine(f0, 48000.0, 3 * 48000, 0.4);
+            let mut out = Vec::with_capacity(long.len());
+            for chunk in long.chunks(480) {
+                let (mut l, mut r) = (chunk.to_vec(), chunk.to_vec());
+                h.process(&mut l, &mut r);
+                out.extend_from_slice(&l);
+            }
+            let want = f0 * 2f32.powf(interval / 12.0);
+            let tail = &out[out.len() - 24000..];
+            let yin = 1200.0 * (detect(&out) / want).log2();
+            let zc = 1200.0 * (zero_cross_freq(tail) / want).log2();
+            (yin, zc, f0 * 2f32.powf(interval / 12.0))
+        };
+        let mut worst = (-1.0f32, -1.0f32, -1.0f32);
+        for f0 in [82.0f32, 110.0, 165.0, 220.0, 440.0] {
+            for interval in [4.0f32, 7.0, -3.0, 12.0] {
+                let (yin, zc, want) = err(f0, interval);
+                let worst_of = yin.abs().max(zc.abs());
+                println!(
+                    "harmonizer {f0:.0} Hz {interval:+.0} st -> {want:.1} Hz: yin {yin:+.2} / zero crossings {zc:+.2} cents"
+                );
+                // A target below the detector's own range cannot be judged by that detector (82 Hz
+                // down three semitones is 69 Hz, under MIN_FREQ): only the zero crossings mean
+                // anything there, and they are the estimator a listener's ear resembles more closely.
+                if want >= MIN_FREQ {
+                    assert!(
+                        (yin - zc).abs() < 5.0,
+                        "{f0} Hz {interval:+} st: the estimators disagree ({yin:+.2} / {zc:+.2}) - the voice is not a clean tone"
+                    );
+                } else {
+                    assert!(
+                        zc.abs() < 5.0,
+                        "{f0} Hz {interval:+} st: zero crossings are {zc:+.2} cents off"
+                    );
+                    if worst.2 < 0.0 || zc.abs() > worst.2 {
+                        worst = (f0, interval, zc.abs());
+                    }
+                    continue;
+                }
+                assert!(
+                    worst_of < 5.0,
+                    "{f0} Hz {interval:+} st: {worst_of:.2} cents off"
+                );
+                if worst.2 < 0.0 || worst_of > worst.2 {
+                    worst = (f0, interval, worst_of);
+                }
+            }
+        }
+        println!("harmonizer worst: {worst:?} (f0, interval, worst of both estimators)");
+    }
+
+    /// The harmonizer's voices take the same rule as the autotune's: period-synchronous by default,
+    /// the classic granular voice only when `formant` asks for the colouring that lives there. The
+    /// declared chain latency is the observable: 1 sample against 256.
+    #[test]
+    fn harmonizer_voices_use_the_period_synchronous_path() {
+        let chain = |formant: f32| {
+            let mut h = Harmonizer::new(48000.0);
+            h.set_param(4, formant);
+            let mut l = sine(220.0, 48000.0, 9600, 0.4);
+            let mut r = l.clone();
+            h.process(&mut l, &mut r);
+            h.latency()
+        };
+        assert_eq!(chain(0.0), 1, "formant off: the period-synchronous voices");
+        assert_eq!(
+            chain(1.0),
+            256,
+            "formant on: the classic voices, which colour"
+        );
     }
 
     #[test]

@@ -48,6 +48,23 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — the harmony voices stop being rough on low notes (2026-11-14)
+
+Measuring the harmonizer the way the autotune was measured turned up a worse version of the same defect. One
+voice at a time, no dry signal: on the classic granular path a harmony at 82 Hz (E2) came out **+45.75 cents**
+off up four semitones and **+86.19 cents** up seven by zero crossings while the detector said −2.99 and −5.79 —
+the two estimators disagreeing means the voice was rough, not just detuned — and at 110 Hz a fifth up they were
+14 cents apart. The same ratios through the period-synchronous shifter landed within **0.2 cents** on all twenty
+cases (82–440 Hz, −3 to +12 semitones), with both estimators agreeing. The harmonizer's four voices now run that
+path by default, the lead's delay follows whichever path is in use so lead and voices stay phase-aligned, and
+`formant` on keeps the classic voices because the colouring lives there. The chain latency of a harmonizer drops
+from 256 samples to 1, so a chain with an autotune and a harmonizer reads 2 instead of 257 — verified live
+through the protocol on the simulated device: `Pop Polish` 1/1 → 1/0, `Harmony Stack` 2/2 → 2/0, both restoring
+to the main chain's figure. A hard `SwapChains` between two presets steps a little further than before
+(0.3516 against 0.2579 for Pop Polish → Harmony Stack) because the swapped chain's waveform differs more; the
+monitor machinery still adds nothing of its own, which is what the guard in that test is for, so its absolute
+bound moved with the measurement. Engine workspace green: 206 tests, 0 failed.
+
 ## MixAI Live — the fast pitch path is now the default everywhere (2026-11-14)
 
 `fast = auto` used to keep the classic granular shifter on notes below 187.5 Hz, on the estimate that the

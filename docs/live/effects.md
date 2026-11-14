@@ -36,7 +36,7 @@ Units: `0–1` = fraction shown as a percentage in the UI; `:1` = compression ra
 | [`deesser`](#deesser) | Split-band / wide de-esser | 0 | 0 |
 | [`compressor`](#compressor) | Soft-knee feed-forward compressor | 0 | 0 |
 | [`autotune`](#autotune) | Pitch correction | 1 sample with `fast` `auto`/`on` (the default, at every pitch since 2026-11-14); 256 (5.3 ms @ 48 kHz) with `off` or with `formant` on | 0 |
-| [`harmonizer`](#harmonizer) | 4-voice harmonizer | 256 samples | 0 |
+| [`harmonizer`](#harmonizer) | 4-voice harmonizer | 1 sample (period-synchronous voices, the default); 256 with `formant` on | 0 |
 | [`saturator`](#saturator) | Tape / tube / soft clip | 0 | 0 |
 | [`doubler`](#doubler) | ADT doubler | 0 | 0.06 s |
 | [`chorus`](#chorus) | Stereo chorus | 0 | 0.05 s |
@@ -232,6 +232,17 @@ Up to four pitch-shifted voices around the (latency-aligned) lead.
   the first two modes.
 - `dry` is the lead level (the lead is delayed by the shifter latency so it stays phase-aligned with the voices).
 - `vN_level` and `vN_pan` place each voice; levels are smoothed over 30 ms.
+- The voices are **period-synchronous** since 2026-11-14 (chain latency 1 sample instead of 256), the same path
+  the `autotune` defaults to, and the lead's delay follows the path that is in use so lead and voices stay
+  aligned. `formant` on keeps the classic granular voices, because the colouring lives there.
+  Measured one voice at a time with no dry signal: on the classic path a harmony at 82 Hz (E2) came out
+  **+45.75** cents off up four semitones and **+86.19** cents up seven by zero crossings while the pitch
+  detector said −2.99 / −5.79 — the two disagreeing means the voice was rough, not merely detuned — and at
+  110 Hz a fifth up the two were 14 cents apart. The same ratios through the period-synchronous shifter landed
+  within **0.2 cents** on all twenty cases tried (82–440 Hz, −3 to +12 semitones), with both estimators agreeing
+  (`tune::tests::harmonizer_voice_pitch_at_low_notes`). One case cannot be judged by the detector at all: a
+  low source three semitones down goes below `MIN_FREQ` (82 Hz → 69 Hz), so that row is checked by zero
+  crossings alone.
 
 <!-- params:harmonizer:start (generated from live-dsp/src/tune.rs HARM_SPECS; do not edit by hand) -->
 
