@@ -149,6 +149,9 @@ export interface Meters {
     dsp_load_max: number;
     xruns: number;
     clipped: boolean;
+    /** Deepest gain reduction of the safety limiter since the last snapshot, dB >= 0: main, monitor.
+     *  Published by the engine; 0/0 means the safety stage has not touched anything. */
+    safety_gr?: [number, number];
     tune: Tune | null;
     latency_probe: LatencyProbe;
     chain_latency_samples?: number;

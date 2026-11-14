@@ -72,12 +72,6 @@
         "budgetDeclaredEars": "Declarat pentru urechi",
         "budgetMeasured": "Dus-întors măsurat",
         "budgetRest": "Driver, sistem și rutare",
-        "latencyOverlay": {
-            "title": "Buget de latență",
-            "close": "Închide bugetul de latență",
-            "noMeasurement": "Încă nemăsurat: rulează proba din Configurare și linia apare aici.",
-            "hint": "Tasta L deschide panoul. „Declarat\" e ce controlează motorul; dus-întorsul măsurat vine prin buclă, iar diferența este driverul, sistemul și rutarea."
-        },
         "start": "Pornește",
         "starting": "Pornesc motorul…",
         "cancel": "Anulează",
@@ -228,7 +222,8 @@
         "m": "Mut",
         "arrows": "Partea anterioară / următoare",
         "t": "Bate tempoul",
-        "esc": "Închide panourile"
+        "esc": "Închide panourile",
+        "f11": "Mod scenă"
     },
     "errors": {
         "start": "Motorul nu a putut porni: {{message}}",
@@ -358,5 +353,24 @@
         "lydian": "Lidiană",
         "mixolydian": "Mixolidiană",
         "phrygian_dominant": "Frigiană dominantă"
+    },
+    "latencyOverlay": {
+        "title": "Buget de latență",
+        "close": "Închide bugetul de latență",
+        "noMeasurement": "Încă nemăsurat: rulează proba din Configurare și linia apare aici.",
+        "hint": "Tasta L deschide panoul. „Declarat\" e ce controlează motorul; dus-întorsul măsurat vine prin buclă, iar diferența este driverul, sistemul și rutarea."
+    },
+    "safety": {
+        "title": "Siguranță",
+        "clean": "Curat",
+        "limiter": "Limitator",
+        "dropouts": "Întreruperi",
+        "latency": "Latență",
+        "stage": "Scenă",
+        "exitStage": "Ieși din scenă"
+    },
+    "pitch": {
+        "title": "Ton",
+        "idle": "se așteaptă vocea"
     }
 }

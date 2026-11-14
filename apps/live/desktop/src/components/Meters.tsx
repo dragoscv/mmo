@@ -5,29 +5,8 @@
 import { useEffect, useRef } from "react";
 import { useT } from "../i18n";
 import { dbToPos, frameLoop } from "../lib/meter-bus";
+import { readPalette, type Palette } from "../lib/palette";
 import { linToDb } from "../lib/protocol";
-
-interface Palette {
-    track: string;
-    ok: string;
-    warn: string;
-    hot: string;
-    rms: string;
-    text: string;
-}
-
-function readPalette(el: HTMLElement): Palette {
-    const cs = getComputedStyle(el);
-    const v = (name: string) => cs.getPropertyValue(name).trim();
-    return {
-        track: v("--muted"),
-        ok: v("--success"),
-        warn: v("--warning"),
-        hot: v("--destructive"),
-        rms: v("--primary"),
-        text: v("--muted-foreground"),
-    };
-}
 
 interface Channel {
     peak: number;

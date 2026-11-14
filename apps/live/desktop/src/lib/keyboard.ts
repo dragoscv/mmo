@@ -5,7 +5,7 @@
  */
 import type { MixState } from "./protocol";
 
-export type ShortcutAction = "bypass" | "mute" | "prev" | "next" | "tap" | "latency" | "escape";
+export type ShortcutAction = "bypass" | "mute" | "prev" | "next" | "tap" | "latency" | "stage" | "escape";
 
 export interface KeyLike {
     key: string;
@@ -40,6 +40,7 @@ export function shortcutFor(e: KeyLike, target: TargetInfo | null): ShortcutActi
         if (role && OWNS_ARROWS.has(role)) return null;
         return e.key === "ArrowLeft" ? "prev" : "next";
     }
+    if (e.key === "F11") return "stage";
     const k = e.key.toLowerCase();
     if (k === "m") return "mute";
     if (k === "t") return "tap";

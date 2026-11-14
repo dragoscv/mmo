@@ -38,6 +38,29 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the fixed safety bar, Stage mode and the pitch ribbon (WP21-20 part 1, 2026-11-14)
+
+The performance screen now carries a **safety bar** that is on screen the whole time: bypass, mute and a latched
+panic (or a "Clean" chip when nothing is engaged, and the engine's status when it is not running), the **safety
+limiter's gain reduction** — the engine has been publishing `safety_gr` per bus and the desktop was ignoring it,
+so it is a meter with the dB figure now — a **clip** chip that holds for two seconds (the engine's flag is per
+snapshot, so a momentary clip would otherwise vanish before anyone looked up), the dropouts, the latency figure,
+and the switch for **Stage mode**.
+
+Stage mode (F11, Esc, or the button) drops the screen to what is needed on stage — the safety bar, the preset, the
+meters, the tuner, the ribbon and the mix — and removes the chain editor, the insert detail and the setlist panel,
+so there is nothing to brush against mid-set. What the singer actually watches is the new **pitch ribbon**: a
+four-second scrolling trace of how far the voice is from the note being aimed at, over an in-tune band (±5 ¢ / ±20 ¢
+of context), with the residual left after the correction as a dimmer line, sampled at a fixed 40 Hz so the time
+axis does not follow the frame rate, and drawn from the design tokens through a palette helper the level meters
+now share.
+
+One defect fell out while wiring it: the latency overlay asked for `latencyOverlay.*` while its four strings were
+written under `setup.latencyOverlay`, so the panel had been rendering raw keys since it shipped; the strings moved
+to the namespace the component reads. Desktop typecheck 0, 38 tests, i18n parity 322 keys, production build green.
+A code-level review is in `docs/design-critic/live-desktop-wp21-20.md`; nothing has been seen rendered yet, and
+the spectrum and the per-effect hero visuals are still open.
+
 ## MixAI Live — the fast pitch path stops paying for the shifter it is not using (2026-11-14)
 
 The measurement that gave the period-synchronous path its price said it was **7 % dearer** than the classic one,

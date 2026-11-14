@@ -32,6 +32,9 @@ interface Store {
     notices: Notice[];
     /** The latency budget panel is open (key `L`). It is a peek, not a mode: nothing is paused. */
     latencyOverlay: boolean;
+    /** Stage mode (key `F11`): the performance screen drops to what is needed on stage — the
+     *  safety bar, the preset, the meters, the tuner and the mix. Editing screens are hidden. */
+    stage: boolean;
     /** The last round trip the probe measured, or null. Kept here so the budget can be read after
      *  the setup wizard is closed (the wizard itself keeps no state between opens). */
     measuredRoundTripMs: number | null;
@@ -45,6 +48,7 @@ interface Store {
     sendCoalesced(key: string, msg: ClientMsg): void;
     openPanel(p: Panel): void;
     toggleLatencyOverlay(open?: boolean): void;
+    toggleStage(open?: boolean): void;
     setMeasuredRoundTrip(ms: number | null): void;
     selectInsert(id: number | null): void;
     notify(kind: Notice["kind"], key: string, vars?: Notice["vars"]): void;
@@ -130,6 +134,7 @@ export const useStore = create<Store>((set, get) => {
         selectedInsert: null,
         notices: [],
         latencyOverlay: false,
+        stage: false,
         measuredRoundTripMs: null,
 
         async init() {
@@ -223,6 +228,9 @@ export const useStore = create<Store>((set, get) => {
         },
         toggleLatencyOverlay(open) {
             set((s) => ({ latencyOverlay: open ?? !s.latencyOverlay }));
+        },
+        toggleStage(open) {
+            set((s) => ({ stage: open ?? !s.stage }));
         },
         setMeasuredRoundTrip(measuredRoundTripMs) {
             set({ measuredRoundTripMs });

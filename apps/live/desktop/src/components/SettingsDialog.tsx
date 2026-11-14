@@ -17,6 +17,7 @@ export function SettingsDialog() {
         ["← →", t("keys.arrows")],
         ["T", t("keys.t")],
         ["Esc", t("keys.esc")],
+        ["F11", t("keys.f11")],
     ];
     return (
         <Dialog open={open} onOpenChange={(o) => openPanel(o ? "settings" : null)}>

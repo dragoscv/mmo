@@ -35,6 +35,14 @@ describe("shortcuts", () => {
         expect(shortcutFor({ key: "l", repeat: true }, page)).toBeNull();
     });
 
+    it("toggles stage mode with F11, but never while typing", () => {
+        expect(shortcutFor({ key: "F11" }, page)).toBe("stage");
+        expect(shortcutFor({ key: "F11" }, el("button"))).toBe("stage");
+        expect(shortcutFor({ key: "F11" }, el("input"))).toBeNull();
+        expect(shortcutFor({ key: "F11", repeat: true }, page)).toBeNull();
+        expect(shortcutFor({ key: "F11", ctrlKey: true }, page)).toBeNull();
+    });
+
     it("toggles from the current mix", () => {
         const mix = {
             input_db: 0,
