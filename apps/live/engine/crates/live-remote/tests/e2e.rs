@@ -14,6 +14,7 @@ fn server() -> RemoteServer {
         port: 0,
         osc: false,
         engine_name: "Test".into(),
+        tokens: None,
     })
     .unwrap()
 }
@@ -24,6 +25,7 @@ fn osc_server() -> RemoteServer {
         port: 0,
         osc: true,
         engine_name: "Test".into(),
+        tokens: None,
     })
     .unwrap()
 }
@@ -337,4 +339,36 @@ fn health_and_catalogue_over_http() {
         assert!(body.contains(needle), "{path}");
         assert!(body.contains("Content-Security-Policy"));
     }
+}
+
+/// A host that keeps its tokens on disk hands them to the server: a restart keeps every client
+/// paired. An incomplete set (a first run, or a file from an older version) is replaced instead.
+#[test]
+fn supplied_tokens_are_reused_or_replaced() {
+    let p = live_remote::Pairing {
+        tokens: ["viewer".into(), "performer".into(), "controller".into()],
+        osc_keys: ["osc-p".into(), "osc-c".into()],
+    };
+    let s = RemoteServer::start(RemoteConfig {
+        bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
+        port: 0,
+        osc: false,
+        engine_name: "Test".into(),
+        tokens: Some(p.clone()),
+    })
+    .unwrap();
+    assert_eq!(s.pairing(), p);
+    assert_eq!(s.token(Role::Viewer), "viewer");
+    assert_eq!(s.token(Role::Controller), "controller");
+
+    let fresh = RemoteServer::start(RemoteConfig {
+        bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
+        port: 0,
+        osc: false,
+        engine_name: "Test".into(),
+        tokens: Some(live_remote::Pairing::default()),
+    })
+    .unwrap();
+    assert_ne!(fresh.token(Role::Viewer), "");
+    assert_ne!(fresh.pairing(), live_remote::Pairing::default());
 }

@@ -503,10 +503,19 @@ fn serve(
         })
     );
     let start = Instant::now();
+    let mut restarts = host.restarts();
     loop {
         std::thread::sleep(Duration::from_millis(50));
         if !host.alive() {
             return Err(host.error().unwrap_or_else(|| "engine stopped".into()));
+        }
+        // The device died and came back: say so on stderr (stdout is the JSON channel).
+        if host.restarts() != restarts {
+            restarts = host.restarts();
+            eprintln!(
+                "audio restarted after: {}",
+                host.last_restart().unwrap_or_default()
+            );
         }
         if seconds.is_some_and(|s| start.elapsed() >= Duration::from_secs(s)) {
             return Ok(());

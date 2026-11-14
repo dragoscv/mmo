@@ -231,6 +231,67 @@ impl Session {
         Some(without_pitch(chain))
     }
 
+    /// The commands that reproduce the whole mix on the engine: every scalar and, when the monitor
+    /// option is on, the monitor chain. Used when adopting a saved mix and after a restart.
+    fn mix_commands(&mut self) -> Vec<Command> {
+        let (input, main, monitor, dry, bypass, mute) = (
+            self.mix.input_db,
+            self.mix.main_db,
+            self.mix.monitor_db,
+            self.mix.monitor_dry,
+            self.mix.bypass,
+            self.mix.mute,
+        );
+        let mut out = vec![
+            Command::InputGain(input),
+            Command::MainGain(main),
+            Command::MonitorGain(monitor),
+            Command::MonitorDry(dry),
+            Command::Bypass(bypass),
+            Command::Mute(mute),
+        ];
+        let untuned = self.mix.monitor_untuned;
+        let chain = if untuned { self.monitor_chain() } else { None };
+        if untuned && chain.is_none() {
+            // The chain could not be built: the option stays off rather than lying.
+            self.mix.monitor_untuned = false;
+        }
+        out.push(Command::SetMonitorChain { chain });
+        out
+    }
+
+    /// Adopt a saved mix (from a previous run) and return the commands that apply it. Call after
+    /// the chain is loaded: `monitor_untuned` needs the chain to build the monitor bus.
+    pub fn restore_mix(&mut self, mix: MixState) -> Vec<Command> {
+        self.mix = mix;
+        self.bump();
+        self.mix_commands()
+    }
+
+    /// Commands that put the current chain and mix back on a FRESH engine (the audio device was
+    /// reopened after a failure). Insert ids are preserved, so remote controllers, MIDI bindings
+    /// and the setlist keep pointing at the same inserts, and the parameter values come back
+    /// because the chain is captured from the live state. Returns nothing for a chain that cannot
+    /// be rebuilt (a warning is logged; the engine is then silent rather than wrong).
+    pub fn rebuild(&mut self, sample_rate: f32, max_block: usize) -> Vec<Command> {
+        self.sr = sample_rate;
+        self.max_block = max_block;
+        let preset = self.capture("");
+        let mut out = Vec::new();
+        match preset.build(sample_rate, max_block, 0) {
+            Ok(mut built) => {
+                for (ins, st) in built.chain.inserts.iter_mut().zip(&self.chain) {
+                    ins.id = st.id;
+                }
+                out.push(Command::SwapChain { chain: built.chain });
+            }
+            Err(e) => log::warn!("rebuilding the chain after a restart: {e}"),
+        }
+        // The monitor chain is (re)built here, so it is not carried in the swap above.
+        out.extend(self.mix_commands());
+        out
+    }
+
     /// Load a preset by name: returns the chain swap command (one command: with
     /// `mix.monitor_untuned` on it carries the monitor chain too).
     pub fn load_preset(&mut self, name: &str) -> Result<Command, SessionError> {
@@ -562,6 +623,68 @@ mod tests {
         let j = serde_json::to_string(&s.state()).expect("state must serialize");
         let back: SessionState = serde_json::from_str(&j).expect("state must parse");
         assert_eq!(back, s.state());
+    }
+
+    /// A restart rebuilds the chain on a fresh engine: the insert ids must not change (remote
+    /// controllers, MIDI bindings and the setlist point at them) and the live parameter values and
+    /// the mix must come back, not the preset's defaults.
+    #[test]
+    fn rebuild_keeps_insert_ids_values_and_mix() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Pop Polish").unwrap();
+        let id = s.chain[0].id;
+        let param = s.chain[0].params[0].0.clone();
+        s.set_param(id, &param, 0.123).unwrap();
+        let want = s.chain[0].params[0].1;
+        let count = s.chain.len();
+        s.set_mix(|m| {
+            m.main_db = -4.0;
+            m.mute = true;
+        });
+
+        let cmds = s.rebuild(48000.0, 1024);
+
+        let first = cmds.first().expect("a rebuild emits the chain swap");
+        let Command::SwapChain { chain } = first else {
+            panic!("the first command must be the chain swap");
+        };
+        assert_eq!(chain.inserts.len(), count);
+        assert_eq!(chain.inserts[0].id, id, "ids must survive a restart");
+        assert_eq!(chain.inserts[0].fx.param(0), want);
+        assert!(cmds.iter().any(|c| matches!(c, Command::Mute(true))));
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Command::MainGain(v) if (*v + 4.0).abs() < 1e-6))
+        );
+        assert!(matches!(cmds.last(), Some(Command::SetMonitorChain { .. })));
+    }
+
+    /// Adopting a saved mix applies every value, and the monitor option comes back as a chain.
+    #[test]
+    fn restore_mix_applies_every_value() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Natural Vocal").unwrap();
+        let saved = MixState {
+            input_db: 2.0,
+            main_db: -3.0,
+            monitor_db: -6.0,
+            monitor_dry: 0.25,
+            bypass: true,
+            mute: true,
+            monitor_untuned: true,
+        };
+        let cmds = s.restore_mix(saved.clone());
+        assert_eq!(s.mix, saved, "the saved mix is adopted as is");
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Command::InputGain(v) if (*v - 2.0).abs() < 1e-6))
+        );
+        assert!(cmds.iter().any(|c| matches!(c, Command::Bypass(true))));
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Command::SetMonitorChain { chain: Some(_) })),
+            "the monitor option needs its chain rebuilt"
+        );
     }
 
     /// The old factory name loads the renamed preset, unless the user has a preset of their own

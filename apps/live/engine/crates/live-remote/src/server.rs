@@ -37,6 +37,9 @@ pub struct RemoteConfig {
     /// carry an OSC key (see `osc.rs`); the sender's address grants nothing.
     pub osc: bool,
     pub engine_name: String,
+    /// Reuse these tokens instead of generating fresh ones (the host keeps them on disk so a
+    /// restart does not unpair every client). `None`, or a set with an empty field, means fresh.
+    pub tokens: Option<Pairing>,
 }
 
 impl Default for RemoteConfig {
@@ -46,8 +49,17 @@ impl Default for RemoteConfig {
             port: DEFAULT_PORT,
             osc: false,
             engine_name: "MixAI Live".into(),
+            tokens: None,
         }
     }
+}
+
+/// The tokens a server hands out: one per role, plus the two OSC keys (performer, controller).
+/// Supplied to [`RemoteConfig`] to reuse a previous run's tokens, and read back to persist them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Pairing {
+    pub tokens: [String; 3],
+    pub osc_keys: [String; 2],
 }
 
 /// A validated control waiting for the engine, with where to send the answer.
@@ -161,10 +173,23 @@ impl RemoteServer {
         let listener = TcpListener::bind((config.bind, config.port))?;
         listener.set_nonblocking(true)?;
         let addr = listener.local_addr()?;
-        let inner = Arc::new(Inner {
-            shared: Mutex::new(Shared {
+        // Reuse a supplied set only if it is complete; otherwise generate fresh tokens.
+        let pairing = match config.tokens {
+            Some(p)
+                if p.tokens.iter().all(|t| !t.is_empty())
+                    && p.osc_keys.iter().all(|t| !t.is_empty()) =>
+            {
+                p
+            }
+            _ => Pairing {
                 tokens: [new_token(), new_token(), new_token()],
                 osc_keys: [new_token(), new_token()],
+            },
+        };
+        let inner = Arc::new(Inner {
+            shared: Mutex::new(Shared {
+                tokens: pairing.tokens,
+                osc_keys: pairing.osc_keys,
                 hello: json!({ "engine_name": config.engine_name }),
                 state: "null".into(),
                 meters: String::new(),
@@ -232,6 +257,15 @@ impl RemoteServer {
 
     pub fn token(&self, role: Role) -> String {
         self.inner.lock().tokens[role_index(role)].clone()
+    }
+
+    /// The tokens in use, to write down so the next start reuses them.
+    pub fn pairing(&self) -> Pairing {
+        let s = self.inner.lock();
+        Pairing {
+            tokens: s.tokens.clone(),
+            osc_keys: s.osc_keys.clone(),
+        }
     }
 
     /// OSC key of a role (`None` when OSC is off, and for viewers: OSC only sends controls).

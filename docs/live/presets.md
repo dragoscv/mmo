@@ -156,6 +156,8 @@ factory preset, checks it has no unknown parameters and round-trips it through J
 | `presets/<slug>.json` | one user preset (this format) | `save_preset`; removed by `delete_preset` |
 | `setlist.json` | the last loaded setlist | `load_setlist`; restored on start |
 | `midi.json` | MIDI bindings and settings | learn, unbind, `midi_settings` |
+| `tokens.json` | pairing tokens (one per role + the two OSC keys) | first start; **reused** on the next start, so a restart does not unpair clients |
+| `mix.json` | the mix: input/main/monitor gain, monitor dry, bypass, mute, the monitor option | a change, at most every 500 ms, and again on exit; restored on start |
 
 Slug = lowercase ASCII letters/digits joined by `-` (names with no ASCII letters get a hash). Writes go to a
 `.tmp` file and are renamed, so a crash never leaves a half-written preset. Unreadable preset files are skipped

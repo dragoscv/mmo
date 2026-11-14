@@ -216,6 +216,21 @@ health). `mixai-live-engine serve` and the phone engine (`live-ffi`) both run it
 same. The streams are opened inside that thread and never cross threads. `io::start` with host `Null` is a
 simulated loopback device for tests.
 
+### Restart, and what survives it
+
+A device unplug, a driver reset or two seconds without audio events ends the *streams*, not the engine. The host
+reopens the device itself, waiting in a backoff (200 ms, 400, 800, 1.6 s, 3.2 s, then 5 s — ten attempts) that a
+`stop` interrupts at once. The **control server, the pairing tokens and the session survive**: only the audio
+device changes, so a paired phone, watch or browser keeps working and no code has to be scanned again. On the
+fresh stream the host rebuilds the chain and the mix (`Session::rebuild`), **preserving insert ids** so remote
+controllers, MIDI bindings and the setlist keep pointing at the same inserts, and re-publishes `RunningInfo`.
+`EngineHost::restarts()` and `last_restart()` report how often and why (`serve` prints a line on stderr); when
+the device never comes back the error names the reason and the number of attempts.
+
+The engine also **keeps state on disk**, so a whole process restart behaves: the pairing tokens (`tokens.json`,
+reused when complete, so an app restart does not unpair clients), the mix (`mix.json`, written at most every
+500 ms and again on exit) and — as before — presets, the setlist and the MIDI map. Layout: [storage](presets.md#storage).
+
 ## Crate map
 
 | Crate | Licence | Depends on | Role |

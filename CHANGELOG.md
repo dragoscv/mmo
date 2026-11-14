@@ -38,6 +38,23 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the engine recovers by itself, and a restart keeps clients paired (WP21-19 part 1, 2026-11-14)
+
+A device unplug, a driver reset or two seconds without audio events used to end the engine: the desktop showed an
+error and waited for a click, and nothing came back on its own. The host now reopens the device **in the same
+process**, waiting in a backoff (200 ms, 400, 800, 1.6 s, 3.2 s, then 5 s, ten attempts) that a stop interrupts at
+once. The control server, the pairing tokens and the session survive the device change, so a paired phone, watch
+or browser keeps working and no pairing code has to be scanned again. On the fresh stream the chain and the mix
+are rebuilt with their **insert ids preserved**, so remote controllers, MIDI bindings and the setlist keep
+pointing at the same inserts; `restarts()` and `last_restart()` say how often and why, and `serve` prints the
+reason on stderr.
+
+Two things are now written to disk so that even a whole-process restart behaves: the **pairing tokens** (reused
+when complete — an app restart no longer unpairs every client) and the **mix** (faders, mute, bypass and the
+monitor option, written at most every 500 ms and again on exit, restored on the next start). Proven on the
+simulated Null device: two in-process starts hand out the same token, and a mute set before a stop comes back
+after the next start. Engine workspace green: 213 tests, clippy `-D warnings` clean.
+
 ## MixAI Live — the docs say the fast pitch path is the default everywhere (2026-11-14)
 
 Turning `auto` into the period-synchronous shifter at every pitch (the entry below, and the decision it records)

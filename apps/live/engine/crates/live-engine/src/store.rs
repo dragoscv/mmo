@@ -4,10 +4,14 @@
 //!   <dir>/presets/<slug>.json   one user preset per file (factory presets are built in)
 //!   <dir>/setlist.json          the last loaded setlist (restored on start)
 //!   <dir>/midi.json             MIDI bindings
+//!   <dir>/tokens.json           pairing tokens (kept so a restart does not unpair every client)
+//!   <dir>/mix.json              the mix (faders, mute, bypass, the monitor option), restored on start
 //! Writes go to `<file>.tmp` then rename, so a crash mid-write never leaves a torn file.
 
 use crate::midi::MidiMap;
 use crate::preset::{Preset, Setlist};
+use crate::session::MixState;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -15,6 +19,34 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug)]
 pub struct Store {
     dir: PathBuf,
+}
+
+/// Pairing tokens handed to clients, written once on the first start and reused afterwards so a
+/// restart of the engine process does not unpair every phone and watch. Empty fields are replaced
+/// with fresh tokens (a first run, or a file written by an older version).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoredTokens {
+    #[serde(default)]
+    pub viewer: String,
+    #[serde(default)]
+    pub performer: String,
+    #[serde(default)]
+    pub controller: String,
+    #[serde(default)]
+    pub osc_performer: String,
+    #[serde(default)]
+    pub osc_controller: String,
+}
+
+impl StoredTokens {
+    /// `true` when every field carries a token (a fresh, usable set).
+    pub fn complete(&self) -> bool {
+        !self.viewer.is_empty()
+            && !self.performer.is_empty()
+            && !self.controller.is_empty()
+            && !self.osc_performer.is_empty()
+            && !self.osc_controller.is_empty()
+    }
 }
 
 /// File-name slug: lowercase ASCII alphanumerics and dashes (names stay inside the JSON).
@@ -124,6 +156,30 @@ impl Store {
             &serde_json::to_string_pretty(m).unwrap_or_default(),
         )
     }
+
+    pub fn load_tokens(&self) -> Option<StoredTokens> {
+        let s = fs::read_to_string(self.dir.join("tokens.json")).ok()?;
+        serde_json::from_str(&s).ok()
+    }
+
+    pub fn save_tokens(&self, t: &StoredTokens) -> io::Result<()> {
+        write_atomic(
+            &self.dir.join("tokens.json"),
+            &serde_json::to_string_pretty(t).unwrap_or_default(),
+        )
+    }
+
+    pub fn load_mix(&self) -> Option<MixState> {
+        let s = fs::read_to_string(self.dir.join("mix.json")).ok()?;
+        serde_json::from_str(&s).ok()
+    }
+
+    pub fn save_mix(&self, m: &MixState) -> io::Result<()> {
+        write_atomic(
+            &self.dir.join("mix.json"),
+            &serde_json::to_string_pretty(m).unwrap_or_default(),
+        )
+    }
 }
 
 /// Default data directory per OS (the desktop shell passes its own app-data dir instead).
@@ -189,6 +245,42 @@ mod tests {
         st.save_midi(&m).unwrap();
         assert_eq!(st.load_midi(), m);
         assert!(!d.join("midi.json.tmp").exists());
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn round_trips_tokens_and_mix() {
+        let d = tmp("tokens-mix");
+        let st = Store::new(&d);
+        assert_eq!(st.load_tokens(), None, "nothing saved yet");
+        assert!(st.load_mix().is_none());
+
+        let t = StoredTokens {
+            viewer: "aa".into(),
+            performer: "bb".into(),
+            controller: "cc".into(),
+            osc_performer: "dd".into(),
+            osc_controller: "ee".into(),
+        };
+        st.save_tokens(&t).unwrap();
+        assert_eq!(st.load_tokens(), Some(t.clone()));
+        assert!(t.complete());
+        // A set with an empty field is not usable: the host then generates fresh tokens.
+        let short = StoredTokens {
+            viewer: String::new(),
+            ..t
+        };
+        assert!(!short.complete());
+
+        let mix = MixState {
+            main_db: -3.5,
+            mute: true,
+            monitor_untuned: true,
+            ..MixState::default()
+        };
+        st.save_mix(&mix).unwrap();
+        assert_eq!(st.load_mix(), Some(mix));
+        assert!(!d.join("mix.json.tmp").exists());
         let _ = fs::remove_dir_all(&d);
     }
 }
