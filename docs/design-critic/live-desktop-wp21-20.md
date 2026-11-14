@@ -44,14 +44,15 @@ slice is roughly 30/42. The previous audit scored this screen 33/60 code-level.
 
 ## Prescriptions (priority order)
 
-1. `App.tsx` — Stage mode still shows `PresetsBar` with its save/delete dialogs. Keep the preset *switch* and
-   drop the editing affordances (a `stage` prop on `PresetsBar`).
-2. `components/SafetyBar.tsx` + `components/PitchRibbon.tsx` — tactility: `active:scale-[0.97]` on the Stage and
-   state chips, and a soft glow behind the ribbon's live point (a second, blurred arc).
+All four applied in the same pass:
 
-Applied from this review: the clip chip now holds for 2 s after `meters.clipped` clears (a momentary clip would
-otherwise vanish before the performer looked up), and the ribbon has a `min-h-40` so the chain cannot squeeze it
-to a strip.
+1. `Presets.tsx` — Stage mode keeps the preset *recall* and drops the editing: the delete/revert button and
+   "save as" are hidden while `store.stage` is on.
+2. `SafetyBar.tsx` + `PitchRibbon.tsx` — tactility: the Stage button compresses (`active:scale-[0.97]`) and the
+   ribbon's live point has a soft halo so the eye lands on it before it reads the trace.
+3. `SafetyBar.tsx` — the clip chip holds for 2 s after `meters.clipped` clears (the engine's flag is per snapshot,
+   so a momentary clip would otherwise vanish before the performer looked up).
+4. `PitchRibbon.tsx` — `min-h-40`, so the chain cannot squeeze the ribbon to a strip on a short window.
 
 ## Still owed in WP21-20
 

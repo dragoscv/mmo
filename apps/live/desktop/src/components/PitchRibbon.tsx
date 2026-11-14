@@ -114,7 +114,16 @@ export function PitchRibbon() {
             // The live point.
             if (voiced) {
                 const c = tune.cents;
-                ctx.fillStyle = Math.abs(c) < 5 ? pal.ok : Math.abs(c) < 20 ? pal.warn : pal.hot;
+                const colour = Math.abs(c) < 5 ? pal.ok : Math.abs(c) < 20 ? pal.warn : pal.hot;
+                // A soft halo, so the eye lands on the point before it reads the trace.
+                ctx.save();
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = colour;
+                ctx.beginPath();
+                ctx.arc(w - 3, y(h, c), 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                ctx.fillStyle = colour;
                 ctx.beginPath();
                 ctx.arc(w - 3, y(h, c), 3.5, 0, Math.PI * 2);
                 ctx.fill();

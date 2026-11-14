@@ -74,6 +74,7 @@ export function PresetsBar() {
     const factory: string[] = useStore((s) => s.proto.state?.factory_presets ?? EMPTY_CHAIN);
     const modified: string[] = useStore((s) => s.proto.state?.modified_presets ?? EMPTY_CHAIN);
     const current = useStore((s) => s.proto.state?.preset ?? "");
+    const stage = useStore((s) => s.stage);
     const send = useStore((s) => s.send);
     const notify = useStore((s) => s.notify);
     const [open, setOpen] = useState(false);
@@ -112,9 +113,11 @@ export function PresetsBar() {
                     );
                 })}
             </div>
-            {presets.includes(current) && (!factory.includes(current) || modified.includes(current)) ? (
+            {/* Stage mode keeps the recall (what you need mid-set) and drops the editing. */}
+            {!stage && presets.includes(current) && (!factory.includes(current) || modified.includes(current)) ? (
                 <DeletePreset name={current} factory={factory.includes(current)} />
             ) : null}
+            {!stage ? (
             <Button
                 variant="outline"
                 size="sm"
@@ -127,6 +130,7 @@ export function PresetsBar() {
             >
                 <Save /> {t("presets.save")}
             </Button>
+            ) : null}
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent size="sm">
                     <form onSubmit={save} className="flex flex-col gap-4">

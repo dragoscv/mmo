@@ -129,6 +129,7 @@ export function SafetyBar() {
                     onClick={() => toggleStage()}
                     aria-pressed={stage}
                     title={`F11 — ${t("keys.f11")}`}
+                    className="transition-transform duration-(--dur-fast) active:scale-[0.97]"
                 >
                     {stage ? t("safety.exitStage") : t("safety.stage")}
                 </Button>
