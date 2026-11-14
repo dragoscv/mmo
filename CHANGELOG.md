@@ -48,6 +48,27 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — every route measured in one command, and two ASIO facts (2026-11-14)
+
+The declared figures said which route *should* be cheapest; nothing yet made the measured ones comparable.
+`scripts/live-measure-routes.ps1` runs `latency` once per route — exclusive, shared, insert, ASIO — keeps every
+answer and every failure verbatim, and writes a comparison beside the raw output
+(`.copilot-tmp/live/measured/<tag>/{comparison.md,raw.log,declared.json}`): one row per route with the measured
+round trip, the declared figure and its source, and, when the probe fails, the engine's own sentence about which
+part of the loop failed. It changes nothing (no setting, no buffer, no Voicemeeter configuration) and it opens
+with a read-only **Preconditions** block: whether Voicemeeter is running and which device is on bus A1 — while
+Voicemeeter holds the interface as A1, exclusive and shared cannot open it — whether the binary was built with
+ASIO, whether the named device exists, and the reminder that every probe needs a loopback. Each route gets the
+input channel and the period it can actually take (the insert route addresses Voicemeeter's channel 8 for the
+microphone; the direct routes address the interface's channel 0; ASIO takes 256 frames where WASAPI takes 128),
+so a full table of honest failures is still a correct run rather than a pile of argument errors.
+
+Two facts about ASIO on this machine came out of building it: a driver's name is limited to 32 characters and
+VB-Audio's really does end in an ellipsis (`Voicemeeter Potato Insert Vi...` — a tidied-up name is rejected with
+`device not found`), and that driver accepts a single period, 256 frames, so the WASAPI 128 fails with
+`Buffer size 128 is not in the supported range 256..=256`. Both are now stated in the latency guide with the
+recipe for a first run.
+
 ## MixAI Live — the latency budget on the performance screen, and a route comparison (2026-11-14)
 
 The budget is no longer one dialog deep. **Key `L`** opens it over the performance screen: each stage the engine

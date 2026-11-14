@@ -140,15 +140,22 @@ Voicemeeter buffer (`voicemeeter --save --buffer wdm=160`) moves that row down.
 
      | ASIO device | in / out | note |
      |---|---:|---|
-     | `Voicemeeter Potato Insert Virtual ASIO` | 34 / 34 | Voicemeeter's own ASIO face of the insert point the Remote-API host uses |
+    | `Voicemeeter Potato Insert Vi...` | 34 / 34 | Voicemeeter's own ASIO face of the insert point the Remote-API host uses; the driver's name really ends in an ellipsis (see below) |
      | `Voicemeeter Insert Virtual ASIO` | 22 / 22 | same, standard/Banana layout |
      | `Voicemeeter Virtual ASIO` / `AUX` / `VAIO3` | 8 / 8 | the virtual buses |
      | `ASIO4ALL v2`, `FL Studio ASIO` | 2 / 2 | wrappers over WASAPI, not the interface's own driver |
 
    6. Run it with the interface's own driver on both sides (same device for input and output, no drift):
      `mixai-live-engine latency --host ASIO --input "<device>" --output "<device>" --buffer 64`.
-     A direct test on this rig is worth it: `Voicemeeter Potato Insert Virtual ASIO` is the ASIO route to the
-     same insert point the Remote-API host uses, so the two can be measured against each other.
+     A direct test on this rig is worth it: `Voicemeeter Potato Insert Vi...` is the ASIO route to the same
+     insert point the Remote-API host uses, so the two can be measured against each other.
+     - **The ellipsis is part of the name.** ASIO gives a driver 32 characters for it and VB-Audio's full name
+       ("Voicemeeter Potato Insert Virtual ASIO", 38) does not fit, so the driver reports `Voicemeeter Potato
+       Insert Vi...` and that is the string `--input` has to match — a truncation of your own making is
+       rejected with `device not found`. Copy the name from `devices --host ASIO` (measure every route in one
+       go below prints the available names when the one you passed is not there).
+     - **The buffer is the driver's, not yours.** The insert driver accepts one period only, 256 frames; ask
+       for the WASAPI 128 and the probe fails with `Buffer size 128 is not in the supported range 256..=256`.
    7. Do not ship the binary (or a beta) before both signatures are on the agreement; the repository stores no
      SDK file, so CI cannot build this tier at all.
   - **Before any ASIO build leaves this PC** (decided 2026-11-12, tracker WP21-27; terms as read on Steinberg's
@@ -167,6 +174,34 @@ Voicemeeter buffer (`voicemeeter --save --buffer wdm=160`) moves that row down.
       Media Technologies GmbH" and use the ASIO Compatible logo as the Usage Guidelines say (the artwork is in
       the SDK package). "ASIO" may not be part of a product or company name.
     5. The SDK itself is never redistributed; the repository holds no SDK file.
+  ### Measuring every route in one go
+
+  `scripts/live-measure-routes.ps1` runs `latency` once per route, keeps every answer and every failure
+  verbatim, and writes a comparison next to the raw output:
+
+  ```powershell
+  pwsh -NoProfile -File scripts/live-measure-routes.ps1 -ResultsDir .copilot-tmp/live/measured -Tag first-run
+  ```
+
+  | | |
+  |---|---|
+  | `-Routes` | `exclusive,shared,insert,asio` (default) — ONE comma-separated string |
+  | `-In` / `-Out` | the interface's capture and render endpoint (defaults are this rig's HD-II) |
+  | `-InCh` / `-DirectInCh` | the input channel for the insert route (8: the mic is the left channel of strip 4) and for the direct routes (0: the interface has two channels, Voicemeeter's insert space has 34) |
+  | `-Buffer` / `-AsioBuffer` | 128 for WASAPI and Voicemeeter, 256 for ASIO (that driver's only period) |
+  | `-AsioDevice` | the exact driver name, ellipsis included |
+  | `-ResultsDir` / `-Tag` | where the run lands: `<ResultsDir>/<Tag>/{comparison.md,raw.log,declared.json}` |
+
+  It changes nothing — no setting, no buffer, no Voicemeeter configuration — but it does open the audio devices,
+  so the Live engine must not be running. The file opens with a **Preconditions** block: whether Voicemeeter is
+  running and which device is on bus A1 (while Voicemeeter holds the interface as A1, `exclusive` and `shared`
+  cannot open it — measure those with Voicemeeter closed, and `insert` with it running), whether the binary was
+  built with ASIO and whether the named device exists, and the reminder that every probe needs a loopback. Each
+  row is either a measured round trip or the engine's own sentence about why the loop failed, so a table full of
+  failures is still a correct run: on 2026-11-14 it reported `exclusive` = the device in use by Voicemeeter,
+  `shared` = the mixer's client would not initialise, and `insert`/`asio` = no click came back (no loopback
+  attached) — the declared column being filled in for all four from `routes`.
+
 - ASIO drivers usually expose one device for input and output: pass the same device to `--input` and `--output`
   (no clock drift). With two different devices the engine corrects drift by dropping frames and says so in
   `info.notes`.
