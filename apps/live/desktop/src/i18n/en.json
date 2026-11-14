@@ -80,7 +80,8 @@
         },
         "start": "Start",
         "starting": "Starting the engine…",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "measureRunningHint": "The engine is running and owns the audio device. Stop it first, then measure."
     },
     "meters": {
         "input": "In",
@@ -241,7 +242,8 @@
             "factory_preset": "This is already the factory version of the preset; built-in presets cannot be deleted.",
             "unknown_binding": "That MIDI binding no longer exists.",
             "unknown_preset": "That preset no longer exists."
-        }
+        },
+        "offline": "Not connected to the engine: that control did not go anywhere."
     },
     "fx": {
         "gate": "Gate",

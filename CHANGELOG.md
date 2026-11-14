@@ -38,6 +38,19 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — measuring no longer stops the show, and controls stop lying offline (WP21-19 part 3, 2026-11-14)
+
+"Measure latency" used to stop the running engine to take the device, and nothing started it again: the app was
+left on "Reconnecting…" against a dead port with no way out. It now **refuses** while the engine is running — the
+setup step disables the button and says why ("the engine is running and owns the audio device. Stop the engine,
+then measure.") — so nothing disappears behind your back. Stop, measure, start again.
+
+The desktop also stopped pretending. While the connection is down the mix controls are disabled (they stayed
+enabled and moved on screen while sending nothing), a coalesced knob no longer applies an optimistic change it
+cannot send, and a control that still lands nowhere (a keyboard shortcut) raises one debounced notice instead of
+vanishing. The header shows the engine's own failure reason beside the status chip and offers Restart while
+"Reconnecting…" too, where it used to offer nothing at all.
+
 ## MixAI Live — PANIC is latched, and a flood cannot take the button away (WP21-19 part 2, 2026-11-14)
 
 The panic button used to mute and clear the tails **once**: a stray unmute, a mute toggle or a preset load could

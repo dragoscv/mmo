@@ -63,6 +63,19 @@ const DEFAULT_SETTINGS: Settings = { device: null, lastPreset: null, lan: false 
 /** Engine error codes with a dedicated, localised message (`errors.code.<code>`); others show the raw message. */
 const LOCALISED_CODES = new Set(["factory_preset", "unknown_binding", "unknown_preset"]);
 
+/**
+ * A control that had nowhere to go. The controls are disabled while the engine is not connected, but
+ * a shortcut or a knob already in flight can still arrive here: say so instead of dropping it in
+ * silence, at most once every few seconds.
+ */
+let offlineNoticeAt = 0;
+function dropped(get: () => Store) {
+    const now = Date.now();
+    if (now - offlineNoticeAt < 5000) return;
+    offlineNoticeAt = now;
+    get().notify("error", "errors.offline");
+}
+
 export const useStore = create<Store>((set, get) => {
     const connect = (r: StartResult) => {
         conn?.close();
@@ -174,12 +187,20 @@ export const useStore = create<Store>((set, get) => {
 
         send(msg) {
             const id = conn?.send(msg) ?? null;
-            if (id == null) return;
+            if (id == null) {
+                dropped(get);
+                return;
+            }
             const proto = trackPending(get().proto, id);
             set({ proto: { ...proto, state: applyOptimistic(proto.state, msg) } });
         },
 
         sendCoalesced(key, msg) {
+            if (!conn?.online) {
+                // Nothing will be sent: do not move the knob on screen as if it had been.
+                dropped(get);
+                return;
+            }
             const proto = get().proto;
             set({ proto: { ...proto, state: applyOptimistic(proto.state, msg) } });
             coalesced.set(key, msg);
@@ -191,6 +212,7 @@ export const useStore = create<Store>((set, get) => {
                 for (const m of batch) {
                     const id = conn?.send(m) ?? null;
                     if (id != null) set({ proto: trackPending(get().proto, id) });
+                    else dropped(get);
                 }
             }, 33);
         },

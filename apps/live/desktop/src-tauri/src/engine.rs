@@ -230,6 +230,10 @@ impl EngineState {
     fn take(&self) -> Option<Running> {
         self.running.lock().ok().and_then(|mut g| g.take())
     }
+    /// True while an engine owns the audio device.
+    fn is_running(&self) -> bool {
+        self.running.lock().map(|g| g.is_some()).unwrap_or(false)
+    }
     fn set_error(&self, e: Option<String>) {
         if let Ok(mut g) = self.last_error.lock() {
             *g = e;
@@ -314,8 +318,13 @@ pub async fn measure_latency(
     config: EngineConfig,
 ) -> Result<Value, String> {
     config.validate()?;
-    // One owner per device: the live engine must be stopped while the click train runs.
-    kill(state.take());
+    // One owner per device. Do NOT stop the engine to measure: the probe needs the device, but
+    // silently ending the show to take a reading is not this dialog's call. Refuse, and say why.
+    if state.is_running() {
+        return Err(
+            "the engine is running and owns the audio device. Stop the engine, then measure.".into(),
+        );
+    }
     let out = run_once(&app, config.latency_args(), LATENCY_TIMEOUT).await?;
     serde_json::from_str(&out).map_err(|e| format!("bad latency JSON: {e}"))
 }

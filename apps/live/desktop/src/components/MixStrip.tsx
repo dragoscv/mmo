@@ -27,12 +27,15 @@ const DRY: ParamSpec = { id: "dry", min: 0, max: 1, default: 0, unit: "percent",
 export function MixStrip() {
     const t = useT();
     const mix = useStore((s) => s.proto.state?.mix);
+    const status = useStore((s) => s.status);
     const send = useStore((s) => s.send);
     const sendCoalesced = useStore((s) => s.sendCoalesced);
     const m = useMeterSample(4);
     const monLat = m?.monitor_chain_latency_samples;
     const untunedLatency = m?.chain_latency_samples;
-    const disabled = !mix;
+    // Not connected: a control would silently go nowhere (the store now says so, but the honest
+    // thing is not to offer it at all).
+    const disabled = !mix || status !== "running";
     const s = mix ?? {
         input_db: 0,
         main_db: 0,

@@ -80,7 +80,8 @@
         },
         "start": "Pornește",
         "starting": "Pornesc motorul…",
-        "cancel": "Anulează"
+        "cancel": "Anulează",
+        "measureRunningHint": "Engine-ul rulează și deține dispozitivul audio. Oprește-l întâi, apoi măsoară."
     },
     "meters": {
         "input": "Intr.",
@@ -241,7 +242,8 @@
             "factory_preset": "Aceasta este deja varianta din fabrică a presetării; presetările predefinite nu pot fi șterse.",
             "unknown_binding": "Asocierea MIDI nu mai există.",
             "unknown_preset": "Presetarea nu mai există."
-        }
+        },
+        "offline": "Neconectat la engine: comanda nu a ajuns nicăieri."
     },
     "fx": {
         "gate": "Poartă",

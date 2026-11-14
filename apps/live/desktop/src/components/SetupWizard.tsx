@@ -279,6 +279,9 @@ export function SetupWizard() {
     const hostItems: Record<string, string> = { [AUTO]: t("setup.hostAuto") };
     for (const h of data?.hosts ?? []) hostItems[h] = h;
     const starting = status === "starting";
+    // The probe needs the audio device to itself. The running engine owns it, so measuring is
+    // offered only when nothing is playing (the command refuses too, in case of a race).
+    const engineRunning = status === "running";
 
     return (
         <Dialog open={open} onOpenChange={(o) => (o || canClose) && openPanel(o ? "setup" : null)}>
@@ -399,10 +402,12 @@ export function SetupWizard() {
                         </div>
 
                         <div className="flex flex-col gap-2 rounded-xl border p-3">
-                            <Button variant="secondary" onClick={() => void measure()} disabled={!inDev || !outDev || measuring || starting} loading={measuring}>
+                            <Button variant="secondary" onClick={() => void measure()} disabled={!inDev || !outDev || measuring || starting || engineRunning} loading={measuring}>
                                 <Activity /> {measuring ? t("setup.measuring") : t("setup.measure")}
                             </Button>
-                            <p className="text-xs text-muted-foreground">{t("setup.measureHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {engineRunning ? t("setup.measureRunningHint") : t("setup.measureHint")}
+                            </p>
                             <div className="mt-1 flex items-center gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => void compare()} disabled={!inDev || !outDev || comparing} loading={comparing}>
                                     <SlidersHorizontal /> {t("setup.compareRoutes")}

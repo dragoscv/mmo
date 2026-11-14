@@ -61,6 +61,10 @@ xruns appear, then go one step up.
 5. Everything runs inside the audio callback (no allocation); the CLI waits 500 ms for the streams to settle
   and gives up after 10 s. The CLI mutes the engine output for the measurement, so only the clicks are played.
 
+The device has one owner. **Measuring from the desktop is refused while the engine is running** — the command says
+so and the setup step disables the button — because the running engine holds the device and stopping the show to
+take a reading is not a choice a dialog gets to make. Stop the engine, measure, start again.
+
 You need a loopback from the output back to the input — any of:
 
 - **Cable**: interface output 1 → interface input 1 (turn the monitor/direct-monitor knob down first).

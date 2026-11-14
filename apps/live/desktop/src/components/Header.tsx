@@ -37,6 +37,7 @@ export function Header() {
     const t = useT();
     const status = useStore((s) => s.status);
     const start = useStore((s) => s.start);
+    const engineError = useStore((s) => s.engineError);
     const settings = useStore((s) => s.settings);
     const openPanel = useStore((s) => s.openPanel);
     const startEngine = useStore((s) => s.startEngine);
@@ -69,6 +70,15 @@ export function Header() {
                 </span>
                 {t(`status.${status}`)}
             </motion.div>
+            {engineError ? (
+                <span
+                    role="alert"
+                    title={engineError}
+                    className="min-w-0 truncate text-xs text-destructive"
+                >
+                    {engineError}
+                </span>
+            ) : null}
             {start?.info ? (
                 <span className="hidden truncate text-xs text-muted-foreground lg:inline">
                     {start.info.input} → {start.info.output} · {start.info.buffer_frames} @ {(start.info.sample_rate / 1000).toFixed(1)} kHz
@@ -82,7 +92,7 @@ export function Header() {
                     <Button variant={start?.lan ? "secondary" : "outline"} size="sm" onClick={() => openPanel("pair")}>
                         <Smartphone /> {t("header.pair")}
                     </Button>
-                    {status === "error" || status === "stopped" ? (
+                    {status === "error" || status === "stopped" || status === "reconnecting" ? (
                         <IconButton label={t("header.restart")} onClick={restart}>
                             <RotateCcw />
                         </IconButton>

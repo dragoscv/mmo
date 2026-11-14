@@ -90,6 +90,11 @@ export class EngineConnection {
         return id;
     }
 
+    /** True while the socket is up: a control sent now will reach the engine. */
+    get online(): boolean {
+        return this.ws != null;
+    }
+
     close() {
         this.closed = true;
         window.clearTimeout(this.timer);
