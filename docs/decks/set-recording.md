@@ -32,10 +32,10 @@ ISRC, time and duration of use). Check their current template before you submit.
 
 ## Tauri desktop app (`apps/mixai`): tracklist + Mixcloud upload page (WP19-27, step 1)
 
-Not released yet (changelog: Unreleased 1.7.0). The Tauri app records the master with its own engine command
+Shipped in Decks 1.7.0 (changelog: section 1.7.0). The Tauri app records the master with its own engine command
 (`start_recording`, 32-bit float WAV, the file is picked in a save dialog) and does not use `decks-ffi`. Its
-tracklist is a TypeScript port of the same rule, in `apps/mixai/src/setlog/`; no Rust code changed, so it works
-with the 1.6.0 shell.
+tracklist is a TypeScript port of the same rule, in `apps/mixai/src/setlog/`; no Rust code changed, so it runs on
+any shell from 1.6.0 on (1.7.0 included).
 
 | File | What it holds |
 |---|---|
