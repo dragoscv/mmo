@@ -1420,19 +1420,33 @@ mod tests {
     }
 
     /// The delay the option removes from the ears, measured with an impulse: the monitor bus
-    /// answers in the same sample, the main bus one shifter grain (256 samples, 5.3 ms at
-    /// 48 kHz) later per pitch insert. The meters report the same two figures.
+    /// answers in the same sample, the main bus one shifter's delay later per pitch insert. The
+    /// figures are read from the engine rather than hard-coded, because the shifter's latency
+    /// depends on which path it runs — 1 sample with the period-synchronous autotune that `auto`
+    /// selects since 2026-11-14, 256 with the classic one. What is pinned is the shape: one
+    /// insert's delay less per pitch insert, both buses equal when the option is off.
     #[test]
     fn untuned_monitor_answers_one_grain_earlier_per_pitch_insert() {
         // Pop Polish has an autotune; Harmony Stack an autotune and a harmonizer.
-        for (name, saved) in [("Pop Polish", 256), ("Harmony Stack", 512)] {
+        let mut saved = Vec::new();
+        for name in ["Pop Polish", "Harmony Stack"] {
             let mut input = vec![0.0f32; 9600];
             input[1000] = 0.5;
-            // Off: both buses carry the full chain, so both answer `saved` samples late.
-            let (main, mon) = render_all(&mut core_with(name, false), &input, 128);
+            // Off: both buses carry the full chain, so both answer the chain's latency late.
+            let mut off = core_with(name, false);
+            let (main, mon) = render_all(&mut off, &input, 128);
+            let m = off.meters_due().unwrap();
+            let here = m.chain_latency_samples as usize;
+            assert!(here > 0, "{name}: the chain declares no latency at all");
+            saved.push(here);
             assert_eq!(
                 (onset(&main), onset(&mon)),
-                (Some(1000 + saved), Some(1000 + saved)),
+                (Some(1000 + here), Some(1000 + here)),
+                "{name} off"
+            );
+            assert_eq!(
+                (m.chain_latency_samples, m.monitor_chain_latency_samples),
+                (here as u32, here as u32),
                 "{name} off"
             );
             // On: the main bus is where it was, the monitor answers at once.
@@ -1440,26 +1454,24 @@ mod tests {
             let (main, mon) = render_all(&mut core, &input, 128);
             assert_eq!(
                 (onset(&main), onset(&mon)),
-                (Some(1000 + saved), Some(1000)),
+                (Some(1000 + here), Some(1000)),
                 "{name} on"
             );
             let m = core.meters_due().unwrap();
             assert_eq!(
                 (m.chain_latency_samples, m.monitor_chain_latency_samples),
-                (saved as u32, 0),
+                (here as u32, 0),
                 "{name}"
             );
-            let m = {
-                let mut off = core_with(name, false);
-                render_all(&mut off, &input, 128);
-                off.meters_due().unwrap()
-            };
-            assert_eq!(
-                (m.chain_latency_samples, m.monitor_chain_latency_samples),
-                (saved as u32, saved as u32),
-                "{name} off"
-            );
         }
+        // One insert's delay per pitch insert: Harmony Stack has one more than Pop Polish. Measured
+        // 2026-11-14 the pair is (1, 257) — the autotune runs the period-synchronous path, whose
+        // declared latency is one sample, while the harmonizer still costs the classic grain (256).
+        // So the assertion is the direction, not a multiple: the two inserts no longer cost the same.
+        assert!(
+            saved[1] > saved[0],
+            "one more pitch insert must cost more delay, measured {saved:?} (autotune 1 on the fast path, harmonizer 256)"
+        );
     }
 
     /// Turning the option on and off while singing does not click: the monitor bus crossfades
@@ -2016,9 +2028,10 @@ mod tests {
             core.meters_due().unwrap()
         };
         // The ears are back on the main chain: whatever the pitch effect costs right now, the
-        // monitor reports the same figure. With `fast = auto` that is not a fixed 256 any more -
-        // the fast shifter is 1 sample and `auto` takes it for notes at or above 187.5 Hz, so the
-        // assertion is equality plus "it is the pitch effect's figure", not one specific number.
+        // monitor reports the same figure. With `fast = auto` that is not a fixed 256 any more - the
+        // period-synchronous shifter declares 1 sample and `auto` selects it at every pitch (since
+        // 2026-11-14) - so the assertion is equality plus "it is the pitch effect's figure", not one
+        // specific number.
         assert_eq!(
             m.chain_latency_samples, m.monitor_chain_latency_samples,
             "the ears must hear the main chain again"

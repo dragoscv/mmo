@@ -48,6 +48,21 @@ measured one is what came back through the loopback. It works before an engine i
 the buffer being chosen) and needs no hardware to compute. Labels in EN and RO; the arithmetic lives in
 `src/lib/latency-budget.ts` with five tests.
 
+## MixAI Live — the fast pitch path is now the default everywhere (2026-11-14)
+
+`fast = auto` used to keep the classic granular shifter on notes below 187.5 Hz, on the estimate that the
+period-synchronous path is further behind there. The measurements in the entries below took that back: below
+the line the classic path loses a small correction entirely (−25.16 cents for a +25 cent transpose) and a
+partial `mix` comes out 17.3 dB down, while the period-synchronous path applies the correction (+0.01 cents)
+and keeps the mix coherent (−3.1 dB) — and a note's onset actually arrives *earlier* on it (1 sample against
+258). `auto` now selects the period-synchronous path at every pitch; `off` still means the classic path, and
+so does `auto` while `formant` is on, because the colouring is implemented there (which is also the change that
+stops `formant` being dropped silently above 187.5 Hz). The chain latency of an autotune therefore reads 1
+instead of 256 by default, which the engine's own tests now derive rather than hard-code: the monitor option
+was re-measured live on the simulated device through the protocol (**1/1 → 1/0**, where the recipe reported
+256/256 → 256/0 on 2026-11-13), and the harmonizer still costs its classic grain (a chain with both reports
+257 = 1 + 256). Whole engine workspace green: 204 tests, 0 failed.
+
 ## MixAI Live — a half mix nearly mutes a low voice (2026-11-14)
 
 Measuring whether the period-synchronous path could take over low notes turned up a defect that has nothing to

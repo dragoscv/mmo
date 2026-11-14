@@ -165,8 +165,10 @@ every 128 samples (2.7 ms at 48 kHz).
 - The detector analyses the newest samples of its 1024-sample history (a test on a glide of one octave per
   second allows 9 cents of lag; the first version read the oldest part and was 20 cents behind).
 - Two shifters exist and `fast` chooses between them: the **classic** granular one (256-sample grains) and the
-  **period-synchronous** one (`psola`). `auto` — the default — uses the period-synchronous path from 187.5 Hz
-  up (a period shorter than a grain), and the classic one below. `off` and `on` force one of them.
+  **period-synchronous** one (`psola`). `auto` — the default — uses the period-synchronous path at **every**
+  pitch since 2026-11-14 (before that it kept the classic one below 187.5 Hz; the measurements below took that
+  back). `off` forces the classic path, `on` forces the period-synchronous one, and `auto` also stays on the
+  classic path while `formant` is on, because colouring is implemented there.
 - Shifter accuracy of the classic path, measured on pure tones on 2026-11-12 (output pitch against input ×
   ratio, ratios 0.8–1.25): with nothing to correct (ratio 1) the pitch is kept exactly (the first version was
   6.8 cents flat, measured at 220 Hz); at 220, 330, 440 and 880 Hz the output is within 5.1 cents (tests allow 6).
@@ -181,15 +183,16 @@ every 128 samples (2.7 ms at 48 kHz).
   lost — `tune::tests::what_auto_costs_on_a_low_note`). What the threshold buys is delay: in the steady state
   the envelope of the period-synchronous output lags by 287 samples against 57 for the classic path at 110 Hz
   (+4.8 ms, `tune::tests::the_fast_path_costs_delay_on_a_low_note`), which is why `auto` keeps the classic one
-  on low notes. Setting `fast` to `on` trades that delay for the correction. Neither path has been measured on
-  a real voice below 187.5 Hz.
+  on low notes. That estimate is why `auto` used to keep the classic path below 187.5 Hz; it did not survive
+  measurement (`fast` on `auto` selects the period-synchronous one everywhere now). Neither path has been
+  measured on a real voice below 187.5 Hz.
   **A partial `mix` nearly mutes a low note on the classic path.** Measured 2026-11-14 on a 110 Hz tone with a
   +25 cent transpose: `mix` 0.5 comes out 17.3 dB below either side alone (0.0386 against 0.2828 RMS), because
   the dry tap sits at the classic path's fixed 256 samples while a grain restart at that pitch anchors the wet
   path near antiphase. At 220 and 440 Hz the same measurement lands at −2.9…−3.2 dB, which is what mixing two
   sines costs, and the period-synchronous path is at −3.1 dB at 110 Hz as well
-  (`tune::tests::a_partial_mix_does_not_cancel`). So on a male voice a half mix is not a half mix: it is close
-  to silence, and `fast = on` avoids it entirely.
+  (`tune::tests::a_partial_mix_does_not_cancel`). So a half mix on the classic path at a low pitch is not a
+  half mix: it is close to silence. It affects `fast = off`, and `auto` only while `formant` is on.
 - `retune` is the glide time to the target: ~0.5 ms is the hard "robot" effect, 40–100 ms sounds natural.
 - `humanize` leaves small deviations alone: deviations under `30 × humanize` cents are not corrected and
   correction fades in smoothly over the next 30 cents (vibrato and scoops survive). `sticky` (cents) keeps the

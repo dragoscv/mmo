@@ -104,7 +104,7 @@ while it is on. Every later edit of the main chain — parameter, enable, add, r
 setlist navigation, MIDI, `reset` — reaches the monitor chain too; inserts are linked by id, so an operation on a
 pitch insert simply does not apply there.
 
-**Verifying it without any hardware** (run on 2026-11-13 against the release binary, result below): the `Null`
+**Verifying it without any hardware** (run against the release binary, results below): the `Null`
 host is a simulated device, so nothing is played and no interface is opened.
 
 ```powershell
@@ -114,10 +114,16 @@ host is a simulated device, so nothing is played and no interface is opened.
 #    {"type":"subscribe","meters":true}, then {"type":"set_mix","monitor_untuned":true}
 ```
 
-Measured with `Pop Polish` (which carries `autotune`): off → `chain_latency_samples` 256,
-`monitor_chain_latency_samples` 256; on → 256 and **0**, so the ears lose 256 samples (5.33 ms at 48 kHz) while
-the main chain is unchanged; the option survives a `load_preset` and putting it back off returns the monitor to
-the main chain's figure. A preset without a pitch effect shows the two equal, which is correct.
+Measured with `Pop Polish` (which carries `autotune`): off → `chain_latency_samples` **1**,
+`monitor_chain_latency_samples` **1**; on → 1 and **0**; putting it back off returns the monitor to the main
+chain's figure. The figure is whatever the chain actually costs, and the first run of this recipe (2026-11-13)
+reported **256 / 256 → 256 / 0**, because the autotune then ran the classic granular shifter by default; since
+2026-11-14 `auto` selects the period-synchronous one (chain latency 1) at every pitch, so a chain whose only
+pitch effect is an autotune reports 1, and a chain with the autotune set to `fast = off` still reports 256. A
+preset without a pitch effect shows the two equal, which is correct. Re-measured on the Null host with
+`monitor-meters.mjs` from this repository's scratch area (`serve --host Null --preset "Pop Polish"`, subscribe
+to meters, toggle `set_mix {monitor_untuned}`): 1/1 → 1/0 → 1/1, "the ears lose the whole chain latency, the
+main chain is untouched".
 
 The option is not persisted: the engine starts with it off, so a client that wants it must send `set_mix` again
 after every restart. Switching it on or off while singing crossfades the monitor bus over 10 ms, and a scene

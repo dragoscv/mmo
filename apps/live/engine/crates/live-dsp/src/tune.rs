@@ -27,20 +27,18 @@ const TUNE_SPECS: &[ParamSpec] = &[
     ParamSpec::new("transpose", -12.0, 12.0, 0.0, Unit::Semitones),
     ParamSpec::new("sticky", 0.0, 100.0, 60.0, Unit::Cents),
     // "Fast pitch": the period-synchronous shifter (`psola`) instead of the grain shifter. 1 sample
-    // of delay at rest instead of 256 (5.3 ms), but during a correction on a LOW note its delay runs
-    // up to one period (82 Hz: 12.2 ms), more than the classic shifter's fixed 5.3 ms. `auto`
-    // (default) picks the fast one where it cannot be later: notes whose period is at most the
-    // classic delay (`FAST_PERIOD` = 256 samples, 187.5 Hz at 48 kHz).
+    // of delay at rest instead of 256 (5.3 ms), and in the steady state a slow amplitude modulation
+    // comes out later than the classic path's (measured 110 Hz: 287 samples against 57), which is
+    // why `auto` used to keep the classic one on low notes. The measurement of 2026-11-14 took that
+    // back: below 187.5 Hz the classic path loses a small correction entirely (-25.16 cents for a
+    // +25 cent transpose) and a partial `mix` comes out 17.3 dB down, a note's onset arrives EARLIER
+    // on the fast path (1 sample against 258), and the mix stays coherent. `auto` therefore uses the
+    // fast one at every pitch. `off` still means the classic path, and so does `auto` with `formant`
+    // on, which is implemented there.
     ParamSpec::choice("fast", FAST_NAMES, 1),
 ];
 
 const FAST_NAMES: &[&str] = &["off", "auto", "on"];
-/// Period at or below which `auto` uses the fast shifter: the classic shifter's own fixed delay, so
-/// above it the fast one is never later on average (mean delay = half a period).
-const FAST_PERIOD: f32 = Shifter::latency() as f32;
-/// Leave the fast shifter only above this period (10 % up), so a vibrato around the boundary does
-/// not crossfade back and forth.
-const SLOW_PERIOD: f32 = FAST_PERIOD * 1.1;
 
 /// Snapshot of what the corrector is doing (telemetry for the tuner UI).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -62,10 +60,8 @@ pub struct Autotune {
     /// Weight of the fast shifter on the wet path, 0 = classic. Ramped over 10 ms so the switch
     /// between two paths with a very different delay does not click.
     mode: Smoothed,
-    /// What the last control step decided (in `auto`, from the detected period).
+    /// What the last control step decided.
     want_fast: bool,
-    /// `auto` only: the state the hysteresis band keeps (see [`FAST_PERIOD`], [`SLOW_PERIOD`]).
-    auto_fast: bool,
     scale: Scale,
     stable: Option<i32>,
     semis: f32,
@@ -87,12 +83,11 @@ impl Autotune {
             shifter: Shifter::new(v[5] > 0.5),
             psola: PsolaShifter::new(sample_rate),
             mode: Smoothed::with_ms(
-                if v[9] as usize == 2 { 1.0 } else { 0.0 },
+                if v[9] as usize == 0 { 0.0 } else { 1.0 },
                 10.0,
                 sample_rate,
             ),
-            want_fast: v[9] as usize == 2,
-            auto_fast: false,
+            want_fast: v[9] as usize != 0,
             scale: Scale::new(v[0] as usize, v[1] as usize),
             stable: None,
             semis: 0.0,
@@ -182,27 +177,17 @@ impl Autotune {
             0.0
         };
         self.psola.set_period(period);
-        // Which shifter feeds the wet path. `auto` keeps the classic one on low notes, where the
-        // fast one's delay during a correction can exceed the classic shifter's fixed 256 samples.
+        // Which shifter feeds the wet path. `auto` uses the period-synchronous one at every pitch:
+        // measured 2026-11-14 at 110 Hz, the classic path loses a small correction entirely and a
+        // partial `mix` comes out 17.3 dB down, while the fast one applies the correction (+0.01
+        // cents against -25.16) and keeps the mix coherent (-3.1 dB), and a note's onset arrives
+        // earlier on it (1 sample against 258). `formant` is implemented in the classic shifter
+        // only, so with it on `auto` stays there rather than dropping the setting silently; an
+        // explicit `on` is the user overriding even that.
         self.want_fast = match self.v[9] as usize {
             0 => false,
             2 => true,
-            _ => {
-                // `formant` is implemented in the classic shifter only, so with it on `auto` must not
-                // choose a path that would drop it silently (`on` is the user overriding this).
-                if self.v[5] > 0.5 {
-                    self.auto_fast = false;
-                } else if period > 0.0 {
-                    // Hysteresis: enter at or below the classic delay, leave only 10 % above it.
-                    self.auto_fast = if self.auto_fast {
-                        period <= SLOW_PERIOD
-                    } else {
-                        period <= FAST_PERIOD
-                    };
-                }
-                // Unvoiced (a pause) keeps whatever the last note chose: no flapping in silence.
-                self.auto_fast
-            }
+            _ => self.v[5] <= 0.5,
         };
         self.mode.set(if self.want_fast { 1.0 } else { 0.0 });
     }
@@ -568,13 +553,20 @@ mod tests {
         assert_eq!(t.param(5), 0.0, "formant must default to off");
         assert_eq!(t.param(9), 1.0, "the fast shifter must default to auto");
         assert_eq!(FAST_NAMES[t.param(9) as usize], "auto");
-        assert_eq!(t.latency(), 256, "the classic shifter is the default");
+        assert_eq!(
+            t.latency(),
+            1,
+            "auto means the period-synchronous path, at every pitch"
+        );
     }
 
-    /// `auto`: the fast shifter for notes whose period is at most the classic delay (187.5 Hz at
-    /// 48 kHz), the classic one below - with a 10 % band, so a vibrato does not flap.
+    /// `auto` is the period-synchronous path at every pitch since 2026-11-14 (it used to keep the
+    /// classic one below 187.5 Hz, on the estimate that the fast path is further behind there; the
+    /// measurement took that back — see `what_auto_costs_on_a_low_note` and
+    /// `a_partial_mix_does_not_cancel`). `off` is the classic path, and `formant` on keeps `auto`
+    /// there because colouring is implemented on that path only.
     #[test]
-    fn fast_mode_is_automatic_around_the_classic_delay() {
+    fn auto_uses_the_period_synchronous_path_at_every_pitch() {
         let latency_after = |f: f32| {
             let mut t = Autotune::new(48000.0);
             // 40 ms of the tone is enough for the detector and the crossfade.
@@ -583,28 +575,17 @@ mod tests {
             t.process(&mut l, &mut r);
             t.latency()
         };
-        // Period 109 samples at 440 Hz, 218 at 220 Hz: both at or below 256 -> fast.
-        assert_eq!(
-            latency_after(440.0),
-            1,
-            "440 Hz should take the fast shifter"
-        );
-        assert_eq!(
-            latency_after(220.0),
-            1,
-            "220 Hz should take the fast shifter"
-        );
-        // Period 436 samples at 110 Hz, 585 at 82 Hz: above 256 -> classic.
-        assert_eq!(
-            latency_after(110.0),
-            256,
-            "110 Hz should keep the classic shifter"
-        );
-        assert_eq!(
-            latency_after(82.0),
-            256,
-            "82 Hz should keep the classic shifter"
-        );
+        // Periods 109 (440 Hz), 218 (220 Hz), 436 (110 Hz) and 585 samples (82 Hz): all fast now.
+        for f in [82.0f32, 110.0, 220.0, 440.0] {
+            assert_eq!(latency_after(f), 1, "{f} Hz must take the fast shifter");
+        }
+        // With `formant` on, auto stays on the classic path: colouring lives there.
+        let mut t = Autotune::new(48000.0);
+        t.set_param(5, 1.0);
+        let mut l = sine(440.0, 48000.0, 1920, 0.4);
+        let mut r = l.clone();
+        t.process(&mut l, &mut r);
+        assert_eq!(t.latency(), 256, "formant on must keep the classic shifter");
         // Forced modes ignore the pitch.
         for (mode, want) in [(0.0, 256usize), (2.0, 1)] {
             let mut t = Autotune::new(48000.0);
@@ -826,26 +807,27 @@ mod tests {
         let (auto, on, off) = (delay(1.0), delay(2.0), delay(0.0));
         println!("110 Hz, delay of the envelope: auto {auto:.0} samples, on {on:.0}, off {off:.0}");
         assert!(
-            (auto - off).abs() < 1.0,
-            "auto must be the classic path here too"
+            (auto - on).abs() < 1.0,
+            "auto must be the fast path here too"
         );
         // Measured 2026-11-14: 287 against 57, so the fast path is ~4.8 ms further behind in the
-        // steady state. That is what the ~187.5 Hz line buys; the pitch side of the trade is in
-        // `what_auto_costs_on_a_low_note`. Loose bound on purpose: it guards the direction, not a
-        // figure, and the method is envelope correlation, not the phase delay the chain declares.
+        // steady state when the signal is an amplitude modulation, while a note's ONSET arrives
+        // earlier on it (see `the_fast_path_is_fast`). That combination is why this figure alone
+        // does not decide the default; `what_auto_costs_on_a_low_note` and
+        // `a_partial_mix_does_not_cancel` are the rest of it. Loose bound on purpose: it guards the
+        // direction, not a figure, and the method is envelope correlation, not the phase delay the
+        // chain declares.
         assert!(
             on - off > 100.0,
-            "the fast path is expected to sit further behind on a low note ({on:.0} against {off:.0}); the reason for the auto threshold disappeared, revisit it"
+            "the fast path is expected to lag the classic one on a slow amplitude modulation ({on:.0} against {off:.0}); if it does not any more, revisit the numbers behind the default"
         );
     }
 
-    /// What the shipped default costs on a low note, as one number. `fast` defaults to `auto`, and
-    /// auto keeps the classic shifter below ~187.5 Hz (a period longer than a grain), which is where
-    /// the classic shifter loses small corrections: at 110 Hz a +25 cent transpose comes out at the
-    /// input pitch instead of the target. Measured in three runs of the same signal, processed in
-    /// blocks the way the engine does, so the owner can weigh moving that line. The assertion pins
-    /// the ROUTING (auto must agree with the classic path), not the defect: the day the line moves,
-    /// this test has to be updated deliberately.
+    /// What the default does on a low note, as one number, and what the classic path costs there:
+    /// at 110 Hz a +25 cent transpose comes out at the input pitch instead of the target on the
+    /// classic path (the whole correction lost), while the period-synchronous one lands it. This is
+    /// the measurement that moved `auto` to the period-synchronous path at every pitch on
+    /// 2026-11-14; it stays as the number behind that decision.
     #[test]
     fn what_auto_costs_on_a_low_note() {
         let error_cents = |mode: f32| {
@@ -867,8 +849,12 @@ mod tests {
         let (auto, on, off) = (error_cents(1.0), error_cents(2.0), error_cents(0.0));
         println!("110 Hz +25 cents: auto {auto:+.2} cents off, on {on:+.2}, off {off:+.2}");
         assert!(
-            (auto - off).abs() < 1.0,
-            "auto must be the classic path at 110 Hz (auto {auto:+.2}, classic {off:+.2}); if the threshold moved, update this test and docs/live/latency.md"
+            (auto - on).abs() < 1.0,
+            "auto must be the period-synchronous path at 110 Hz (auto {auto:+.2}, on {on:+.2})"
+        );
+        assert!(
+            off.abs() > 20.0,
+            "the classic path is expected to lose the whole correction here, measured {off:+.2}; if it no longer does, this decision can be revisited"
         );
     }
 
