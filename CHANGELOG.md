@@ -77,8 +77,9 @@ so does `auto` while `formant` is on, because the colouring is implemented there
 stops `formant` being dropped silently above 187.5 Hz). The chain latency of an autotune therefore reads 1
 instead of 256 by default, which the engine's own tests now derive rather than hard-code: the monitor option
 was re-measured live on the simulated device through the protocol (**1/1 → 1/0**, where the recipe reported
-256/256 → 256/0 on 2026-11-13), and the harmonizer still costs its classic grain (a chain with both reports
-257 = 1 + 256). Whole engine workspace green: 204 tests, 0 failed.
+256/256 → 256/0 on 2026-11-13), and the harmonizer still cost its classic grain at that point (a chain with both
+reported 257 = 1 + 256 — superseded hours later by the entry above, where the harmony voices took the same
+path). Whole engine workspace green: 204 tests, 0 failed.
 
 ## MixAI Live — a half mix nearly mutes a low voice (2026-11-14)
 
