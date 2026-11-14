@@ -21,11 +21,14 @@ export interface MixState {
     monitor_db: number;
     monitor_dry: number;
     /** Monitor option "tuned only for the audience": the ears get the chain without the pitch
-     *  effects, so without the shifter's 256 samples (5.3 ms). Not persisted by the engine: a
-     *  client must send it again after every restart. */
+     *  effects, so without the shifter's 256 samples (5.3 ms). Part of the mix the engine persists
+     *  and restores. */
     monitor_untuned: boolean;
     bypass: boolean;
     mute: boolean;
+    /** PANIC is latched: it stays until the panic control is used again, and while it is set the
+     *  engine forces `mute` on (an ordinary unmute cannot bring the audio back). */
+    panic: boolean;
 }
 
 export interface SongPart {

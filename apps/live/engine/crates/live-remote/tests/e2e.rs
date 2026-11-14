@@ -372,3 +372,53 @@ fn supplied_tokens_are_reused_or_replaced() {
     assert_ne!(fresh.token(Role::Viewer), "");
     assert_ne!(fresh.pairing(), live_remote::Pairing::default());
 }
+
+/// A control flood must not be able to take the panic button away: PANIC is exempt from the
+/// per-second cap (200), so it lands even when the same client is flooding the server. The test
+/// also insists that the cap actually engaged, so it cannot pass by sending nothing.
+#[test]
+fn a_flood_does_not_eat_the_panic() {
+    use std::io::ErrorKind::{TimedOut, WouldBlock};
+
+    let s = server();
+    let mut session = Session::new(48000.0, 128);
+    session.load_preset("Natural Vocal").unwrap();
+    let mut p = connect(&s, &s.token(Role::Performer)).unwrap();
+    wait_for("flood-hello", &mut p, &s, &mut session, |m| {
+        m["type"] == "hello"
+    });
+
+    for i in 0..260u32 {
+        p.send(Message::text(format!(
+            r#"{{"type":"set_mix","main_db":-1.0,"id":{i}}}"#
+        )))
+        .unwrap();
+    }
+    p.send(Message::text(r#"{"type":"panic","id":9000}"#))
+        .unwrap();
+
+    let mut saw_limited = false;
+    let mut panic_acked = false;
+    let t0 = Instant::now();
+    while t0.elapsed() < Duration::from_secs(5) && !(saw_limited && panic_acked) {
+        pump(&s, &mut session);
+        match p.read() {
+            Ok(Message::Text(t)) => {
+                let v: Value = serde_json::from_str(t.as_str()).unwrap();
+                if v["code"] == "rate_limited" {
+                    saw_limited = true;
+                }
+                if v["type"] == "ack" && v["id"] == 9000 {
+                    panic_acked = true;
+                }
+            }
+            Ok(_) => {}
+            Err(tungstenite::Error::Io(e)) if matches!(e.kind(), WouldBlock | TimedOut) => {}
+            Err(e) => panic!("flood read: {e}"),
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(saw_limited, "the flood must have hit the rate cap");
+    assert!(panic_acked, "the panic must get through the flood");
+    assert!(session.mix.panic, "the panic is latched in the state");
+}

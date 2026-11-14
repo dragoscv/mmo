@@ -44,6 +44,7 @@ describe("shortcuts", () => {
             monitor_untuned: false,
             bypass: true,
             mute: false,
+            panic: false,
         };
         expect(toggleFor("bypass", mix)).toEqual({ bypass: false });
         expect(toggleFor("mute", mix)).toEqual({ mute: true });

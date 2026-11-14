@@ -41,6 +41,7 @@ export function MixStrip() {
         monitor_untuned: false,
         bypass: false,
         mute: false,
+        panic: false,
     };
     const knob = (key: "input_db" | "main_db" | "monitor_db" | "monitor_dry", label: string, spec: ParamSpec) => (
         <div className="relative">
@@ -107,27 +108,40 @@ export function MixStrip() {
                     <MidiLearnButton target={{ kind: "action", action: "toggle_mute" }} label={t("mix.mute")} />
                 </div>
             </div>
-            <AlertDialog>
-                <AlertDialogTrigger
-                    render={
-                        <Button variant="destructive" disabled={disabled} className="ms-1 h-auto self-stretch px-3">
-                            <OctagonAlert className="size-5" /> {t("mix.panic")}
-                        </Button>
-                    }
-                />
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t("mix.panicTitle")}</AlertDialogTitle>
-                        <AlertDialogDescription>{t("mix.panicBody")}</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>{t("mix.cancel")}</AlertDialogCancel>
-                        <AlertDialogAction variant="destructive" onClick={() => send({ type: "panic" })}>
-                            {t("mix.panicConfirm")}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            {s.panic ? (
+                // Panic is latched: the same control releases it, without the destructive question.
+                <Button
+                    variant="destructive"
+                    disabled={disabled}
+                    aria-pressed
+                    onClick={() => send({ type: "panic" })}
+                    className="ms-1 h-auto self-stretch px-3"
+                >
+                    <OctagonAlert className="size-5" /> {t("mix.panicRelease")}
+                </Button>
+            ) : (
+                <AlertDialog>
+                    <AlertDialogTrigger
+                        render={
+                            <Button variant="destructive" disabled={disabled} className="ms-1 h-auto self-stretch px-3">
+                                <OctagonAlert className="size-5" /> {t("mix.panic")}
+                            </Button>
+                        }
+                    />
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t("mix.panicTitle")}</AlertDialogTitle>
+                            <AlertDialogDescription>{t("mix.panicBody")}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t("mix.cancel")}</AlertDialogCancel>
+                            <AlertDialogAction variant="destructive" onClick={() => send({ type: "panic" })}>
+                                {t("mix.panicConfirm")}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
             <MidiLearnButton target={{ kind: "action", action: "panic" }} label={t("mix.panic")} className="self-start" />
         </section>
     );

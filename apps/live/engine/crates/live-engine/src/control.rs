@@ -282,8 +282,16 @@ impl Session {
     }
 
     fn panic(&mut self) -> Vec<Command> {
-        let mut v = self.set_mix(|m| m.mute = true);
-        v.push(Command::Reset);
+        // The control toggles the latch: once latched, pressing it again is the only way back, so a
+        // stray unmute or a scene change cannot restore the audio by accident.
+        let latch = !self.mix.panic;
+        let mut v = self.set_mix(|m| {
+            m.panic = latch;
+            m.mute = latch;
+        });
+        if latch {
+            v.push(Command::Reset);
+        }
         v
     }
 
@@ -567,6 +575,51 @@ mod tests {
             )
             .unwrap();
         assert!(matches!(norm[0], Command::SetParam { value, .. } if (value - 0.5).abs() < 1e-6));
+    }
+
+    /// PANIC is latched: an ordinary unmute, a mute toggle or a scene change cannot bring the audio
+    /// back — only pressing PANIC again can. The latch is in the state, so every surface can show it.
+    #[test]
+    fn panic_latches_until_pressed_again() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Natural Vocal").unwrap();
+        let t0 = Instant::now();
+
+        let cmds = s.apply_control(Control::Panic, t0).unwrap();
+        assert!(s.mix.panic && s.mix.mute, "panic latches and silences");
+        assert!(cmds.iter().any(|c| matches!(c, Command::Mute(true))));
+        assert!(matches!(cmds.last(), Some(Command::Reset)));
+
+        // A stray unmute does nothing while latched.
+        let cmds = s
+            .apply_control(
+                Control::SetMix {
+                    input_db: None,
+                    main_db: None,
+                    monitor_db: None,
+                    monitor_dry: None,
+                    bypass: None,
+                    mute: Some(false),
+                    monitor_untuned: None,
+                },
+                t0,
+            )
+            .unwrap();
+        assert!(
+            s.mix.panic && s.mix.mute,
+            "the latch holds against an unmute"
+        );
+        assert!(!cmds.iter().any(|c| matches!(c, Command::Mute(false))));
+
+        // A scene change does not clear it either.
+        s.load_preset("Harmony Stack").unwrap();
+        assert!(s.mix.panic && s.mix.mute, "a preset load keeps the latch");
+
+        // Pressing it again releases the latch and the audio.
+        let cmds = s.apply_control(Control::Panic, t0).unwrap();
+        assert!(!s.mix.panic && !s.mix.mute, "a second press releases");
+        assert!(cmds.iter().any(|c| matches!(c, Command::Mute(false))));
+        assert!(!cmds.iter().any(|c| matches!(c, Command::Reset)));
     }
 
     fn gig() -> Setlist {

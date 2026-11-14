@@ -33,6 +33,9 @@ time, rotatable. Roles:
 Limits: 32 clients, 16 KiB per message, 200 messages/s per client (excess dropped with an `error`), cross-origin
 WebSocket upgrades refused unless the `Origin` matches the engine host.
 
+`panic` is exempt from that per-second cap (and is never evicted from the queue when a client floods the
+server), so a flood cannot take the panic button away; the OSC path exempts it the same way.
+
 ## Messages
 
 Every message is `{"type": "...", ...}`. Client messages may carry `"id": <u32>`; the server echoes it in the
@@ -71,7 +74,7 @@ types are described in [MIDI control](midi.md).
 | `goto` | `song, part` | performer |
 | `next` / `prev` | — | performer |
 | `tap_tempo` | — (the server averages taps and sets every delay `bpm`) | performer |
-| `panic` | — (mute + reset tails; `set_mix {mute:false}` to recover) | performer |
+| `panic` | — (silences everything and clears the effect tails; **latched** — send it again to recover, and `set_mix {mute:false}` cannot while it is latched; `state.mix.panic` says which way it is) | performer |
 | `latency_probe` | — | controller |
 | `midi_learn` | `target: MidiTarget \| null` (null cancels) — the next CC / note binds to it | controller |
 | `midi_unbind` | `index` into `state.midi.map.bindings` | controller |

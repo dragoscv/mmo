@@ -126,9 +126,10 @@
         "mute": "Mut",
         "panic": "Panică",
         "panicTitle": "Panică: oprești tot sunetul?",
-        "panicBody": "Toate ieșirile devin mute și cozile efectelor (reverb, delay) se golesc. Apasă din nou Mut ca să revii.",
+        "panicBody": "Toate ieșirile devin mute și cozile efectelor (reverb, delay) se golesc. Panica este blocată: rămâne până o eliberezi, iar butonul devine Eliberează.",
         "panicConfirm": "Oprește acum",
-        "cancel": "Anulează"
+        "cancel": "Anulează",
+        "panicRelease": "Eliberează"
     },
     "presets": {
         "title": "Presetări",

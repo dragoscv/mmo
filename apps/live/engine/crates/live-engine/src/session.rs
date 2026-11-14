@@ -32,6 +32,11 @@ pub struct MixState {
     /// pitch effects (so without their delay); the main bus keeps the full chain.
     #[serde(default)]
     pub monitor_untuned: bool,
+    /// PANIC is latched. Set by `Control::Panic`, and cleared only by pressing it again — a stray
+    /// unmute, a scene change or a preset load cannot bring the audio back by accident. While it
+    /// is set, `mute` is forced on.
+    #[serde(default)]
+    pub panic: bool,
 }
 
 impl Default for MixState {
@@ -44,6 +49,7 @@ impl Default for MixState {
             bypass: false,
             mute: false,
             monitor_untuned: false,
+            panic: false,
         }
     }
 }
@@ -505,6 +511,10 @@ impl Session {
     pub fn set_mix(&mut self, f: impl FnOnce(&mut MixState)) -> Vec<Command> {
         let before = self.mix.clone();
         f(&mut self.mix);
+        if self.mix.panic {
+            // A latched PANIC holds: only the panic control itself gets the audio back.
+            self.mix.mute = true;
+        }
         let m = &self.mix;
         let mut out = Vec::new();
         if m.input_db != before.input_db {
@@ -672,6 +682,7 @@ mod tests {
             bypass: true,
             mute: true,
             monitor_untuned: true,
+            panic: false,
         };
         let cmds = s.restore_mix(saved.clone());
         assert_eq!(s.mix, saved, "the saved mix is adopted as is");
@@ -873,8 +884,10 @@ mod tests {
                 .apply_control(serde_json::from_str(json).unwrap(), now)
                 .unwrap(),
             Edit::Panic => {
+                // Panic, then release it the way a user does: the latch (WP21-19) means the only
+                // way back is the panic control itself, not a plain unmute.
                 let mut v = s.apply_control(Control::Panic, now).unwrap();
-                v.extend(s.set_mix(|m| m.mute = false));
+                v.extend(s.apply_control(Control::Panic, now).unwrap());
                 v
             }
             Edit::Untuned(on) => untuned(s, on),

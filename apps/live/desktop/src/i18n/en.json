@@ -126,9 +126,10 @@
         "mute": "Mute",
         "panic": "Panic",
         "panicTitle": "Panic: mute everything?",
-        "panicBody": "All outputs are muted and effect tails (reverb, delay) are cleared. Press Mute again to come back.",
+        "panicBody": "All outputs are muted and effect tails (reverb, delay) are cleared. Panic is latched: it stays until you release it, and the button turns into Release.",
         "panicConfirm": "Mute now",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "panicRelease": "Release"
     },
     "presets": {
         "title": "Presets",

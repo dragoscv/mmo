@@ -124,7 +124,20 @@ impl Inner {
     pub(crate) fn push_incoming(&self, inc: Incoming) {
         let mut s = self.lock();
         if s.incoming.len() >= MAX_PENDING {
-            s.incoming.pop_front();
+            // A flood must not be able to take the panic button away: drop the oldest control that
+            // is not a PANIC instead of the oldest control outright.
+            match s
+                .incoming
+                .iter()
+                .position(|q| !matches!(q.control, Control::Panic))
+            {
+                Some(i) => {
+                    s.incoming.remove(i);
+                }
+                None => {
+                    s.incoming.pop_front();
+                }
+            }
         }
         s.incoming.push_back(inc);
     }
@@ -653,15 +666,25 @@ fn session(
                     window = Instant::now();
                     in_window = 0;
                 }
+                let parsed = parse_client(t.as_str());
+                // A PANIC is never rate-limited: a flood must not be able to delay or eat the panic
+                // button (the OSC path exempts it the same way).
+                let panic = matches!(
+                    &parsed,
+                    Parsed::Control {
+                        control: Control::Panic,
+                        ..
+                    }
+                );
                 in_window += 1;
-                if in_window > MAX_MSGS_PER_SEC {
+                if !panic && in_window > MAX_MSGS_PER_SEC {
                     if in_window == MAX_MSGS_PER_SEC + 1 {
                         let e = json!({ "type": "error", "code": "rate_limited", "message": "too many messages" });
                         send(&mut ws, e.to_string()).map_err(io_err)?;
                     }
                     continue;
                 }
-                match parse_client(t.as_str()) {
+                match parsed {
                     Parsed::Subscribe { meters, hz } => {
                         meters_on = meters;
                         meters_every = Duration::from_millis(1000 / hz as u64);

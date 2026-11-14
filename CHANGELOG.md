@@ -38,6 +38,20 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — PANIC is latched, and a flood cannot take the button away (WP21-19 part 2, 2026-11-14)
+
+The panic button used to mute and clear the tails **once**: a stray unmute, a mute toggle or a preset load could
+bring the audio back by accident, and on the WebSocket path a flood counted against the same per-second cap as
+everything else, so the panic could simply be dropped. PANIC is now **latched** — the control toggles it, the
+engine forces the mute while it is set, and `state.mix.panic` tells every surface which way it is, so the only way
+back is the panic control itself. It is also **exempt from the per-second cap** and is never evicted from the
+pending queue, the way the OSC path already treated it. The desktop button turns into "Release" while latched and
+no longer asks the destructive question a second time.
+
+Proven end to end: from one client, 260 messages then a panic, and the panic still lands and leaves the latch set
+(and the test insists the cap actually engaged, so it cannot pass by sending nothing). Engine workspace green:
+214 tests, clippy `-D warnings` clean; desktop typecheck 0, 37 tests, i18n parity OK.
+
 ## MixAI Live — the engine recovers by itself, and a restart keeps clients paired (WP21-19 part 1, 2026-11-14)
 
 A device unplug, a driver reset or two seconds without audio events used to end the engine: the desktop showed an

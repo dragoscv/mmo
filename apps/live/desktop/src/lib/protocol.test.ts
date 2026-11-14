@@ -28,7 +28,7 @@ const state = (revision: number, over: Partial<SessionState> = {}): SessionState
         { id: 2, fx: "compressor", enabled: true, params: [["ratio", 3]] },
         { id: 3, fx: "reverb", enabled: false, params: [["mix", 0.2]] },
     ],
-    mix: { input_db: 0, main_db: 0, monitor_db: -6, monitor_dry: 0, monitor_untuned: false, bypass: false, mute: false },
+    mix: { input_db: 0, main_db: 0, monitor_db: -6, monitor_dry: 0, monitor_untuned: false, bypass: false, mute: false, panic: false },
     setlist: null,
     position: null,
     presets: ["Natural Vocal", "Pop Polish"],
