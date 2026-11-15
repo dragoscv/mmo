@@ -111,9 +111,13 @@ test("with a session: the chain draws one hero visual per effect, none of them b
     }
     expect(new Set(drawn.map((d) => d.fx)).size, "distinct effects drawn").toBeGreaterThanOrEqual(9);
 
-    // The mix the fixture set is what the strip shows, so the state really reached the UI.
-    // `formatValue` renders dB as `-3.0 dB` (and a locale may use a comma).
-    await expect(page.getByText(/-3[.,]0 dB/).first()).toBeVisible();
+    // The fixture's state really reached the UI: the mix knob reports its value (a knob draws a dial
+    // and carries the figure in `aria-valuetext`, not as text) and the setlist shows the songs.
+    await expect(page.getByRole("slider", { name: ANY("Main", "Principal") })).toHaveAttribute(
+        "aria-valuetext",
+        /-3[.,]0 dB/,
+    );
+    await expect(page.getByRole("region", { name: ANY("Setlist", "Listă de cântece") })).toContainText(/Warm up/);
     await page.screenshot({ path: "test-results/live-desktop-fixture-1280x720.png" });
 
     // And the panels that need live frames are drawn: the ribbon and spectrum canvases have ink.
