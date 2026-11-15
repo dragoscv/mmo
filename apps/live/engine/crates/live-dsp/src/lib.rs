@@ -18,6 +18,7 @@ pub mod denoise;
 pub mod denormal;
 pub mod dynamics;
 pub mod eq;
+pub mod feedback;
 pub mod filter;
 pub mod modulation;
 pub mod param;

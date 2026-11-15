@@ -172,6 +172,36 @@ browser version lost it; fixed in web 3.4.5 too). Below the threshold the two ba
 
 <!-- params:deesser:end -->
 
+## feedback
+
+Feedback (howl) suppression: a bank of 18 narrow detectors between 200 Hz and 8 kHz, and a notch on any that is
+howling. A band is a candidate when it stands `sensitivity` dB above the **median** of all bands and stays that
+way for about 21 ms; the median is what separates a howl from music, because a howl excites one band and leaves
+the crowd low while music lifts the median with it (measured: a 1 kHz howl stands 20 dB above the median, and a
+sung note does not). A "louder than the next band" test was tried first and abandoned — the bands sit 0.31
+octave apart, so a tone between two centres excites both about equally and that test can never fire.
+
+The notch goes on the interpolated peak (a parabola through the top three bands in log frequency), because a
+howl rarely sits on a band centre and a notch beside it leaves the howl alive. Notches are peaking filters
+`depth` dB deep at Q 8, `notches` of them at most, held for `hold` seconds after the howl stops, and a band that
+already carries one is skipped when looking for the next — otherwise the loudest howl is refreshed forever and a
+second one is never addressed. A free slot is the identity filter, so an idle unit is flat to the bit.
+
+**What it cannot do**: separate a howl from a *sustained pure tone*. At this resolution those are the same
+signal, and every single-band detector has that limit. The unit notches, holds and releases; it does not guess.
+
+<!-- params:feedback:start (generated from live-dsp/src/feedback.rs SPECS; do not edit by hand) -->
+
+| # | Param id | Range | Default | Unit | Curve |
+|---|---|---|---|---|---|
+| 0 | `notches` | 1 … 8 | 4 | — | linear |
+| 1 | `sensitivity` | 5 … 30 | 12 | dB | linear |
+| 2 | `depth` | 3 … 30 | 18 | dB | linear |
+| 3 | `hold` | 0.5 … 10 | 3 | s | log |
+| 4 | `mix` | 0 … 1 | 1 | 0–1 | linear |
+
+<!-- params:feedback:end -->
+
 ## denoise
 
 Noise suppression for the stream bus, as a **per-band downward expander**. A broadband gate cannot do this

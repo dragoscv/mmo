@@ -253,7 +253,7 @@ written at most every 500 ms and again on exit) and — as before — presets, t
 
 | Crate | Licence | Depends on | Role |
 |---|---|---|---|
-| `live-dsp` | MIT OR Apache-2.0 | — (zero runtime deps) | `Processor` trait, 16 effects, `Chain`, `Insert`, `ParamSpec`, `Smoothed` |
+| `live-dsp` | MIT OR Apache-2.0 | — (zero runtime deps) | `Processor` trait, 17 effects, `Chain`, `Insert`, `ParamSpec`, `Smoothed` |
 | `live-engine` | MIT OR Apache-2.0 | `live-dsp`, cpal 0.18, rtrb, serde | `Core`, `Command`, `Meters`, device I/O, presets/setlists, `Session`, `Control`, latency probe |
 | `live-remote` | MIT OR Apache-2.0 | `live-engine`, tungstenite (handshake), rosc, mdns-sd, qrcode | HTTP + WebSocket server, OSC, mDNS, QR, web remote page |
 | `live-cli` | MIT OR Apache-2.0 | all of the above, clap | `mixai-live-engine` binary |

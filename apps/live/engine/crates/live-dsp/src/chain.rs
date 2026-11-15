@@ -6,6 +6,7 @@ use crate::delay::Delay;
 use crate::denoise::Denoise;
 use crate::dynamics::{Compressor, DeEsser, Gate, Limiter};
 use crate::eq::Eq;
+use crate::feedback::Feedback;
 use crate::filter::Filter;
 use crate::modulation::{Chorus, Doubler};
 use crate::param::{ParamSpec, Smoothed, param_index};
@@ -24,6 +25,7 @@ pub enum FxKind {
     Filter,
     Character,
     Denoise,
+    Feedback,
     Saturator,
     Doubler,
     Chorus,
@@ -35,12 +37,13 @@ pub enum FxKind {
 }
 
 impl FxKind {
-    pub const ALL: [FxKind; 16] = [
+    pub const ALL: [FxKind; 17] = [
         FxKind::Gate,
         FxKind::Eq,
         FxKind::Filter,
         FxKind::Character,
         FxKind::Denoise,
+        FxKind::Feedback,
         FxKind::DeEsser,
         FxKind::Compressor,
         FxKind::Autotune,
@@ -64,6 +67,7 @@ impl FxKind {
             FxKind::Filter => "filter",
             FxKind::Character => "character",
             FxKind::Denoise => "denoise",
+            FxKind::Feedback => "feedback",
             FxKind::Saturator => "saturator",
             FxKind::Doubler => "doubler",
             FxKind::Chorus => "chorus",
@@ -90,6 +94,7 @@ impl FxKind {
             FxKind::Filter => Box::new(Filter::new(sample_rate)),
             FxKind::Character => Box::new(Character::new(sample_rate)),
             FxKind::Denoise => Box::new(Denoise::new(sample_rate)),
+            FxKind::Feedback => Box::new(Feedback::new(sample_rate)),
             FxKind::Saturator => Box::new(Saturator::new(sample_rate)),
             FxKind::Doubler => Box::new(Doubler::new(sample_rate)),
             FxKind::Chorus => Box::new(Chorus::new(sample_rate)),

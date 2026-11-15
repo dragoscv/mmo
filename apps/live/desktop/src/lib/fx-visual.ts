@@ -144,6 +144,31 @@ export function shapeFor(fx: string, p: ParamReader): Shape {
             line(s, pts, "primary");
             break;
         }
+        case "feedback": {
+            // What the unit is armed with: a flat path with as many notches as `notches` allows, each
+            // `depth` dB deep. The live frequencies are the engine's business, not the view's.
+            const count = Math.round(clamp(p("notches", 4), 1, 8));
+            const depth = clamp(p("depth", 18), 3, 30);
+            const pts: [number, number][] = [];
+            const step = 100 / (count + 1);
+            for (let i = 0; i <= 100; i += 1) {
+                pts.push([i, 84]);
+            }
+            for (let k = 1; k <= count; k++) {
+                const x = k * step;
+                // Replace the flat run around each notch with a V.
+                for (let d = -2; d <= 2; d++) {
+                    const at = x + d;
+                    if (at <= 0 || at >= 100) continue;
+                    const y = 84 - (depth / 30) * 55 * (1 - Math.abs(d) / 2.5);
+                    pts.push([at, clamp(y, 3, 97)]);
+                }
+            }
+            pts.sort((a, b) => a[0] - b[0]);
+            s.hlines.push({ y: 84, tone: "muted", dashed: true });
+            line(s, pts, "primary");
+            break;
+        }
         case "character": {
             const mode = Math.round(clamp(p("mode", 1), 0, CHARACTER_BANDS.length - 1));
             const [lo, hi] = CHARACTER_BANDS[mode] ?? CHARACTER_BANDS[0]!;

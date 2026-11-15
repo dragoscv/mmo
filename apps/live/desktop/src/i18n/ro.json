@@ -262,7 +262,8 @@
         "tuner": "Acordor",
         "filter": "Filtru",
         "character": "Caracter",
-        "denoise": "Anti-zgomot"
+        "denoise": "Anti-zgomot",
+        "feedback": "Anti-reacție"
     },
     "param": {
         "voice": "Vocea {{n}} · {{name}}",
@@ -341,7 +342,9 @@
         "grit": "Asprime",
         "learn": "Învață camera",
         "type": "Tip",
-        "early": "Reflexii timpurii"
+        "early": "Reflexii timpurii",
+        "notches": "Notch-uri",
+        "sensitivity": "Sensibilitate"
     },
     "choice": {
         "off": "Oprit",

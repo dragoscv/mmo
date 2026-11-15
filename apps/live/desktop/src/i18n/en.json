@@ -262,7 +262,8 @@
         "tuner": "Tuner",
         "filter": "Filter",
         "character": "Character",
-        "denoise": "Denoise"
+        "denoise": "Denoise",
+        "feedback": "Feedback killer"
     },
     "param": {
         "voice": "Voice {{n}} · {{name}}",
@@ -341,7 +342,9 @@
         "grit": "Grit",
         "learn": "Learn the room",
         "type": "Type",
-        "early": "Early reflections"
+        "early": "Early reflections",
+        "notches": "Notches",
+        "sensitivity": "Sensitivity"
     },
     "choice": {
         "off": "Off",

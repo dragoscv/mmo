@@ -38,6 +38,32 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — a feedback killer (WP21-21 part 4, 2026-11-15)
+
+A howl could end a show. The chain now watches for one: 18 narrow detectors between 200 Hz and 8 kHz, and a notch
+on any band that stands `sensitivity` dB above the **median** of them all for about 21 ms. The median is the
+discriminator — a howl excites one band and leaves the crowd low, while music lifts the median with it (a 1 kHz
+howl measures 20 dB above the median). The notch lands on the **interpolated** peak (a parabola through the top
+three bands in log frequency), because a howl rarely sits on a band centre and a notch beside it leaves the howl
+alive; `notches` of them at most, `depth` dB deep at Q 8, held `hold` seconds after the howl stops. A band that
+already carries a notch is skipped when looking for the next one, so a second howl is found rather than the first
+being refreshed forever, and a free slot is the identity filter.
+
+Four things had to be measured rather than assumed, and each was silently wrong first: the detector bank must run
+at the **full sample rate** (fed one sample in 128 it sampled a 1 kHz tone at 375 Hz — above its own Nyquist — and
+every band level was an alias); a "louder than the next band" test can never fire at 0.31-octave spacing, because
+a tone between two centres excites both about equally (0.9 dB apart); the parameter smoothers were never advanced,
+so `depth`, `sensitivity`, `notches` and `hold` silently stayed at their defaults (`hold` read 3 s when the test
+set 0.5); and a howl that had stopped still held its ratio against a median decaying with it, so the notch was
+refreshed forever until an audibility floor was added.
+
+Stated limit, in the docs too: it cannot separate a howl from a *sustained pure tone* — at this resolution they are
+the same signal, and every single-band detector has that limit. Verified: 93 `live-dsp` tests with five new ones
+(the howl notched at the right frequency and really attenuated, the notch releasing after its hold with the path
+flat again, broadband material untouched, the slot limit holding at 1 and rising to 2 with room for four, an idle
+unit flat to the bit), plus fmt, clippy `-D warnings`, the desktop at typecheck 0 / 43 tests / i18n 353 keys, and
+the generated effects page at 17 effects / 129 params.
+
 ## MixAI Live — reverb types and first reflections (WP21-21 part 3, 2026-11-15)
 
 The reverb had one character. It now has four, and — stated plainly, because the alternative would be four
