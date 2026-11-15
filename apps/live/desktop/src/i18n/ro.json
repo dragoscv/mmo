@@ -339,7 +339,9 @@
         "slope": "Pantă",
         "q": "Q",
         "grit": "Asprime",
-        "learn": "Învață camera"
+        "learn": "Învață camera",
+        "type": "Tip",
+        "early": "Reflexii timpurii"
     },
     "choice": {
         "off": "Oprit",
@@ -358,7 +360,11 @@
         "megaphone": "Megafon",
         "radio": "Radio",
         "lofi": "Lo-fi",
-        "robot": "Robot"
+        "robot": "Robot",
+        "room": "Cameră",
+        "hall": "Sală",
+        "plate": "Placă",
+        "spring": "Arc"
     },
     "scale": {
         "chromatic": "Cromatică",

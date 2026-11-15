@@ -38,6 +38,25 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — reverb types and first reflections (WP21-21 part 3, 2026-11-15)
+
+The reverb had one character. It now has four, and — stated plainly, because the alternative would be four
+near-identical code paths pretending to be four products — `type` is the **geometry of the same 8-line network**:
+it scales the delay lengths, the decay, the damping frequency and the modulation depth together. A **room** is
+short and dark (0.55× the lengths, 0.75× the decay), a **plate** is bright and wide (1.6× the damping frequency,
+1.8× the modulation), a **spring** is short and heavily modulated (2.6×), and a **hall** is the reference the
+others scale from. The tail a scene switch waits for follows the type with the decay.
+
+`early` adds the **first reflections** the reverb was missing: five discrete taps of the pre-delayed input at
+13/19/27/37/47 ms, the right channel slightly later for width. They are what tells the ear how big the room is
+before the diffuse tail arrives; at 0 it is a tail-only reverb again. The settings panel draws the onset burst
+and a tail whose length follows the type.
+
+Verified: 88 `live-dsp` tests with three new ones — a hall rings at least 1.5× longer than a room at the same
+decay setting, the taps are audible and disappear at `early` 0, and every type stays finite under a peak of 4
+even at an 8 s decay — plus fmt, clippy `-D warnings`, the desktop at typecheck 0 / 43 tests / i18n parity 350
+keys, and the generated effects page at 16 effects / 124 params.
+
 ## MixAI Live — noise suppression for the stream bus (WP21-21 part 2, 2026-11-15)
 
 The audit's eleventh P0 theme was blunt: *no noise suppression, only a gate — table stakes for streamers*. The

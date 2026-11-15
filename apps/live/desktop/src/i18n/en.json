@@ -339,7 +339,9 @@
         "slope": "Slope",
         "q": "Q",
         "grit": "Grit",
-        "learn": "Learn the room"
+        "learn": "Learn the room",
+        "type": "Type",
+        "early": "Early reflections"
     },
     "choice": {
         "off": "Off",
@@ -358,7 +360,11 @@
         "megaphone": "Megaphone",
         "radio": "Radio",
         "lofi": "Lo-fi",
-        "robot": "Robot"
+        "robot": "Robot",
+        "room": "Room",
+        "hall": "Hall",
+        "plate": "Plate",
+        "spring": "Spring"
     },
     "scale": {
         "chromatic": "Chromatic",

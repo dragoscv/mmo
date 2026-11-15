@@ -445,6 +445,15 @@ Stereo delay with free time or tempo sync, filtered feedback, ping-pong and duck
 on the reverb input, stereo `width` and slow line `modulation` against metallic ringing. The tail length used
 for scene switching is `decay + pre_delay`.
 
+`type` is the **geometry of the same network**, not four algorithms: it scales the delay lengths, the decay, the
+damping frequency and the modulation depth together — a room is short and dark, a plate is bright and wide, a
+spring is short and heavily modulated, and a hall is the reference the others scale from. Saying that is better
+than four near-identical code paths pretending to be four products.
+
+`early` mixes in the **first reflections** — five discrete taps of the pre-delayed input at 13/19/27/37/47 ms,
+with the right channel slightly later for width. They are what tells the ear how big the room is before the
+diffuse tail arrives; set it to 0 for a tail-only reverb.
+
 <!-- params:reverb:start (generated from live-dsp/src/reverb.rs SPECS; do not edit by hand) -->
 
 | # | Param id | Range | Default | Unit | Curve |
@@ -457,6 +466,8 @@ for scene switching is `decay + pre_delay`.
 | 5 | `width` | 0 … 1 | 1 | 0–1 | linear |
 | 6 | `mix` | 0 … 1 | 0.2 | 0–1 | linear |
 | 7 | `modulation` | 0 … 1 | 0.3 | 0–1 | linear |
+| 8 | `type` | 0 `room`, 1 `hall`, 2 `plate`, 3 `spring` | 1 (`hall`) | choice | — |
+| 9 | `early` | 0 … 1 | 0.4 | 0–1 | linear |
 
 <!-- params:reverb:end -->
 

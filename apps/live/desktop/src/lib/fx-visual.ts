@@ -246,9 +246,15 @@ export function shapeFor(fx: string, p: ParamReader): Shape {
         case "reverb": {
             const decay = clamp(p("decay", 0.4), 0, 1);
             const damp = clamp(p("damping", 0.4), 0, 1);
+            // The tail length is the type's, so the drawing changes with `type` as the sound does.
+            const typeScale = [0.55, 1.0, 0.75, 0.45][Math.round(clamp(p("type", 1), 0, 3))] ?? 1;
+            const drop = (1 + (1 - clamp(decay * typeScale * 1.4, 0, 1)) * 6) / typeScale;
             const pts: [number, number][] = xs(41).map(
-                (x) => [x, clamp(2 + 92 * Math.exp((-x / 100) * (1 + (1 - decay) * 6)) * (1 - damp * 0.35))] as [number, number],
+                (x) => [x, clamp(2 + 92 * Math.exp((-x / 100) * drop) * (1 - damp * 0.35))] as [number, number],
             );
+            // The onset taps, as a short burst before the tail.
+            const early = clamp(p("early", 0.4), 0, 1) * 80;
+            if (early > 0) line(s, [[4, 0], [4, early], [10, early], [10, 0]], "warning", 1);
             line(s, pts, "primary");
             s.fills.push({ points: [[0, 0], ...pts, [100, 0]], tone: "primary" });
             break;
