@@ -102,6 +102,16 @@ for d in $DIRS; do
 done
 for j in $(jobs -p); do [ "$j" = "$SYNC_PID" ] && continue; wait "$j" || INST_FAIL=1; done
 tail -n 3 /tmp/install-*.log
+if [ "$INST_FAIL" = "1" ]; then
+  # Seen 2026-11-14: "failed to import .../<pkg>_pacquet-stage_...: No such file or directory" —
+  # parallel installs racing in a cold pnpm store. Retry serially before giving up.
+  echo "an install failed; retrying serially (cold-store race)"
+  INST_FAIL=0
+  for d in $DIRS; do
+    [ -f "$W/$d/pnpm-lock.yaml" ] || continue
+    as_runner "cd $d && pnpm install --frozen-lockfile --prefer-offline --reporter=silent" > "/tmp/install-$(basename "$d").log" 2>&1 || INST_FAIL=1
+  done
+fi
 if [ "$INST_FAIL" = "1" ]; then echo "✗ an install failed"; tail -n 40 /tmp/install-*.log; exit 1; fi
 as_runner "cd apps/web && pnpm exec playwright install chromium" || exit 1
 phase install
