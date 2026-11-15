@@ -31,11 +31,14 @@ function useShortcuts() {
             const action = shortcutFor(e, targetInfo(document.activeElement));
             if (!action) return;
             if (action === "escape") {
-                // Dialogs handle Esc themselves; on the main screen it closes the topmost thing:
-                // the budget peek, then stage mode, then the detail panel.
-                if (!s.panel && s.latencyOverlay) s.toggleLatencyOverlay(false);
-                else if (!s.panel && s.stage) s.toggleStage(false);
-                else if (!s.panel && s.selectedInsert != null) s.selectInsert(null);
+                // A dialog also handles Esc itself (Base UI), and the two listeners can run in
+                // either order: closing the panel here too makes the outcome the same either way.
+                if (s.panel) s.openPanel(null);
+                // Otherwise it closes the topmost thing: the budget peek, then stage mode, then the
+                // detail panel.
+                else if (s.latencyOverlay) s.toggleLatencyOverlay(false);
+                else if (s.stage) s.toggleStage(false);
+                else if (s.selectedInsert != null) s.selectInsert(null);
                 return;
             }
             if (s.panel) return;

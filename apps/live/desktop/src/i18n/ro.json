@@ -49,7 +49,7 @@
         "hintDifferent": "Intrarea și ieșirea sunt dispozitive diferite: motorul corectează deriva de ceas aruncând cadre. Mai bine aceeași placă pentru ambele.",
         "applyRecommended": "Folosește recomandarea",
         "measure": "Măsoară latența reală",
-        "measureHint": "Are nevoie de buclă: leagă ieșirea înapoi la intrare (cablu, o bandă Voicemeeter sau difuzor spre microfon). Motorul live se oprește cât timp măsoară.",
+        "measureHint": "Are nevoie de buclă: leagă ieșirea înapoi la intrare (cablu, o bandă Voicemeeter sau difuzor spre microfon). Motorul nu trebuie să ruleze: el deține dispozitivul.",
         "compareRoutes": "Compară rutele",
         "compareRoutesHint": "Ce declară fiecare rută, fără să atingă audio",
         "routesThRoute": "Rută",

@@ -49,7 +49,7 @@
         "hintDifferent": "Input and output are different devices: the engine corrects clock drift by dropping frames. The same interface for both is better.",
         "applyRecommended": "Use recommended",
         "measure": "Measure real latency",
-        "measureHint": "Needs a loopback: connect the output back to the input (cable, a Voicemeeter strip, or speaker into the mic). The live engine stops while it measures.",
+        "measureHint": "Needs a loopback: connect the output back to the input (cable, a Voicemeeter strip, or speaker into the mic). The engine must not be running: it owns the device.",
         "compareRoutes": "Compare routes",
         "compareRoutesHint": "What each route declares, without touching the audio",
         "routesThRoute": "Route",
