@@ -127,6 +127,23 @@ export function shapeFor(fx: string, p: ParamReader): Shape {
             line(s, pts, "primary");
             break;
         }
+        case "denoise": {
+            // Input level across the box, output level up it: the 2:1 expansion below the knee, with
+            // the identity line for reference. The floor is the bottom of the drawn range.
+            const depth = clamp(p("depth", 18) * clamp(p("amount", 0.6), 0, 1), 0, 60);
+            const thr = -60 + clamp(p("threshold", 9), 3, 30);
+            const level = (db: number) => clamp(((db + 60) / 60) * 100, 0, 100);
+            const pts: [number, number][] = xs().map((x, i) => {
+                const inDb = -60 + (i / 32) * 60;
+                const over = inDb - thr;
+                const outDb = over >= 0 ? inDb : inDb + Math.max(over * 2, -depth);
+                return [x, level(outDb)] as [number, number];
+            });
+            line(s, [[0, 0], [100, 100]], "muted", 1, true);
+            s.hlines.push({ y: level(thr), tone: "warning", dashed: true });
+            line(s, pts, "primary");
+            break;
+        }
         case "character": {
             const mode = Math.round(clamp(p("mode", 1), 0, CHARACTER_BANDS.length - 1));
             const [lo, hi] = CHARACTER_BANDS[mode] ?? CHARACTER_BANDS[0]!;

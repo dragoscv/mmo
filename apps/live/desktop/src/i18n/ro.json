@@ -261,7 +261,8 @@
         "limiter": "Limitator",
         "tuner": "Acordor",
         "filter": "Filtru",
-        "character": "Caracter"
+        "character": "Caracter",
+        "denoise": "Anti-zgomot"
     },
     "param": {
         "voice": "Vocea {{n}} · {{name}}",
@@ -337,7 +338,8 @@
         "lpf_freq": "Frecv. tăiere înalte",
         "slope": "Pantă",
         "q": "Q",
-        "grit": "Asprime"
+        "grit": "Asprime",
+        "learn": "Învață camera"
     },
     "choice": {
         "off": "Oprit",

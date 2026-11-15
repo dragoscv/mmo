@@ -14,6 +14,7 @@ pub mod character;
 pub mod color;
 pub mod delay;
 pub mod delay_line;
+pub mod denoise;
 pub mod denormal;
 pub mod dynamics;
 pub mod eq;

@@ -38,6 +38,30 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — noise suppression for the stream bus (WP21-21 part 2, 2026-11-15)
+
+The audit's eleventh P0 theme was blunt: *no noise suppression, only a gate — table stakes for streamers*. The
+chain has one now, and it is deliberately **not** a gate. A gate opens on any loud sound, so a rumble during a
+phrase keeps the hiss open with it, and it chatters on a voice that dips. This splits the signal into three
+bands (300 Hz and 3 kHz, Linkwitz-Riley 4th-order crossovers — the same pair the de-esser uses) and gives each
+one its own noise floor, so hiss is taken down while the band carrying the voice stays open.
+
+Two findings shaped it, both from measuring rather than guessing. First, the detector is an **RMS** follower,
+not a peak follower: a peak detector on noise tracks crests well above the RMS a level comparison uses, and the
+pair measured **−1.6 dB** of usable depth until the two sides were made to measure the same thing (**−18 dB**
+after). Second, **the floor is captured, not chased**: three bands cannot tell a sustained note from a room that
+got louder, and a fast tracker learned a held 1 kHz tone as "the noise" and pulled it down **15 dB**. `learn`
+captures the floor in about 20 ms (press it in a quiet moment), leaving it off lets the floor drift over ~5 s so
+a room that changes across a set is followed but a phrase never is, and with no learn and no drift nothing is
+attenuated — the safe default.
+
+Below `threshold` dB above the floor each band expands 2:1 downwards, capped at `depth` and scaled by `amount`;
+`gain_reduction_db` and `band_gain_db()` feed the meters. Verified: 85 `live-dsp` tests with four new ones
+(noise alone down 18 dB with every band down, while a voice over it comes through within 0.06 RMS; the bands
+acting independently under a loud neighbour; `mix` as a bypass; silence staying silent and every sample finite),
+the engine workspace at fmt + clippy `-D warnings` + 242 tests, the desktop at typecheck 0, 43 tests and i18n
+parity at 344 keys, and the generated effects page at 16 effects / 122 params.
+
 ## MixAI Live — a tone filter and a character effect (WP21-21 part 1, 2026-11-15)
 
 Two effects the audit named as missing, both pure DSP with no new dependency, so the chain is 15 effects.

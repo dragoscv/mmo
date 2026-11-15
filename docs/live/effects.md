@@ -172,6 +172,40 @@ browser version lost it; fixed in web 3.4.5 too). Below the threshold the two ba
 
 <!-- params:deesser:end -->
 
+## denoise
+
+Noise suppression for the stream bus, as a **per-band downward expander**. A broadband gate cannot do this
+job: it opens on any loud sound, so a rumble during a phrase keeps the hiss open with it, and it chatters on a
+voice that dips. Three bands (300 Hz / 3 kHz, Linkwitz-Riley 4th-order crossovers, the pair the de-esser uses)
+each carry their own floor, so hiss is taken down while the band holding the voice stays open.
+
+The detector is an **RMS follower** (20 ms up, `release` down), not a peak follower: the floor and the
+comparison have to measure the same quantity, and a peak detector on noise tracks crests well above the RMS a
+level measurement compares against, which halves the usable depth.
+
+The floor is **captured, not chased**. Three bands cannot tell a sustained note from a room that got louder, so
+a tracker that always followed the level would learn a held phrase as "the noise" and pull the voice down with
+it (measured: 15 dB lost on a 1 kHz tone with a fast tracker). `learn` on captures the floor from the signal as
+it is now (~20 ms) — press it during a quiet moment; `learn` off lets the floor drift very slowly (~5 s) in
+either direction, so a room that changes over a set is eventually followed but a phrase never is. With no learn
+and no drift the floor is 0 and nothing is attenuated, which is the safe default.
+
+Below `threshold` dB above the floor the band is expanded 2:1 downwards, capped at `depth` dB and scaled by
+`amount`. `gain_reduction_db` reports the deepest band for the meters.
+
+<!-- params:denoise:start (generated from live-dsp/src/denoise.rs SPECS; do not edit by hand) -->
+
+| # | Param id | Range | Default | Unit | Curve |
+|---|---|---|---|---|---|
+| 0 | `amount` | 0 … 1 | 0.6 | 0–1 | linear |
+| 1 | `depth` | 0 … 40 | 18 | dB | linear |
+| 2 | `threshold` | 3 … 30 | 9 | dB | linear |
+| 3 | `release` | 20 … 1000 | 180 | ms | log |
+| 4 | `learn` | 0 / 1 | off | on/off | — |
+| 5 | `mix` | 0 … 1 | 1 | 0–1 | linear |
+
+<!-- params:denoise:end -->
+
 ## compressor
 
 Feed-forward compressor with a soft knee, a high-pass filter on the detector (`sidechain_hpf`, stops plosives
