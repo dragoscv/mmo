@@ -23,7 +23,13 @@ export function FxVisual({
         params instanceof Map ? (params.get(id) ?? fallback) : (params?.[id] ?? fallback);
     const s = shapeFor(fx, read);
     return (
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden className={cn("h-full w-full", className)}>
+        <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden
+            data-fx={fx}
+            className={cn("h-full w-full", className)}
+        >
             {s.fills.map((f, i) => (
                 <path key={`f${i}`} d={areaPath(f.points)} style={fill(f.tone)} opacity={0.18} />
             ))}

@@ -4,6 +4,7 @@
  */
 import { create } from "zustand";
 import { EngineConnection } from "./lib/connection";
+import { fixtureEnabled, installFixture } from "./lib/fixture";
 import { parseCatalogue, type FxSpec } from "./lib/params";
 import { applyOptimistic, initialProtocol, reduce, trackPending, type ClientMsg, type ProtocolState } from "./lib/protocol";
 import { api, isTauri, type EngineConfig, type Settings, type StartResult } from "./lib/tauri";
@@ -139,6 +140,13 @@ export const useStore = create<Store>((set, get) => {
 
         async init() {
             if (!isTauri()) {
+                // The rendered design pass (cloud browser) has no Tauri runtime: with the build-time
+                // fixture flag the console is seeded so it can actually be looked at. Dead code
+                // otherwise.
+                if (fixtureEnabled()) {
+                    installFixture((proto) => set({ proto, status: "running", settingsLoaded: true }));
+                    return;
+                }
                 set({ settingsLoaded: true, panel: "setup" });
                 get().notify("info", "errors.notTauri");
                 return;

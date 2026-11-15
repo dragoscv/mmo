@@ -94,7 +94,7 @@ export function SafetyBar() {
             </div>
 
             <div className="flex min-w-0 items-center gap-2">
-                <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                     {t("safety.limiter")}
                 </span>
                 <div
@@ -103,14 +103,14 @@ export function SafetyBar() {
                     aria-valuemin={0}
                     aria-valuemax={GR_MAX_DB}
                     aria-valuenow={Math.round(gr * 10) / 10}
-                    className="h-2 w-24 overflow-hidden rounded-full bg-muted"
+                    className="h-2.5 w-28 overflow-hidden rounded-full bg-muted"
                 >
                     <div
                         className={cn("h-full rounded-full", gr > 0 ? "bg-warning" : "bg-success")}
                         style={{ width: `${Math.min(100, (gr / GR_MAX_DB) * 100)}%` }}
                     />
                 </div>
-                <span className={cn("text-sm font-semibold tabular-nums", gr > 0 && "text-warning")}>
+                <span className={cn("text-base font-semibold tabular-nums", gr > 0 && "text-warning")}>
                     {gr > 0 ? `−${gr.toFixed(1)} dB` : "0 dB"}
                 </span>
                 {clipHold ? <Chip tone="bad">{t("meters.clip")}</Chip> : null}

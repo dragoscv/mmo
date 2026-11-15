@@ -84,3 +84,57 @@ test("no serious or critical accessibility violation on the console", async ({ p
     const bad = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(bad.map((v) => `${v.id} (${v.nodes.length} nodes)`), "serious/critical axe violations").toEqual([]);
 });
+
+// The cloud build sets VITE_LIVE_FIXTURE, which seeds a synthetic session — without it a browser has
+// no engine and the chain, the hero visuals and the ribbon are never actually seen.
+const FIXTURE = process.env.LIVE_FIXTURE !== "0";
+
+test("with a session: the chain draws one hero visual per effect, none of them blank", async ({ page }) => {
+    test.skip(!FIXTURE, "needs the fixture build (VITE_LIVE_FIXTURE=1)");
+    await openConsole(page);
+
+    // The fixture preset and its inserts are on screen: the chain is not "empty" any more.
+    const chain = page.getByRole("region", { name: CHAIN });
+    await expect(chain).toBeVisible();
+    const visuals = chain.locator("svg[data-fx]");
+    await expect.poll(() => visuals.count(), { timeout: 5_000 }).toBeGreaterThanOrEqual(9);
+
+    // Every card's visual has geometry, and the nine effects are the nine the preset chains.
+    const drawn = await visuals.evaluateAll((els) =>
+        els.map((el) => ({
+            fx: el.getAttribute("data-fx") ?? "",
+            geometry: el.querySelectorAll("polyline, line, path").length,
+        })),
+    );
+    for (const { fx, geometry } of drawn) {
+        expect(geometry, `${fx} draws nothing`).toBeGreaterThan(0);
+    }
+    expect(new Set(drawn.map((d) => d.fx)).size, "distinct effects drawn").toBeGreaterThanOrEqual(9);
+
+    // The mix the fixture set is what the strip shows, so the state really reached the UI.
+    await expect(page.getByText(/\s-\s?3(\.0)? dB/).first()).toBeVisible();
+    await page.screenshot({ path: "test-results/live-desktop-fixture-1280x720.png" });
+
+    // And the panels that need live frames are drawn: the ribbon and spectrum canvases have ink.
+    const ink = await page.evaluate(() => {
+        const canvases = [...document.querySelectorAll("canvas")];
+        return canvases.map((c) => {
+            const ctx = c.getContext("2d");
+            if (!ctx || c.width === 0 || c.height === 0) return 0;
+            const data = ctx.getImageData(0, 0, c.width, c.height).data;
+            let n = 0;
+            for (let i = 3; i < data.length; i += 4) if (data[i] > 0) n++;
+            return n;
+        });
+    });
+    expect(ink.filter((n) => n > 100).length, "canvases with content").toBeGreaterThanOrEqual(3);
+});
+
+test("with a session: axe is still clean once the console is populated", async ({ page }) => {
+    test.skip(!FIXTURE, "needs the fixture build (VITE_LIVE_FIXTURE=1)");
+    await openConsole(page);
+    await expect(page.getByRole("region", { name: CHAIN }).locator("svg[data-fx]").first()).toBeVisible();
+    const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+    const bad = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(bad.map((v) => `${v.id} (${v.nodes.length} nodes)`), "serious/critical axe violations").toEqual([]);
+});

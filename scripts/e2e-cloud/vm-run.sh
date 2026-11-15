@@ -145,7 +145,9 @@ if [ "$MODE" = "vm-prod" ]; then
 elif [ "$MODE" = "vm-live" ]; then
   # The desktop console, built and served as a plain web app: the Tauri-only calls fail (and are
   # caught), so this renders the shell, the panels and the modes — not the live engine data.
-  as_runner "cd apps/live/desktop && pnpm build" > /tmp/build-live.log 2>&1
+  # VITE_LIVE_FIXTURE seeds a synthetic session (no Tauri, so no engine) — without it the console
+  # renders empty and the chain, the hero visuals and the ribbon could never be looked at.
+  as_runner "cd apps/live/desktop && VITE_LIVE_FIXTURE=1 pnpm build" > /tmp/build-live.log 2>&1
   rc=$?
   tail -n 12 /tmp/build-live.log
   [ "$rc" = "0" ] || { echo "✗ desktop build failed ($rc)"; exit 1; }
