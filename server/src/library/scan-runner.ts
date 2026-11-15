@@ -22,6 +22,7 @@ import {
     type ScanJob,
     type ScannedTrackPayload,
 } from "./scan-jobs";
+import { quickHashOrNull } from "./quick-hash";
 
 // music-metadata 11 is ESM-only; this build is CommonJS (see lib/esm-import).
 const loadMusicMetadata = lazyEsm<typeof import("music-metadata")>("music-metadata");
@@ -84,6 +85,9 @@ async function parseAll(files: string[], job: ScanJob, onUpdate: () => void): Pr
                 sampleRate: metadata.format.sampleRate,
                 fileSize: stat.size,
                 year: metadata.common.year,
+                // Two short reads, no decode — cheap enough to do for every
+                // file so every track has its Decks identity key at once.
+                quickHash: quickHashOrNull(fullPath) ?? undefined,
             });
         } catch {
             job.errored++;
@@ -128,6 +132,7 @@ export async function parseSingleFile(fullPath: string): Promise<ScannedTrackPay
             sampleRate: metadata.format.sampleRate,
             fileSize: stat.size,
             year: metadata.common.year,
+            quickHash: quickHashOrNull(fullPath) ?? undefined,
         };
     } catch {
         try {

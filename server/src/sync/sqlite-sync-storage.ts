@@ -24,6 +24,9 @@
  */
 
 import type Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as librarySchema from "../library/schema";
+import { applyChanges, resolveTrackId, type LibraryChange } from "../library/sync-changes";
 import type { SyncChange, SyncState, SyncStorage } from "./cloud-sync-client";
 
 type SqliteDb = Database.Database;
@@ -106,6 +109,10 @@ export interface SqliteSyncStorageOptions {
 export class SqliteSyncStorage implements SyncStorage {
     private readonly logger: NonNullable<SqliteSyncStorageOptions["logger"]>;
     private readonly getSeed?: SqliteSyncStorageOptions["getSeed"];
+    /** Drizzle wrapper over the same handle, built on first use — the cue
+     *  apply path shares the library change-feed rules (an imported type only,
+     *  so there is no runtime cycle). */
+    private _drizzle: ReturnType<typeof drizzle<typeof librarySchema>> | null = null;
 
     constructor(private readonly db: SqliteDb, opts: SqliteSyncStorageOptions = {}) {
         this.logger = opts.logger ?? ((msg, err) => console.warn(msg, err));
@@ -354,12 +361,43 @@ export class SqliteSyncStorage implements SyncStorage {
     }
 
     private applyRemoteCuepoint(change: SyncChange & { id: number }): void {
-        // The companion has no `cuepoints` table yet — analyzer-derived
-        // beats / downbeats / structure live on the tracks row, and DJ
-        // cuepoints are produced by the Mixer at runtime, not synced.
-        // The cursor advances so we don't re-process; cloud stays
-        // authoritative until the companion exposes a typed cuepoint repo.
-        void change;
+        // The cloud relays a cue the server itself pushed (or one written on
+        // another server). It lands in `track_cues` through the SAME conflict
+        // rules as a local change (per-cue LWW + the hot-slot rule), so both
+        // directions converge.
+        const p = (change.payload ?? {}) as Record<string, unknown>;
+        const sha = String(p.trackSha256 ?? "");
+        const userId = String(p.userId ?? p.user_id ?? "");
+        if (!sha || !userId) return;
+
+        const kindRaw = String(p.kind ?? "hot");
+        // The pre-phase-1 cloud split a loop into two rows (loop_in / loop_out).
+        // A loop is now ONE row with an end; ignore the legacy "loop_out" half
+        // rather than writing a bogus zero-length cue.
+        if (kindRaw === "loop_out") return;
+        const kind = kindRaw === "loop_in" ? "loop" : kindRaw;
+
+        const db = (this._drizzle ??= drizzle(this.db, { schema: librarySchema }));
+        const trackId = resolveTrackId(db, userId, undefined, undefined, sha);
+        if (trackId == null) return; // track unknown here yet — waits for its row
+
+        const at = Date.parse(change.updatedAt);
+        const lib: LibraryChange = {
+            entity: "cue",
+            entityId: change.entityId,
+            op: change.op,
+            changedAt: Number.isFinite(at) ? at : Date.now(),
+            payload: change.op === "delete" ? null : {
+                trackId,
+                kind,
+                slot: p.slot ?? null,
+                startMs: Number(p.positionMs ?? 0),
+                endMs: p.endMs ?? p.end_ms ?? null,
+                label: p.label ?? null,
+                colour: p.color ?? p.colour ?? null,
+            },
+        };
+        applyChanges(db, userId, "cloud", [lib]);
     }
 
     /** Idempotent set ops. Only `playlist_tracks` carries data the

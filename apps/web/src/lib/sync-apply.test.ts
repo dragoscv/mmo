@@ -289,4 +289,46 @@ describe("applyCuepointUpsert (row-level LWW on delete)", () => {
         expect(res.changed).toBe(true);
         expect(state.deleteCalls).toBe(1);
     });
+
+    // The payload below is the exact shape the MMO Server's relay emits
+    // (`server/src/library/cloud-feed.ts#enqueueCuepointChange`, asserted to be
+    // so in `server/src/library/library-changes.test.ts`). This closes the loop:
+    // what the server queues is what the cloud applies.
+    it("inserts a relayed loop as ONE row carrying its end (phase 1, D3)", async () => {
+        state.nextRowQueue = [
+            [{ id: 1 }], // the track the cuepoint resolves to (by sha256)
+            [],          // no existing cuepoint for this external id
+        ];
+        const res = await applyCuepointUpsert("u", {
+            entity: "cuepoints",
+            entityId: "loop-9",
+            op: "upsert",
+            updatedAt: "2026-05-10T10:00:00.000Z",
+            payload: { trackSha256: "sha-abc", positionMs: 1200, endMs: 8400, kind: "loop", label: "intro", color: null },
+        });
+        expect(res.changed).toBe(true);
+        expect(state.insertCalls).toHaveLength(1);
+        const v = state.insertCalls[0];
+        expect(v.endMs).toBe(8400);
+        expect(v.positionMs).toBe(1200);
+        expect(v.kind).toBe("loop");
+        expect(v.label).toBe("intro");
+    });
+
+    it("clears the end when the loop becomes a plain cue", async () => {
+        state.nextRowQueue = [
+            [{ id: 1 }],
+            [{ id: 99, updatedAt: new Date("2026-05-10T09:00:00.000Z") }],
+        ];
+        const res = await applyCuepointUpsert("u", {
+            entity: "cuepoints",
+            entityId: "loop-9",
+            op: "upsert",
+            updatedAt: "2026-05-10T10:00:00.000Z",
+            payload: { trackSha256: "sha-abc", positionMs: 1200, endMs: null, kind: "hot" },
+        });
+        expect(res.changed).toBe(true);
+        expect(state.updateCalls[0]!.endMs).toBeNull();
+        expect(state.updateCalls[0]!.kind).toBe("hot");
+    });
 });

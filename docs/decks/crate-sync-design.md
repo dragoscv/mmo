@@ -1,6 +1,8 @@
 # Crate, favourite and cue sync through the MMO Server: design proposal (WP19-28)
 
-Status: **decided by the owner on 2026-11-13** (section 9 records the answers). Nothing in this document is built yet.
+Status: **decided by the owner on 2026-11-13** (section 9 records the answers).
+**Phase 1 (the server side) is built** — see [`crate-sync-server.md`](crate-sync-server.md) for what exists, how it
+was verified and what is still open. Phases 2–5 (the apps) are not started.
 Scope chosen by the owner on 2026-11-12: full two-way sync, cue points included.
 
 The facts in section 1 were read from the code on 2026-11-12 (a read-only survey, nothing was run). Where this

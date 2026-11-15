@@ -200,6 +200,66 @@ function bootstrap(sqlite: Database.Database) {
         );
         CREATE INDEX IF NOT EXISTS idx_scan_jobs_status ON scan_jobs(status);
         CREATE INDEX IF NOT EXISTS idx_scan_jobs_started ON scan_jobs(started_at DESC);
+
+        -- ── Crate / cue sync (docs/decks/crate-sync-design.md, phase 1) ──
+        -- DJ cue points, one row per cue (a loop is ONE row with start+end).
+        CREATE TABLE IF NOT EXISTS track_cues (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            track_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            slot INTEGER,
+            start_ms INTEGER NOT NULL,
+            end_ms INTEGER,
+            colour TEXT,
+            label TEXT,
+            changed_at INTEGER NOT NULL,
+            changed_by TEXT NOT NULL,
+            rev INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_track_cues_user_track ON track_cues(user_id, track_id);
+        CREATE INDEX IF NOT EXISTS idx_track_cues_rev ON track_cues(user_id, rev);
+
+        -- Hand-edited beat grids, one per track.
+        CREATE TABLE IF NOT EXISTS track_grids (
+            user_id TEXT NOT NULL,
+            track_id INTEGER NOT NULL,
+            bpm REAL NOT NULL,
+            first_beat_ms INTEGER NOT NULL,
+            markers TEXT,
+            fixed INTEGER NOT NULL DEFAULT 0,
+            changed_at INTEGER NOT NULL,
+            changed_by TEXT NOT NULL,
+            rev INTEGER NOT NULL,
+            PRIMARY KEY (user_id, track_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_track_grids_rev ON track_grids(user_id, rev);
+
+        -- Tombstones for the change feed (a delete is a row with a rev).
+        CREATE TABLE IF NOT EXISTS library_tombstones (
+            user_id TEXT NOT NULL,
+            entity TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            rev INTEGER NOT NULL,
+            changed_at INTEGER NOT NULL,
+            PRIMARY KEY (user_id, entity, entity_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_library_tombstones_rev ON library_tombstones(user_id, rev);
+
+        -- Per-user revision counter for the change feed.
+        CREATE TABLE IF NOT EXISTS library_sync_meta (
+            user_id TEXT PRIMARY KEY,
+            rev INTEGER NOT NULL DEFAULT 0,
+            min_kept_rev INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- Old quick hashes kept as aliases after a re-tag / re-encode.
+        CREATE TABLE IF NOT EXISTS track_hash_aliases (
+            user_id TEXT NOT NULL,
+            quick_hash TEXT NOT NULL,
+            track_id INTEGER NOT NULL,
+            PRIMARY KEY (user_id, quick_hash)
+        );
     `);
 
     // ── Idempotent column migrations for existing DBs ──────────────────
@@ -254,17 +314,47 @@ function bootstrap(sqlite: Database.Database) {
         // merge without clobbering newer fields. Stored as JSON string
         // because SQLite has no native jsonb.
         ["field_versions", "TEXT"],
+        // Quick content hash (32 hex) — the Decks identity key, computed at
+        // scan / ingest (two short reads, no decode) and backfilled for rows
+        // that pre-date the column.
+        ["quick_hash", "TEXT"],
+        // Library change-feed revision; bumped only on synced-field writes.
+        ["sync_rev", "INTEGER NOT NULL DEFAULT 0"],
+        // Row clock for the change feed (last synced change, ms since epoch).
+        ["sync_changed_at", "INTEGER"],
+        ["sync_changed_by", "TEXT"],
     ]);
     ensureColumns("playlists", [
         // Stable cross-device id. Cloud playlists key on (user_id, external_id).
         ["external_id", "TEXT"],
         ["updated_at", "TEXT"],
+        // Crate tree + change feed.
+        ["parent_external_id", "TEXT"],
+        ["is_folder", "INTEGER DEFAULT 0"],
+        ["sort_key", "TEXT"],
+        ["rev", "INTEGER NOT NULL DEFAULT 0"],
+        ["changed_at", "INTEGER"],
+        ["changed_by", "TEXT"],
+        // 30-day trash for deleted crates.
+        ["deleted_at", "INTEGER"],
+    ]);
+    // library_sync_meta gained `min_kept_rev` after the table existed.
+    ensureColumns("library_sync_meta", [["min_kept_rev", "INTEGER NOT NULL DEFAULT 0"]]);
+    ensureColumns("playlist_tracks", [
+        // Per-entry identity + order key so adds and reorders merge instead
+        // of "last full list wins".
+        ["entry_id", "TEXT"],
+        ["sort_key", "TEXT"],
+        ["changed_at", "INTEGER"],
+        ["changed_by", "TEXT"],
+        ["rev", "INTEGER NOT NULL DEFAULT 0"],
     ]);
     // Best-effort indices for the new sync columns. CREATE INDEX IF NOT
     // EXISTS is safe to run on every boot.
     try {
         sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tracks_user_sha ON tracks(user_id, sha256) WHERE sha256 IS NOT NULL`);
         sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_playlists_user_ext ON playlists(user_id, external_id) WHERE external_id IS NOT NULL`);
+        sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_tracks_user_quick ON tracks(user_id, quick_hash) WHERE quick_hash IS NOT NULL`);
     } catch (e) {
         console.warn("[db] sync index creation failed:", e);
     }

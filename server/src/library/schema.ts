@@ -9,7 +9,7 @@
  * by userId at every query).
  */
 
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const tracks = sqliteTable("tracks", {
@@ -111,6 +111,22 @@ export const tracks = sqliteTable("tracks", {
      *  timestamps. Used by the cloud's per-field merge so partial pushes
      *  from any device can converge without clobbering newer values. */
     fieldVersions: text("field_versions"),
+    /** Quick content fingerprint — the first 16 bytes (32 hex chars) of a
+     *  SHA-256 over the file size (u64 LE) + the first 256 KiB and, when the
+     *  file is larger than 512 KiB, the last 256 KiB. Same value the Decks
+     *  apps store as `file_hash` (`crates/decks-library/src/util.rs`), so a
+     *  file on a phone finds the same cues as the server's copy. Computed at
+     *  scan / ingest without decoding the audio. Indexed by (user_id, quick_hash). */
+    quickHash: text("quick_hash"),
+    /** Library change-feed revision. Bumped only when a *synced* field of the
+     *  row changes (the favourite flag and the rating / tags the Decks apps
+     *  care about). Analysis-derived columns deliberately do not bump it. */
+    syncRev: integer("sync_rev").notNull().default(0),
+    /** Device clock (ms since epoch) of the last *synced* change — the
+     *  last-write-wins key. NULL until the row is first synced. */
+    syncChangedAt: integer("sync_changed_at"),
+    /** Device that made the last synced change. */
+    syncChangedBy: text("sync_changed_by"),
 });
 
 export const playlists = sqliteTable("playlists", {
@@ -126,6 +142,24 @@ export const playlists = sqliteTable("playlists", {
     externalId: text("external_id"),
     /** ISO-8601 last-write timestamp for row-level LWW. */
     updatedAt: text("updated_at"),
+    /** Crate tree: the parent crate's external id (NULL = root). Only used
+     *  for `type = 'crate'` rows. */
+    parentExternalId: text("parent_external_id"),
+    /** Crate tree: 1 when the row is a folder (holds crates, no tracks). */
+    isFolder: integer("is_folder", { mode: "boolean" }).default(false),
+    /** Crate tree: order key among siblings (short text that sorts between
+     *  its neighbours, so two devices inserting at the same spot merge). */
+    sortKey: text("sort_key"),
+    /** Library change-feed revision for this row (0 = never synced). */
+    rev: integer("rev").notNull().default(0),
+    /** Device clock (ms) of the last change to this crate (row clock). */
+    changedAt: integer("changed_at"),
+    /** Device that made the last change to this crate. */
+    changedBy: text("changed_by"),
+    /** Soft-delete marker for crates: the 30-day trash (owner 2026-11-13).
+     *  A crate in the trash leaves a tombstone in the feed and can be
+     *  restored from any device by re-sending an upsert with a newer clock. */
+    deletedAt: integer("deleted_at"),
 });
 
 export const playlistTracks = sqliteTable("playlist_tracks", {
@@ -133,7 +167,100 @@ export const playlistTracks = sqliteTable("playlist_tracks", {
     playlistId: integer("playlist_id").notNull(),
     trackId: integer("track_id").notNull(),
     position: integer("position").notNull(),
+    /** Stable per-entry id (UUID) minted by the creating device. Lets an
+     *  "add on the phone" and a "reorder on the laptop" both survive instead
+     *  of "last full list wins". */
+    entryId: text("entry_id"),
+    /** Order key within the crate (sorts between its neighbours). */
+    sortKey: text("sort_key"),
+    /** Device clock of the last change (ms since epoch), LWW tie-break. */
+    changedAt: integer("changed_at"),
+    /** Device that made the last change. */
+    changedBy: text("changed_by"),
+    /** Library change-feed revision for this entry (0 = never synced). */
+    rev: integer("rev").notNull().default(0),
 });
+
+/**
+ * DJ cue points (hot / memory / loop), one row per cue.
+ *
+ * The hub copy of the data: Decks devices write here through the change feed
+ * and read it back; a loop is ONE row with `start_ms` + `end_ms` (the cloud
+ * table splits it into two rows until it gains an end column). `id` is a
+ * UUID minted by the creating device so two devices editing different cues
+ * of the same track both survive.
+ */
+export const trackCues = sqliteTable("track_cues", {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    trackId: integer("track_id").notNull(),
+    /** "hot" | "memory" | "loop". */
+    kind: text("kind").notNull(),
+    /** 0..7 for hot cues, NULL otherwise. */
+    slot: integer("slot"),
+    /** Milliseconds from the start of the decoded audio. */
+    startMs: integer("start_ms").notNull(),
+    /** Loop end in ms (NULL for hot / memory cues). */
+    endMs: integer("end_ms"),
+    colour: text("colour"),
+    label: text("label"),
+    /** Device clock of the last change (ms since epoch). */
+    changedAt: integer("changed_at").notNull(),
+    /** UUID of the device that made the last change. */
+    changedBy: text("changed_by").notNull(),
+    /** Library change-feed revision. */
+    rev: integer("rev").notNull(),
+});
+
+/**
+ * Hand-edited beat grids (one per track). A grid is one object: a change
+ * wins or loses as a whole (`fixed` = the DJ locked it by hand).
+ */
+export const trackGrids = sqliteTable("track_grids", {
+    userId: text("user_id").notNull(),
+    trackId: integer("track_id").notNull(),
+    bpm: real("bpm").notNull(),
+    firstBeatMs: integer("first_beat_ms").notNull(),
+    /** JSON array of marker ms positions. */
+    markers: text("markers"),
+    fixed: integer("fixed", { mode: "boolean" }).notNull().default(false),
+    changedAt: integer("changed_at").notNull(),
+    changedBy: text("changed_by").notNull(),
+    rev: integer("rev").notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.trackId] })]);
+
+/**
+ * Tombstones for the library change feed. A deleted cue / crate / entry
+ * leaves a row here with the `rev` of the delete, so a device that pulls
+ * `since=<rev>` learns about the deletion. Kept 180 days; a cursor older
+ * than the oldest kept tombstone forces a full-state answer (`reset`).
+ */
+export const libraryTombstones = sqliteTable("library_tombstones", {
+    userId: text("user_id").notNull(),
+    /** "cue" | "grid" | "crate" | "crate_entry". */
+    entity: text("entity").notNull(),
+    entityId: text("entity_id").notNull(),
+    rev: integer("rev").notNull(),
+    changedAt: integer("changed_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.entity, t.entityId] })]);
+
+/** Per-user revision counter for the library change feed. */
+export const librarySyncMeta = sqliteTable("library_sync_meta", {
+    userId: text("user_id").primaryKey(),
+    rev: integer("rev").notNull().default(0),
+    /** Highest tombstone revision already pruned. A client whose cursor is
+     *  below this may have missed a tombstone, so it gets a full-state
+     *  answer (`reset: true`) instead of a delta. */
+    minKeptRev: integer("min_kept_rev").notNull().default(0),
+});
+
+/** Old quick hashes of a track, kept as aliases so other devices still match
+ *  after a re-tag / re-encode changed the hash (D2 re-link rule). */
+export const trackHashAliases = sqliteTable("track_hash_aliases", {
+    userId: text("user_id").notNull(),
+    quickHash: text("quick_hash").notNull(),
+    trackId: integer("track_id").notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.quickHash] })]);
 
 export const scanLogs = sqliteTable("scan_logs", {
     id: integer("id").primaryKey({ autoIncrement: true }),
@@ -189,3 +316,8 @@ export type PlaylistTrack = typeof playlistTracks.$inferSelect;
 export type ScanLog = typeof scanLogs.$inferSelect;
 export type DownloadRecord = typeof downloads.$inferSelect;
 export type SavedDrive = typeof savedDrives.$inferSelect;
+export type TrackCue = typeof trackCues.$inferSelect;
+export type NewTrackCue = typeof trackCues.$inferInsert;
+export type TrackGrid = typeof trackGrids.$inferSelect;
+export type NewTrackGrid = typeof trackGrids.$inferInsert;
+export type LibraryTombstone = typeof libraryTombstones.$inferSelect;

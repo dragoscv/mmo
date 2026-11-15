@@ -14,15 +14,22 @@
 
 import express from "express";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { getLibraryDb } from "./db";
+import { getLibraryDb, getLibrarySqlite } from "./db";
 import { tracks, playlists, playlistTracks, scanLogs, downloads, savedDrives } from "./schema";
 import type { NewTrack } from "./schema";
 import { analyzer, type AnalyzeOptions } from "./analyzer";
-import { enqueueSyncChange } from "../sync";
 import { listConnectedDrives } from "./drives";
 import { inspectRekordboxDrive, cleanRekordboxDrive } from "./rekordbox-drive";
 import { validateCopyRequest, resolveTrackTarget } from "./usb-copy";
 import { runExport, type ManifestTrack, type ManifestPlaylist, type TranscodePolicy } from "./rekordbox-export";
+import { quickHashOrNull } from "./quick-hash";
+import { backfillQuickHashes } from "./quick-hash-backfill";
+import { enqueueTrackChange, enqueuePlaylistChange, relayCue, relayCueDelete, enqueuePlaylistTrackChange } from "./cloud-feed";
+import {
+    applyChanges, getChanges, getRev, nextRev, validateChange, appendSortKey, renumberCrate,
+    recordTombstone, rebalancedKeys,
+    MAX_CHANGES_PER_PUSH, type LibraryChange,
+} from "./sync-changes";
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { copyFile, mkdir, stat as statAsync } from "node:fs/promises";
 import path from "node:path";
@@ -63,44 +70,14 @@ function pushTrackChange(
     row: { id: number; userId: string; sha256?: string | null } & Record<string, unknown>,
     extraPayload?: Record<string, unknown>,
 ) {
-    try {
-        const sha = (row.sha256 ?? "") as string;
-        const entityId = sha || `${row.userId}:${row.id}`;
-        enqueueSyncChange({
-            entity: "tracks",
-            entityId,
-            op,
-            // `companionTrackId` lets the cloud round-trip the companion's
-            // local row id, so the web app's write actions (rating, tags…)
-            // can target the right companion track even when reads now come
-            // from cloud Postgres.
-            payload: { sha256: sha || undefined, ...row, companionTrackId: row.id, ...extraPayload },
-            updatedAt: new Date().toISOString(),
-        });
-    } catch {
-        // Sync subsystem may not be initialised yet (e.g. unpaired device).
-        // The local write already happened; nothing else to do.
-    }
+    enqueueTrackChange(op, row, extraPayload);
 }
 
 function pushPlaylistChange(
     op: "upsert" | "delete",
     row: { id: number; userId: string } & Record<string, unknown>,
 ) {
-    try {
-        // Playlists are keyed in cloud by externalId (UUID). Older rows
-        // without one fall back to a deterministic synthetic id so the
-        // cloud can still upsert; the next pull will rehydrate the proper
-        // externalId once the cloud assigns one.
-        const ext = (row.externalId as string | undefined) || `${row.userId}:pl:${row.id}`;
-        enqueueSyncChange({
-            entity: "playlists",
-            entityId: ext,
-            op,
-            payload: { externalId: ext, ...row },
-            updatedAt: new Date().toISOString(),
-        });
-    } catch { /* see pushTrackChange */ }
+    enqueuePlaylistChange(op, row);
 }
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
@@ -297,12 +274,42 @@ function buildAutoCrates(
     return out;
 }
 
-export function createLibraryRouter(authMiddleware: express.RequestHandler): express.Router {
+export interface LibraryRouterOptions {
+    /** Called after every library change-feed write so the HTTP server can
+     *  broadcast a `library:changed` hint (with the new revision) over its
+     *  WebSocket fan-out. Best-effort: a failure here must never fail a route. */
+    onChanged?: (userId: string, rev: number) => void;
+}
+
+export function createLibraryRouter(
+    authMiddleware: express.RequestHandler,
+    opts: LibraryRouterOptions = {},
+): express.Router {
     const router = express.Router();
 
     // All library routes require both device token AND user id.
     router.use(authMiddleware);
     router.use(requireUser);
+
+    /** Device id for the change-feed row clock; the companion is single-device
+     *  per token today, so an absent header degrades to "server". */
+    const deviceOf = (req: express.Request) =>
+        (req.headers["x-device-id"] as string | undefined)?.trim() || "server";
+
+    const announce = (userId: string, rev: number) => {
+        try { opts.onChanged?.(userId, rev); } catch { /* best-effort */ }
+    };
+
+    /** Whole-file hashes of the given local track ids — the cloud's keys, used
+     *  when an entry change is told to the cloud. Missing hash = no relay. */
+    const shaMap = (db: ReturnType<typeof getLibraryDb>, userId: string, ids: number[]) => {
+        const out = new Map<number, string>();
+        if (ids.length === 0) return out;
+        const rows = db.select({ id: tracks.id, sha256: tracks.sha256 }).from(tracks)
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, ids))).all();
+        for (const r of rows) if (r.sha256) out.set(r.id, r.sha256);
+        return out;
+    };
 
     // Express 5 (path-to-regexp v8) dropped inline regex constraints such as
     // `:id(\\d+)`. Numeric ids are enforced here instead for the SQLite-row
@@ -399,6 +406,43 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
         if (full) pushTrackChange("upsert", full);
         res.json({ success: true, isFavorite: next });
+    });
+
+    // ── Tracks: set favourite (idempotent — safe to retry) ──────────────
+    // The toggle above flips the flag, so a retried request flips it back.
+    // This one takes the wanted value, records the change on the library
+    // change feed (so other Decks devices see it) and pushes to the cloud.
+    router.put("/tracks/:id/favorite", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const id = parseInt(req.params.id, 10);
+        const { favorite } = req.body as { favorite: unknown };
+        if (typeof favorite !== "boolean") {
+            res.status(400).json({ error: "favorite must be a boolean" });
+            return;
+        }
+        const db = getLibraryDb();
+        const row = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
+        if (!row) { res.status(404).json({ error: "Not found" }); return; }
+
+        // A retry with the same value is a true no-op: no revision bump, no
+        // feed noise, no cloud push.
+        if (Boolean(row.isFavorite) === favorite) {
+            res.json({ success: true, isFavorite: favorite, rev: row.syncRev });
+            return;
+        }
+        const rev = nextRev(db, userId);
+        db.update(tracks)
+            .set({
+                isFavorite: favorite, syncRev: rev,
+                syncChangedAt: Date.now(), syncChangedBy: deviceOf(req),
+            })
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).run();
+        const full = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
+        if (full) pushTrackChange("upsert", full);
+        announce(userId, rev);
+        res.json({ success: true, isFavorite: favorite, rev });
     });
 
     // ── Tracks: set rating ───────────────────────────────────────────────
@@ -502,7 +546,14 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         for (const t of incoming) {
             if (!t?.filepath || !t?.filename) { skipped++; continue; }
             try {
-            const r = db.insert(tracks).values({ ...scanTagFields(t as typeof t & { key?: unknown }), userId }).run();
+            const payload = scanTagFields(t as typeof t & { key?: unknown; quickHash?: unknown });
+            // Quick hash is computed at scan time; older clients that omit it
+            // get it computed here (two short reads, no decode) so every track
+            // has its Decks identity key.
+            const quickHash = typeof payload.quickHash === "string" && /^[0-9a-f]{32}$/.test(payload.quickHash)
+                ? payload.quickHash
+                : quickHashOrNull(t.filepath) ?? undefined;
+            const r = db.insert(tracks).values({ ...payload, quickHash, userId }).run();
             fresh.push({ id: Number(r.lastInsertRowid), filepath: t.filepath });
                 inserted++;
                 db.insert(scanLogs).values({
@@ -526,6 +577,18 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             }
         }
         res.json({ success: true, inserted, skipped, total: incoming.length, analyzing });
+    });
+
+    // ── Quick hash: backfill rows that pre-date the column ───────────────
+    // One pass over the tracks whose `quick_hash` is still NULL; two short
+    // reads per file, no decode. Safe to re-run — only NULL rows are touched.
+    router.post("/quick-hash/backfill", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const { limit } = (req.body ?? {}) as { limit?: unknown };
+        const lim = typeof limit === "number" && Number.isFinite(limit) && limit > 0
+            ? Math.floor(limit) : undefined;
+        const result = backfillQuickHashes(getLibrarySqlite(), { userId, limit: lim });
+        res.json(result);
     });
 
     // ── Genres / Keys / Tags ─────────────────────────────────────────────
@@ -1285,7 +1348,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         }
         if (intIds.length === 0) { res.json({ success: true, added: 0 }); return; }
         const db = getLibraryDb();
-        const owned = db.select({ id: playlists.id }).from(playlists)
+        const owned = db.select({ id: playlists.id, type: playlists.type, externalId: playlists.externalId }).from(playlists)
             .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
         if (!owned) { res.status(404).json({ error: "Not found" }); return; }
 
@@ -1301,11 +1364,25 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             .map((r) => r.trackId);
 
         const toAdd = valid.filter((tid) => !existing.includes(tid));
+        // Crate entries carry their own id, order key and revision so an add
+        // here and a reorder on another device both survive.
+        const isCrate = owned.type === "crate";
+        const now = Date.now();
+        const by = deviceOf(req);
+        const shas = shaMap(db, userId, toAdd);
+        const ext = owned.externalId;
         let position = maxPos + 1;
         for (const trackId of toAdd) {
-            db.insert(playlistTracks).values({ playlistId: id, trackId, position }).run();
+            db.insert(playlistTracks).values({
+                playlistId: id, trackId, position,
+                entryId: randomUUID(), sortKey: appendSortKey(db, id),
+                changedAt: now, changedBy: by,
+                rev: isCrate ? nextRev(db, userId) : 0,
+            }).run();
+            enqueuePlaylistTrackChange("upsert", ext, shas.get(trackId), position);
             position++;
         }
+        if (isCrate && toAdd.length > 0) { renumberCrate(db, id); announce(userId, getRev(db, userId)); }
         res.json({ success: true, added: toAdd.length });
     });
 
@@ -1314,11 +1391,20 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const id = parseInt(req.params.id, 10);
         const trackId = parseInt(req.params.trackId, 10);
         const db = getLibraryDb();
-        const owned = db.select({ id: playlists.id }).from(playlists)
+        const owned = db.select({ id: playlists.id, type: playlists.type, externalId: playlists.externalId }).from(playlists)
             .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
         if (!owned) { res.status(404).json({ error: "Not found" }); return; }
-        db.delete(playlistTracks)
-            .where(and(eq(playlistTracks.playlistId, id), eq(playlistTracks.trackId, trackId))).run();
+        const entry = db.select().from(playlistTracks)
+            .where(and(eq(playlistTracks.playlistId, id), eq(playlistTracks.trackId, trackId))).get();
+        if (!entry) { res.json({ success: true }); return; }
+        db.delete(playlistTracks).where(eq(playlistTracks.id, entry.id)).run();
+        if (owned.type === "crate") {
+            const rev = nextRev(db, userId);
+            recordTombstone(db, userId, "crate_entry", entry.entryId ?? `pt:${entry.id}`, rev, Date.now());
+            renumberCrate(db, id);
+            announce(userId, getRev(db, userId));
+        }
+        enqueuePlaylistTrackChange("delete", owned.externalId, shaMap(db, userId, [trackId]).get(trackId), entry.position);
         res.json({ success: true });
     });
 
@@ -1339,7 +1425,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         if (!incoming) { res.status(400).json({ error: "trackIds (number[]) required" }); return; }
 
         const db = getLibraryDb();
-        const owned = db.select({ id: playlists.id }).from(playlists)
+        const owned = db.select({ id: playlists.id, type: playlists.type, externalId: playlists.externalId }).from(playlists)
             .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
         if (!owned) { res.status(404).json({ error: "Not found" }); return; }
 
@@ -1361,16 +1447,80 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             if (!seen.has(r.trackId)) { ordered.push(r.trackId); seen.add(r.trackId); }
         }
 
+        // Re-key the entries in their new order (one change per entry) so the
+        // library feed reports the move per entry instead of "full list wins".
+        const isCrate = owned.type === "crate";
+        const now = Date.now();
+        const by = deviceOf(req);
+        const keys = rebalancedKeys(ordered.length);
+        const shas = shaMap(db, userId, ordered);
         db.transaction((tx) => {
             for (let i = 0; i < ordered.length; i++) {
                 tx.update(playlistTracks)
-                    .set({ position: i + 1 })
+                    .set({
+                        position: i + 1,
+                        sortKey: keys[i],
+                        changedAt: now, changedBy: by,
+                        rev: isCrate ? nextRev(db, userId) : 0,
+                    })
                     .where(and(eq(playlistTracks.playlistId, id), eq(playlistTracks.trackId, ordered[i])))
                     .run();
+                enqueuePlaylistTrackChange("upsert", owned.externalId, shas.get(ordered[i]), i + 1);
             }
         });
-
+        if (isCrate) announce(userId, getRev(db, userId));
         res.json({ success: true, count: ordered.length });
+    });
+
+    // ── Library change feed: crates, cues, grids, favourites (phase 1) ───
+    //
+    //   GET  /library/changes?since=<rev>   rows with rev > since + tombstones
+    //   POST /library/changes               a batch of device changes
+    //
+    // A cursor below the pruned tombstones answers `reset: true` with the full
+    // state; `since=0` (a fresh client) answers the full state too — that is
+    // the phase-4 first-sync merge input, not a replace.
+    router.get("/changes", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const since = parseInt(String(req.query.since ?? "0"), 10);
+        const db = getLibraryDb();
+        res.json(getChanges(db, userId, Number.isFinite(since) ? since : 0));
+    });
+
+    router.post("/changes", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const body = (req.body ?? {}) as { deviceId?: unknown; changes?: unknown };
+        if (!Array.isArray(body.changes)) {
+            res.status(400).json({ error: "Body must be { changes: [...] }" });
+            return;
+        }
+        if (body.changes.length > MAX_CHANGES_PER_PUSH) {
+            res.status(413).json({ error: `too many changes (max ${MAX_CHANGES_PER_PUSH})` });
+            return;
+        }
+        const deviceId = typeof body.deviceId === "string" && body.deviceId.trim()
+            ? body.deviceId.trim() : deviceOf(req);
+
+        // Keep the caller's indices stable: invalid entries never reach the
+        // apply loop but still appear in `errors` with their original index.
+        const valid: LibraryChange[] = [];
+        const at: number[] = [];
+        const errors: Array<{ index: number; error: string }> = [];
+        body.changes.forEach((c, i) => {
+            const v = validateChange(c);
+            if (v.ok) { valid.push(v.value); at.push(i); } else errors.push({ index: i, error: v.error });
+        });
+
+        const db = getLibraryDb();
+        const result = applyChanges(db, userId, deviceId, valid, Date.now(), (op, cue) => {
+            // Mirror the cue write to the cloud (best-effort). Skipped when the
+            // track has no whole-file hash yet — the cloud keys cues by sha256.
+            if (op === "delete") relayCueDelete(db, userId, cue.trackId, cue.id);
+            else relayCue(db, userId, cue);
+        });
+        for (const r of result.results) r.index = at[r.index] ?? r.index;
+        if (result.results.some((r) => r.status === "applied")) announce(userId, result.rev);
+        res.json({ rev: result.rev, results: result.results, errors });
     });
 
     // ── Downloads (history) ──────────────────────────────────────────────

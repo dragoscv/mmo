@@ -22,6 +22,8 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [dvs-clean-room.md](dvs-clean-room.md) | Clean-room provenance statement for the DVS decoder |
 | [library-interop.md](library-interop.md) | rekordbox / Traktor / Serato / Engine / PDB / JSON read-write matrix, migration, key and colour mapping |
 | [streaming.md](streaming.md) | Streaming strategy (D64), partner applications checklist, draft emails |
+| [crate-sync-design.md](crate-sync-design.md) | Crate / favourite / cue sync through the MMO Server: decisions and rules (WP19-28) |
+| [crate-sync-server.md](crate-sync-server.md) | Phase 1 of that sync, built: routes, tables, conflict rules, the cloud relay, what was not tested |
 
 Tracker: [`docs/mixai-design-tracker.md`](../mixai-design-tracker.md) §13 (D60–D68, WP19). App inventory:
 [`docs/arhitectura/app-inventory.md`](../arhitectura/app-inventory.md).

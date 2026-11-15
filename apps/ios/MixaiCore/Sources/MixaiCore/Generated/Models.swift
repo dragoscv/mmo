@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.15.0); generator: server/scripts/openapi-swift.mjs
+// Source: server/openapi.yaml (info.version 3.17.0); generator: server/scripts/openapi-swift.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 // swiftlint:disable all
 
@@ -496,6 +496,10 @@ public struct Track: Codable, Sendable, Hashable {
     public let sha256: String?
     /// JSON-encoded map of column to ISO-8601 timestamp.
     public let fieldVersions: String?
+    /// Cross-device identity key: 32 hex chars (see /library/quick-hash/backfill).
+    public let quickHash: String?
+    /// Change-feed revision of this row (0 = never synced).
+    public let syncRev: Int?
 
     public init(
         id: Int? = nil,
@@ -565,7 +569,9 @@ public struct Track: Codable, Sendable, Hashable {
         structureSegments: String? = nil,
         dspAnalyzedAt: String? = nil,
         sha256: String? = nil,
-        fieldVersions: String? = nil
+        fieldVersions: String? = nil,
+        quickHash: String? = nil,
+        syncRev: Int? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -635,6 +641,8 @@ public struct Track: Codable, Sendable, Hashable {
         self.dspAnalyzedAt = dspAnalyzedAt
         self.sha256 = sha256
         self.fieldVersions = fieldVersions
+        self.quickHash = quickHash
+        self.syncRev = syncRev
     }
 }
 
@@ -647,6 +655,14 @@ public struct Playlist: Codable, Sendable, Hashable {
     public let createdAt: String?
     public let externalId: String?
     public let updatedAt: String?
+    /// Crate tree: parent crate external id (NULL = root).
+    public let parentExternalId: String?
+    /// Crate tree: true when the row is a folder.
+    public let isFolder: Bool?
+    /// Crate tree: order key among siblings.
+    public let sortKey: String?
+    /// Change-feed revision (0 = never synced).
+    public let rev: Int?
 
     public init(
         id: Int,
@@ -656,7 +672,11 @@ public struct Playlist: Codable, Sendable, Hashable {
         type: String? = nil,
         createdAt: String? = nil,
         externalId: String? = nil,
-        updatedAt: String? = nil
+        updatedAt: String? = nil,
+        parentExternalId: String? = nil,
+        isFolder: Bool? = nil,
+        sortKey: String? = nil,
+        rev: Int? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -666,6 +686,10 @@ public struct Playlist: Codable, Sendable, Hashable {
         self.createdAt = createdAt
         self.externalId = externalId
         self.updatedAt = updatedAt
+        self.parentExternalId = parentExternalId
+        self.isFolder = isFolder
+        self.sortKey = sortKey
+        self.rev = rev
     }
 }
 

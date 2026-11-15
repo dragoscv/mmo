@@ -472,7 +472,11 @@ export const cuepoints = pgTable(
         externalId: text("external_id"),
         /** Position in milliseconds from start of track. */
         positionMs: integer("position_ms").notNull(),
-        /** "hot" | "memory" | "loop_in" | "loop_out" */
+        /** Loop end in milliseconds; NULL for a hot / memory cue. Since the
+         *  crate-sync phase 1 a loop is ONE row with start + end ("loop"),
+         *  not the two rows ("loop_in" / "loop_out") older builds wrote. */
+        endMs: integer("end_ms"),
+        /** "hot" | "memory" | "loop" (legacy: "loop_in" / "loop_out") */
         kind: text("kind").notNull(),
         label: text("label"),
         color: text("color"),

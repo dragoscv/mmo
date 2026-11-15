@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.16.0
+  version: 3.17.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -1232,6 +1232,41 @@ paths:
         '400': { $ref: '#/components/responses/MissingUser' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/ErrorJson' }
+    put:
+      operationId: librarySetTrackFavorite
+      tags: [library]
+      summary: Set the favourite flag of a track (idempotent)
+      description: |
+        Takes the wanted value, so a retry is safe (the `POST` toggle flips the
+        flag and a retry would flip it back). Records the change on the library
+        change feed (`GET /library/changes`) and pushes it to the cloud.
+        A request that does not change the flag bumps no revision.
+      parameters:
+        - { $ref: '#/components/parameters/TrackId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [favorite]
+              properties:
+                favorite: { type: boolean }
+      responses:
+        '200':
+          description: The favourite state after the call, and the new revision
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, isFavorite, rev]
+                properties:
+                  success: { type: boolean }
+                  isFavorite: { type: boolean }
+                  rev: { type: integer, description: Change-feed revision (unchanged when the call is a no-op). }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
 
   /library/tracks/{id}/rating:
     post:
@@ -2360,6 +2395,119 @@ paths:
         '400': { $ref: '#/components/responses/MissingUser' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/ErrorJson' }
+
+
+  /library/quick-hash/backfill:
+    post:
+      operationId: libraryBackfillQuickHashes
+      tags: [library]
+      summary: Fill the quick content hash for tracks that do not have one
+      description: |
+        `quick_hash` is the cross-device identity key of the Decks crate / cue
+        sync: the first 16 bytes (32 hex chars) of a SHA-256 over the file size
+        (u64 little-endian) plus the first 256 KiB and — when the file is larger
+        than 512 KiB — the last 256 KiB. New tracks get it at scan / ingest; this
+        fills rows that pre-date the column. Two short reads per file, no audio
+        decode. Idempotent: only rows whose hash is still NULL are touched, so a
+        second call scans nothing.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, minimum: 1, description: Stop after this many rows (default all). }
+      responses:
+        '200':
+          description: What the pass did
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [scanned, updated, failed, elapsedMs, remaining]
+                properties:
+                  scanned: { type: integer, description: Rows considered (hash still NULL). }
+                  updated: { type: integer, description: Rows given a hash. }
+                  failed: { type: integer, description: 'Rows whose file could not be read (moved, deleted, permissions).' }
+                  elapsedMs: { type: integer }
+                  remaining: { type: integer, description: Rows still without a hash after this pass. }
+        '400': { $ref: '#/components/responses/MissingUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /library/changes:
+    get:
+      operationId: libraryGetChanges
+      tags: [library]
+      summary: Pull library changes since a revision (crates, cues, grids, favourites)
+      description: |
+        The change feed of the crate / cue sync (docs/decks/crate-sync-design.md).
+        Per user one revision counter grows with every synced write; each
+        syncable row carries the revision of its last change, and a deleted row
+        leaves a tombstone carrying the revision of the delete.
+
+        `since` = 0 (a fresh client) answers the full state. A cursor older than
+        the oldest kept tombstone (180 days) answers `reset: true` together with
+        the full state — a client must then replace, not merge.
+      parameters:
+        - { name: since, in: query, schema: { type: integer, default: 0, minimum: 0 }, description: Revision the client already has (0 = full state). }
+      responses:
+        '200':
+          description: The delta (or the full state)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LibraryChanges' }
+        '400': { $ref: '#/components/responses/MissingUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: libraryPostChanges
+      tags: [library]
+      summary: Push a batch of device changes
+      description: |
+        Each change carries its entity id, its op, its own device clock
+        (`changedAt`, ms since epoch — a time in the future is cut to the server
+        now) and a payload. Conflicts are resolved per row by last-write-wins on
+        that clock, with `deviceId` as the tie-break; the per-entity rules are
+        the table in section 5 of the design. A cue for a track the server does
+        not have answers `unknown` and is left for a later batch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changes]
+              properties:
+                deviceId: { type: string, description: Device that made the changes (defaults to the x-device-id header). }
+                changes:
+                  type: array
+                  maxItems: 2000
+                  items: { $ref: '#/components/schemas/LibraryChangeInput' }
+      responses:
+        '200':
+          description: Per-change outcome plus the new revision
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rev, results, errors]
+                properties:
+                  rev: { type: integer }
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/LibraryChangeResult' }
+                  errors:
+                    type: array
+                    description: Entries the batch rejected before applying (index refers to the request array).
+                    items:
+                      type: object
+                      required: [index, error]
+                      properties:
+                        index: { type: integer }
+                        error: { type: string }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/ErrorJson' }
 
 
   /video/probe:
@@ -6824,6 +6972,8 @@ components:
         dspAnalyzedAt: { type: [string, 'null'] }
         sha256: { type: [string, 'null'] }
         fieldVersions: { type: [string, 'null'], description: JSON-encoded map of column to ISO-8601 timestamp. }
+        quickHash: { type: [string, 'null'], description: 'Cross-device identity key: 32 hex chars (see /library/quick-hash/backfill).' }
+        syncRev: { type: integer, description: Change-feed revision of this row (0 = never synced). }
     Playlist:
       type: object
       required: [id, name]
@@ -6836,6 +6986,121 @@ components:
         createdAt: { type: [string, 'null'] }
         externalId: { type: [string, 'null'] }
         updatedAt: { type: [string, 'null'] }
+        parentExternalId: { type: [string, 'null'], description: 'Crate tree: parent crate external id (NULL = root).' }
+        isFolder: { type: [boolean, 'null'], description: 'Crate tree: true when the row is a folder.' }
+        sortKey: { type: [string, 'null'], description: 'Crate tree: order key among siblings.' }
+        rev: { type: integer, description: Change-feed revision (0 = never synced). }
+
+    LibraryChangeInput:
+      type: object
+      required: [entity, entityId, op]
+      properties:
+        entity: { type: string, enum: [favorite, cue, grid, crate, crate_entry] }
+        entityId:
+          type: string
+          maxLength: 128
+          description: 'favorite = the track id; cue / crate_entry = the device-minted UUID; grid = the track id; crate = the crate external id.'
+        op: { type: string, enum: [upsert, delete] }
+        changedAt: { type: integer, description: Device clock in ms since epoch; a future time is cut to the server now. }
+        payload:
+          type: [object, 'null']
+          description: |
+            Per entity: `favorite` `{isFavorite}`; `cue`
+            `{trackId|quickHash, kind: hot|memory|loop, slot, startMs, endMs, label, colour}`;
+            `grid` `{bpm, firstBeatMs, markers, fixed}`; `crate`
+            `{name, parentExternalId, isFolder, sortKey}`; `crate_entry`
+            `{crateExternalId, trackId|quickHash, sortKey}`.
+          additionalProperties: true
+
+    LibraryChangeResult:
+      type: object
+      required: [index, entity, entityId, status]
+      properties:
+        index: { type: integer, description: Position in the request array. }
+        entity: { type: string }
+        entityId: { type: string }
+        status:
+          type: string
+          enum: [applied, superseded, unknown, invalid]
+          description: '`unknown` = the track / crate is not on this server yet (retry later); `superseded` = an older change lost to the stored one.'
+        rev: { type: integer }
+        reason: { type: string }
+
+    LibraryChanges:
+      type: object
+      required: [rev, reset, tracks, cues, grids, crates, crateEntries, tombstones]
+      properties:
+        rev: { type: integer, description: The user's current revision (the next `since`). }
+        reset: { type: boolean, description: 'True when the cursor is older than the kept tombstones — replace, do not merge.' }
+        tracks:
+          type: array
+          items:
+            type: object
+            required: [trackId, isFavorite, rev]
+            properties:
+              trackId: { type: integer }
+              quickHash: { type: [string, 'null'] }
+              isFavorite: { type: boolean }
+              rev: { type: integer }
+        cues:
+          type: array
+          items:
+            type: object
+            required: [id, trackId, kind, startMs, rev]
+            properties:
+              id: { type: string }
+              trackId: { type: integer }
+              kind: { type: string, enum: [hot, memory, loop] }
+              slot: { type: [integer, 'null'] }
+              startMs: { type: integer }
+              endMs: { type: [integer, 'null'] }
+              colour: { type: [string, 'null'] }
+              label: { type: [string, 'null'] }
+              rev: { type: integer }
+        grids:
+          type: array
+          items:
+            type: object
+            required: [trackId, bpm, firstBeatMs, rev]
+            properties:
+              trackId: { type: integer }
+              bpm: { type: number }
+              firstBeatMs: { type: integer }
+              markers: { type: [string, 'null'] }
+              fixed: { type: boolean }
+              rev: { type: integer }
+        crates:
+          type: array
+          items:
+            type: object
+            required: [externalId, name, rev]
+            properties:
+              externalId: { type: string }
+              name: { type: string }
+              parentExternalId: { type: [string, 'null'] }
+              isFolder: { type: boolean }
+              sortKey: { type: [string, 'null'] }
+              rev: { type: integer }
+        crateEntries:
+          type: array
+          items:
+            type: object
+            required: [entryId, crateExternalId, trackId, rev]
+            properties:
+              entryId: { type: string }
+              crateExternalId: { type: string }
+              trackId: { type: integer }
+              sortKey: { type: [string, 'null'] }
+              rev: { type: integer }
+        tombstones:
+          type: array
+          items:
+            type: object
+            required: [entity, entityId, rev]
+            properties:
+              entity: { type: string, enum: [cue, grid, crate, crate_entry] }
+              entityId: { type: string }
+              rev: { type: integer }
     ScanLog:
       type: object
       required: [id, userId, action, filepath]

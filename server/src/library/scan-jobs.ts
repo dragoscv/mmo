@@ -35,6 +35,10 @@ export interface ScannedTrackPayload {
     sampleRate?: number;
     fileSize: number;
     year?: number;
+    /** Quick content hash (32 hex) computed at scan time — the Decks identity
+     *  key. See ./quick-hash. Optional so older clients that POST a payload
+     *  without it still ingest (the route then hashes the file itself). */
+    quickHash?: string;
 }
 
 /**

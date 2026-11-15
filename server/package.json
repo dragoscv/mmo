@@ -1,6 +1,6 @@
 {
   "name": "mmo-server",
-  "version": "3.16.0",
+  "version": "3.17.0",
   "description": "MixAI Server — serves your own music and video files to the MixAI apps",
   "main": "dist/main.js",
   "author": {

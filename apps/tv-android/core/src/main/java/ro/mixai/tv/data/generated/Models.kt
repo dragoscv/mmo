@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.16.0); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.17.0); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -228,6 +228,8 @@ data class Track(
     val dspAnalyzedAt: String? = null,
     val sha256: String? = null,
     val fieldVersions: String? = null,
+    val quickHash: String? = null,
+    val syncRev: Long? = null,
 )
 
 @Serializable
@@ -240,6 +242,10 @@ data class Playlist(
     val createdAt: String? = null,
     val externalId: String? = null,
     val updatedAt: String? = null,
+    val parentExternalId: String? = null,
+    val isFolder: Boolean? = null,
+    val sortKey: String? = null,
+    val rev: Long? = null,
 )
 
 @Serializable

@@ -519,6 +519,7 @@ export async function applyCuepointUpsert(
             trackId: tr[0].id,
             externalId,
             positionMs: Number(payload.positionMs ?? 0),
+            endMs: payload.endMs == null ? null : Number(payload.endMs),
             kind: String(payload.kind ?? "hot"),
             label: payload.label == null ? null : String(payload.label),
             color: payload.color == null ? null : String(payload.color),
@@ -534,6 +535,7 @@ export async function applyCuepointUpsert(
         .update(cuepoints)
         .set({
             ...(payload.positionMs !== undefined ? { positionMs: Number(payload.positionMs) } : {}),
+            ...(payload.endMs !== undefined ? { endMs: payload.endMs == null ? null : Number(payload.endMs) } : {}),
             ...(payload.kind !== undefined ? { kind: String(payload.kind) } : {}),
             ...(payload.label !== undefined ? { label: payload.label == null ? null : String(payload.label) } : {}),
             ...(payload.color !== undefined ? { color: payload.color == null ? null : String(payload.color) } : {}),

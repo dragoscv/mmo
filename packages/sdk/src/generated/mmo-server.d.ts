@@ -752,7 +752,14 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /**
+         * Set the favourite flag of a track (idempotent)
+         * @description Takes the wanted value, so a retry is safe (the `POST` toggle flips the
+         *     flag and a retry would flip it back). Records the change on the library
+         *     change feed (`GET /library/changes`) and pushes it to the cloud.
+         *     A request that does not change the flag bumps no revision.
+         */
+        put: operations["librarySetTrackFavorite"];
         /** Toggle the favourite flag of a track */
         post: operations["libraryToggleTrackFavorite"];
         delete?: never;
@@ -1536,6 +1543,68 @@ export interface paths {
         get: operations["libraryGetTrackPeaks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/quick-hash/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fill the quick content hash for tracks that do not have one
+         * @description `quick_hash` is the cross-device identity key of the Decks crate / cue
+         *     sync: the first 16 bytes (32 hex chars) of a SHA-256 over the file size
+         *     (u64 little-endian) plus the first 256 KiB and — when the file is larger
+         *     than 512 KiB — the last 256 KiB. New tracks get it at scan / ingest; this
+         *     fills rows that pre-date the column. Two short reads per file, no audio
+         *     decode. Idempotent: only rows whose hash is still NULL are touched, so a
+         *     second call scans nothing.
+         */
+        post: operations["libraryBackfillQuickHashes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pull library changes since a revision (crates, cues, grids, favourites)
+         * @description The change feed of the crate / cue sync (docs/decks/crate-sync-design.md).
+         *     Per user one revision counter grows with every synced write; each
+         *     syncable row carries the revision of its last change, and a deleted row
+         *     leaves a tombstone carrying the revision of the delete.
+         *
+         *     `since` = 0 (a fresh client) answers the full state. A cursor older than
+         *     the oldest kept tombstone (180 days) answers `reset: true` together with
+         *     the full state — a client must then replace, not merge.
+         */
+        get: operations["libraryGetChanges"];
+        put?: never;
+        /**
+         * Push a batch of device changes
+         * @description Each change carries its entity id, its op, its own device clock
+         *     (`changedAt`, ms since epoch — a time in the future is cut to the server
+         *     now) and a payload. Conflicts are resolved per row by last-write-wins on
+         *     that clock, with `deviceId` as the tie-break; the per-entity rules are
+         *     the table in section 5 of the design. A cue for a track the server does
+         *     not have answers `unknown` and is left for a later batch.
+         */
+        post: operations["libraryPostChanges"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4729,6 +4798,10 @@ export interface components {
             sha256?: string | null;
             /** @description JSON-encoded map of column to ISO-8601 timestamp. */
             fieldVersions?: string | null;
+            /** @description Cross-device identity key: 32 hex chars (see /library/quick-hash/backfill). */
+            quickHash?: string | null;
+            /** @description Change-feed revision of this row (0 = never synced). */
+            syncRev?: number;
         };
         Playlist: {
             id: number;
@@ -4739,6 +4812,100 @@ export interface components {
             createdAt?: string | null;
             externalId?: string | null;
             updatedAt?: string | null;
+            /** @description Crate tree: parent crate external id (NULL = root). */
+            parentExternalId?: string | null;
+            /** @description Crate tree: true when the row is a folder. */
+            isFolder?: boolean | null;
+            /** @description Crate tree: order key among siblings. */
+            sortKey?: string | null;
+            /** @description Change-feed revision (0 = never synced). */
+            rev?: number;
+        };
+        LibraryChangeInput: {
+            /** @enum {string} */
+            entity: "favorite" | "cue" | "grid" | "crate" | "crate_entry";
+            /** @description favorite = the track id; cue / crate_entry = the device-minted UUID; grid = the track id; crate = the crate external id. */
+            entityId: string;
+            /** @enum {string} */
+            op: "upsert" | "delete";
+            /** @description Device clock in ms since epoch; a future time is cut to the server now. */
+            changedAt?: number;
+            /**
+             * @description Per entity: `favorite` `{isFavorite}`; `cue`
+             *     `{trackId|quickHash, kind: hot|memory|loop, slot, startMs, endMs, label, colour}`;
+             *     `grid` `{bpm, firstBeatMs, markers, fixed}`; `crate`
+             *     `{name, parentExternalId, isFolder, sortKey}`; `crate_entry`
+             *     `{crateExternalId, trackId|quickHash, sortKey}`.
+             */
+            payload?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        LibraryChangeResult: {
+            /** @description Position in the request array. */
+            index: number;
+            entity: string;
+            entityId: string;
+            /**
+             * @description `unknown` = the track / crate is not on this server yet (retry later); `superseded` = an older change lost to the stored one.
+             * @enum {string}
+             */
+            status: "applied" | "superseded" | "unknown" | "invalid";
+            rev?: number;
+            reason?: string;
+        };
+        LibraryChanges: {
+            /** @description The user's current revision (the next `since`). */
+            rev: number;
+            /** @description True when the cursor is older than the kept tombstones — replace, do not merge. */
+            reset: boolean;
+            tracks: {
+                trackId: number;
+                quickHash?: string | null;
+                isFavorite: boolean;
+                rev: number;
+            }[];
+            cues: {
+                id: string;
+                trackId: number;
+                /** @enum {string} */
+                kind: "hot" | "memory" | "loop";
+                slot?: number | null;
+                startMs: number;
+                endMs?: number | null;
+                colour?: string | null;
+                label?: string | null;
+                rev: number;
+            }[];
+            grids: {
+                trackId: number;
+                bpm: number;
+                firstBeatMs: number;
+                markers?: string | null;
+                fixed?: boolean;
+                rev: number;
+            }[];
+            crates: {
+                externalId: string;
+                name: string;
+                parentExternalId?: string | null;
+                isFolder?: boolean;
+                sortKey?: string | null;
+                rev: number;
+            }[];
+            crateEntries: {
+                entryId: string;
+                crateExternalId: string;
+                trackId: number;
+                sortKey?: string | null;
+                rev: number;
+            }[];
+            tombstones: {
+                /** @enum {string} */
+                entity: "cue" | "grid" | "crate" | "crate_entry";
+                entityId: string;
+                rev: number;
+            }[];
         };
         ScanLog: {
             id: number;
@@ -7658,6 +7825,43 @@ export interface operations {
             404: components["responses"]["ErrorJson"];
         };
     };
+    librarySetTrackFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Numeric track id; non-numeric values answer 404. */
+                id: components["parameters"]["TrackId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    favorite: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The favourite state after the call, and the new revision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                        isFavorite: boolean;
+                        /** @description Change-feed revision (unchanged when the call is a no-op). */
+                        rev: number;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
     libraryToggleTrackFavorite: {
         parameters: {
             query?: never;
@@ -9104,6 +9308,109 @@ export interface operations {
             400: components["responses"]["MissingUser"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["ErrorJson"];
+        };
+    };
+    libraryBackfillQuickHashes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Stop after this many rows (default all). */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description What the pass did */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Rows considered (hash still NULL). */
+                        scanned: number;
+                        /** @description Rows given a hash. */
+                        updated: number;
+                        /** @description Rows whose file could not be read (moved, deleted, permissions). */
+                        failed: number;
+                        elapsedMs: number;
+                        /** @description Rows still without a hash after this pass. */
+                        remaining: number;
+                    };
+                };
+            };
+            400: components["responses"]["MissingUser"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    libraryGetChanges: {
+        parameters: {
+            query?: {
+                /** @description Revision the client already has (0 = full state). */
+                since?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delta (or the full state) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryChanges"];
+                };
+            };
+            400: components["responses"]["MissingUser"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    libraryPostChanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Device that made the changes (defaults to the x-device-id header). */
+                    deviceId?: string;
+                    changes: components["schemas"]["LibraryChangeInput"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Per-change outcome plus the new revision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rev: number;
+                        results: components["schemas"]["LibraryChangeResult"][];
+                        /** @description Entries the batch rejected before applying (index refers to the request array). */
+                        errors: {
+                            index: number;
+                            error: string;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["ErrorJson"];
         };
     };
     videoProbe: {

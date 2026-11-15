@@ -2,6 +2,41 @@
 
 All notable changes to MixAI Server (Electron desktop app + local Express server; technical name `mmo-server`, called "MixAI Companion" up to 3.15) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.17.0 — the server as the hub for Decks crates and cue points (WP19-28, phase 1)
+
+First half of the crate / cue sync (`docs/decks/crate-sync-design.md`): the MMO Server can now hold DJ cue
+points and hand-published beat grids, identify a track by content, and serve a change feed a Decks app can
+follow. No app reads it yet — the Decks desktop (phase 2) and the Compose / Swift apps (phase 4) come next.
+
+- **Quick content hash.** Every track gets a `quick_hash` — the first 16 bytes of a SHA-256 over the file size
+	plus the first 256 KiB and, when the file is larger than 512 KiB, the last 256 KiB. It is the same value the
+	Decks apps store as `file_hash`, so the same file on a phone and on the server match. Computed at scan and at
+	ingest (two short reads, no decode), and `POST /library/quick-hash/backfill` fills the tracks that were
+	already in the library. Measured on this machine over 17 214 tracks (318 GB, all files present on an external
+	volume): 450 s, 26 ms per track, no failures; a second pass scans nothing.
+- **Cue points and beat grids on the server.** New tables `track_cues` (one row per cue; a loop is ONE row with
+	start and end, in whole milliseconds) and `track_grids` (one hand-edited grid per track). Both carry a
+	revision, the device clock of the last change and the device that made it.
+- **Favourites can be set, not only toggled.** `PUT /library/tracks/{id}/favorite` takes the wanted value, so a
+	retried request cannot flip the flag back. A call that changes nothing bumps no revision.
+- **A change feed** (`GET /library/changes?since=<rev>`, `POST /library/changes`). Per user, one revision grows
+	with every synced write; a deleted row leaves a tombstone, kept 180 days — a cursor older than the kept
+	tombstones answers `reset: true` with the full state. Conflicts resolve per row by last-write-wins on the
+	device clock, with the device id as the tie-break; two cues claiming one hot slot keep both (the loser becomes
+	a memory cue labelled with its slot), a deleted crate goes to a 30-day trash, and crate entries carry their own
+	id and order key so an add on one device and a reorder on another both survive.
+- **Crate entries are reported.** Adding, removing or reordering tracks in a crate now writes a per-entry change
+	with a revision instead of "the whole list wins". Playlists keep their old behaviour.
+- **The hub tells open clients to pull at once** (`{"type":"library:changed","rev":…}` over the existing `/ws`).
+	Without the socket a client polls.
+- **The cue relay to the cloud is wired**, and the cloud `cuepoints` table gains an end column so a loop is one
+	row there too. The production migration for that column is authored
+	(`apps/web/drizzle/0032_cuepoints_end_ms.sql`) but is **not run yet** — it waits for a deliberate step.
+- **Fixed on the way:** the quick-hash backfill's SQL used a numbered parameter twice, which better-sqlite3
+	refuses; the backfill now binds named parameters. Found by running it against a real 17 000-track library.
+- New routes are in `openapi.yaml` (`openapi:check` and `openapi:lint` clean) with the Kotlin / Swift models and
+	the TypeScript SDK types regenerated.
+
 ## 3.16.0 — MixAI Server name, new brand icons and tray icon (WP22-10)
 
 - **Name:** the app is called **MixAI Server** everywhere you see it: window and macOS title bar, tray tooltip, tray

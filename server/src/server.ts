@@ -1108,7 +1108,14 @@ export async function startServer(): Promise<void> {
     // existing device token + an `X-User-Id` header from the web app's
     // Auth.js session. See `server/src/library/routes.ts`.
 
-    app.use("/library", createLibraryRouter(authMiddleware));
+    app.use("/library", createLibraryRouter(authMiddleware, {
+        // Bridge change-feed writes onto the existing /ws fan-out so an open
+        // Decks / web client pulls the delta at once instead of waiting for its
+        // next 60 s poll (docs/decks/crate-sync-design.md, D7).
+        onChanged: (userId, rev) => {
+            broadcastToWsClients(JSON.stringify({ type: "library:changed", userId, rev, timestamp: Date.now() }));
+        },
+    }));
 
     // ─── OpenSubsonic API (ADR-0005) ─────────────────────────────────────
     //
