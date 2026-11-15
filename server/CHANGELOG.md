@@ -29,9 +29,11 @@ follow. No app reads it yet — the Decks desktop (phase 2) and the Compose / Sw
 	with a revision instead of "the whole list wins". Playlists keep their old behaviour.
 - **The hub tells open clients to pull at once** (`{"type":"library:changed","rev":…}` over the existing `/ws`).
 	Without the socket a client polls.
-- **The cue relay to the cloud is wired**, and the cloud `cuepoints` table gains an end column so a loop is one
-	row there too. The production migration for that column is authored
-	(`apps/web/drizzle/0032_cuepoints_end_ms.sql`) but is **not run yet** — it waits for a deliberate step.
+- **The cue relay to the cloud is wired**, and the cloud `cuepoints` table gained an end column so a loop is one
+	row there too. The production migration (`apps/web/drizzle/0032_cuepoints_end_ms.sql`) was run on 2026-11-15
+	with the owner's go-ahead: backed up first (schema, indexes, constraints and the data — the table was empty),
+	then the column added and the migration recorded in `_manual_migrations`, all in one transaction. Nothing was
+	pending afterwards.
 - **Fixed on the way:** the quick-hash backfill's SQL used a numbered parameter twice, which better-sqlite3
 	refuses; the backfill now binds named parameters. Found by running it against a real 17 000-track library.
 - New routes are in `openapi.yaml` (`openapi:check` and `openapi:lint` clean) with the Kotlin / Swift models and

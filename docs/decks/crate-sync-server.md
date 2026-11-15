@@ -25,7 +25,7 @@ Status: **built 2026-11-15** (server `3.17.0`). No app consumes it yet — the D
 | Hub event | `{"type":"library:changed","rev":…}` on `/ws` | `createLibraryRouter`'s `onChanged` |
 | Cloud relay | `library/cloud-feed.ts` → `cuepoints` | Loop end travels as ONE cloud row (`end_ms`) |
 | Cloud apply | `packages/db/src/sync-apply.ts` | `applyCuepointUpsert` now persists `endMs` |
-| Cloud migration | `apps/web/drizzle/0032_cuepoints_end_ms.sql` | **Authored, NOT run** — needs an explicit go-ahead |
+| Cloud migration | `apps/web/drizzle/0032_cuepoints_end_ms.sql` | **Run on production 2026-11-15** (owner-approved), after a backup |
 
 ### Track identity
 
@@ -88,8 +88,12 @@ The per-entity rules (section 5 of the design) are implemented and tested:
 
 ## What was NOT tested
 
-- **The cloud migration has not been run.** `0032_cuepoints_end_ms.sql` is authored and registered in the
-  journal; running it against production is a separate, deliberate step with a backup first.
+- **The cloud migration was run on production on 2026-11-15** with the owner's go-ahead: `cuepoints` was backed
+  up first (schema, indexes, constraints and the data — the table held 0 rows), then `end_ms` was added and the
+  migration recorded in `_manual_migrations`, in one transaction. Verified afterwards: the column exists and is
+  nullable, the tracker row is present, the row count and the unique index are unchanged, and no migration is
+  pending. The migration rolled out ahead of any writer, which is the safe order (the column waits unused until
+  an app relays a cue).
 - **No cloud round trip through a live Postgres.** The apply path is tested with the cloud's own unit-test
   harness (a stubbed Drizzle client), not against a real database.
 - **No app end to end.** Nothing reads `/library/changes` yet; the first real client is phase 2/4.
