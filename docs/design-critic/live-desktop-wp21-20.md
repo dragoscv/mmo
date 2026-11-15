@@ -105,31 +105,73 @@ and the bundle change are in `scripts/e2e-cloud/{run.mjs,vm-run.sh}` (commit `74
    it measures", which stopped being true in WP21-19 part 3 (measuring now refuses while the engine
    runs). Visible in the rendered Setup panel; both languages corrected.
 
-**Not visible in this pass, and still only code-level.** There is no Tauri runtime in a browser, so the
-app opens Setup and reports it (`errors.notTauri` toast, visible in both screenshots): there is no
-engine, no catalogue, no session state. Therefore the following are **still unseen on screen**: the
-**hero visual per effect** and the chain cards that carry them (the chain renders "Lanțul e gol"), the
-**pitch ribbon and spectrum with real data**, and the meters moving. Closing that needs a real desktop
-run, or a stub that feeds the console a synthetic session — a follow-up, not a claim.
+### Second rendered pass, with a session (`0a707a03` + `39c6be34`): **5 passed, exit 0**
+
+The first pass could only see an empty console, because a browser has no Tauri runtime: the app opens
+Setup and says so, and the chain renders "Lanțul e gol". So the console gained a **session fixture**
+(`lib/fixture.ts`, gated on the build-time `VITE_LIVE_FIXTURE` that only the cloud render mode sets —
+dead code in a real build), and the pass now sees the console **with data**:
+
+- **the hero visual per effect**: `svg[data-fx]` on every chain card, ≥ 9 of them for the fixture's
+   nine-insert preset, each with real geometry, ≥ 9 distinct effects drawn, none blank;
+- the **state reaching the UI**: the mix knob reports `-3 dB` through `aria-valuetext`, the setlist
+   panel reads `Warm up`;
+- the **ribbon and the spectrum with live frames**: at least three canvases carry ink (asserted by
+   reading the pixels), and the meters move.
+
+Seen on screen, then (screenshot `live-desktop-fixture-1280x720.png`): the tuner reads `A3` with
+`Țintă A3 · Corecție -10 ct`, the ribbon traces `A3 · 10 ¢`, the **spectrum draws its log axis and a
+band of content**, the meters show green bars, the preset row has `Pop Polish` lit with `96 BPM`, the
+setlist reads `CLUB SET / Warm up / Chorus · A minor · 96 BPM` with its parts, and the mix strip shows
+`Intrare 0 dB / Principal -3 dB / Monitor -6 dB / Monitor sec 20%` — i.e. exactly the fixture's state.
+
+**A third real defect, and the most instructive one.** The first pass reported "no serious or critical
+axe violation" — and that result was **vacuous**: the Setup dialog was open, Base UI marks the rest of
+the page inert, and axe therefore only scanned the dialog. Once Escape actually closed it (defect 1),
+axe saw the console and found **`button-name`: 9 nodes — every chain card's summary button had no
+accessible name**, because the parameter summary is empty whenever the catalogue is missing (a real
+state: `catalogueError`). Fixed with an explicit `aria-label` on that button (`ea465c50`). Both axe
+tests now pass **against the console itself**.
+
+**One design weakness the render showed, fixed** (`0a707a03`): the spectrum's floor was the engine's
+-90 dB, so ordinary material (the fixture's voice sits at -60…-45 dB) drew as a hairline. The desktop
+now rescales from **-70 dB**, where the same frames read as bars.
+
+Two harness defects surfaced and were fixed so the pass is repeatable: the bundle had to keep
+`apps/live/desktop` (`749da286`) and a cold pnpm store raced on parallel installs
+("failed to import …/…_pacquet-stage_…: No such file or directory"), now retried serially (`f6e5e9c5`).
+
+**Still unseen on screen** (stated, not implied): everything that needs the real engine — the meters'
+ballistics, the ribbon and spectrum driven by an actual voice, the hero visuals' contrast on stage, and
+the whole Tauri shell (window, installer, pairing QR). That is what the rig measurement with the owner
+is for.
 
 **Score, rendered (rubric /60; the cinematic criteria 3, 6, 8, 9, 10 are not applicable to a
 performance console and are scored 1-2 as the rubric demands, not by intent).**
 
-| | Code-level | Rendered |
-|---|---|---|
-| Craft (25) | 15 | **17** — composition and typography confirmed in pixels; "subject presence" is still the ribbon as a card, not a hero |
-| Game feel (25) | 7 | **7** — unchanged: no entrance, no living background, no morphing, by design |
-| Discipline (10) | 8 | **9** — axe clean and the overflow measured; the initial bundle is unchanged |
-| **Total** | 30/60 | **33/60** (≈ 33/42 on the criteria that apply) |
+| | Code-level | Rendered, empty | Rendered, with a session |
+|---|---|---|---|
+| Craft (25) | 15 | 17 | **19** — the populated screen reads as a console: hierarchy, the ribbon over the spectrum, the chain with a shape per card; "subject presence" is still a card, not a hero |
+| Game feel (25) | 7 | 7 | **8** — the ribbon and the meters are alive; no entrance, no morphing, by design |
+| Discipline (10) | 8 | 9 | **10** — axe clean *against the console*, the overflow measured, every interactive element named |
+| **Total** | 30/60 | 33/60 | **37/60** (≈ 37/42 on the criteria that apply to a performance console) |
 
-**Remaining prescriptions.**
+**Prescriptions from this pass, and their state.**
 
-1. `lib/` — a synthetic session fixture so the rendered pass can also *see* the chain, the hero visuals,
-   the ribbon and the spectrum with data (the one real gap in this pass).
-2. `components/Presets.tsx` — the Stage-mode recall row still shows a truncated `Salvează ca...` on a
-   narrow window in normal mode; check at 1280 px with a long preset list.
-3. `components/SafetyBar.tsx` — the `LIMITATOR` bar and its `0 dB` readout are the smallest type on the
-   screen; size them up one step so they read from a metre away on stage.
+1. ~~A session fixture so the rendered pass can see the chain, the visuals and the ribbon~~ — **done**
+   (`39c6be34`); the pass is now 5 tests and looked at the populated console.
+2. `components/Presets.tsx` — the preset row overflows to a horizontal scroll with six presets plus
+   `Salvează ca…`, and the `96 BPM` pill sits outside the scroll on its own. Checked at 1280 px in the
+   render: nothing is broken or clipped, so this is a **layout-preference** item, not a defect — the
+   pills scroll as designed. Left as is, recorded so it is not "found" again.
+3. ~~`LIMITATOR` type too small~~ — **done** (`39c6be34`): the label, the bar and the `0 dB` readout
+   each went one step up, and the render confirms they read at the same weight as the state chips.
+4. **New**: the spectrum's floor is now -70 dB for display; when the rig measurement lands, re-check it
+   against a real voice at stage level (a quiet passage should still be visible, a loud one must not
+   clip flat against the top).
+5. **New**: the fixture's synthetic session is the only session this pass has ever seen. A desktop run
+   on the owner's machine (or a captured real `state` frame) would let the pass check the visuals at
+   real parameter values, including extreme ones (a limiter at -12 dB, a fully wet reverb).
 
 ## User-intent gap
 

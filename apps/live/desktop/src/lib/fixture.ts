@@ -161,9 +161,12 @@ export function installFixture(set: (p: ProtocolState) => void): void {
                 let v = 0;
                 for (let h = 1; h <= 8; h++) {
                     const f = f0 * h;
-                    v += (30 / h) * Math.exp(-0.5 * (Math.log2(hz / f) / 0.09) ** 2);
+                    v += (72 / h) * Math.exp(-0.5 * (Math.log2(hz / f) / 0.09) ** 2);
                 }
-                v += 14 * Math.exp(-0.5 * (Math.log2(hz / 5000) / 0.6) ** 2) * (0.6 + 0.4 * Math.sin(t));
+                v += 34 * Math.exp(-0.5 * (Math.log2(hz / 5000) / 0.6) ** 2) * (0.6 + 0.4 * Math.sin(t));
+                // The byte scale is 0 = -90 dB, 255 = 0 dB: these coefficients put the peak around
+                // -15 dB and the high-frequency tail around -35 dB, which is where a healthy voice
+                // sits, so the rendered panels look like the real thing rather than a hairline.
                 bins[i] = Math.max(0, Math.min(255, Math.round(v)));
             }
             meterBus.publishSpectrum(bins);

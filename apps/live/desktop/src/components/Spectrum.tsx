@@ -14,8 +14,18 @@ import { useStore } from "../store";
 
 /** The engine's published bin count; a frame with another length is drawn as far as it goes. */
 const BINS = 128;
+/** The engine maps its bins from -90 dB, which is a wide, mostly empty range on screen. Drawn from
+ *  here up instead, so ordinary programme material reads as bars rather than a hairline (the
+ *  rendered pass showed a voice-like fixture sitting at -60..-45 dB and barely visible). */
+const FLOOR_DB = -70;
 /** Grid lines, in Hz: what a performer actually reads (100 Hz, 1 kHz, 10 kHz). */
 const GRID_HZ = [100, 1000, 10000];
+
+/** A published byte (0 = -90 dB, 255 = 0 dB) as the height of its bar, 0..1. */
+function barHeight(byte: number): number {
+    const db = (byte / 255) * 90 - 90;
+    return Math.max(0, Math.min(1, (db - FLOOR_DB) / -FLOOR_DB));
+}
 
 export function Spectrum() {
     const t = useT();
@@ -76,7 +86,7 @@ export function Spectrum() {
                 const x0 = xOf((i * nyquist()) / n, w);
                 const x1 = xOf(((i + 1) * nyquist()) / n, w);
                 const bar = Math.max(1, x1 - x0 - 1);
-                const v = (bins[i] ?? 0) / 255;
+                const v = barHeight(bins[i] ?? 0);
                 if (v <= 0) continue;
                 ctx.fillRect(x0, h - v * h, bar, v * h);
             }
