@@ -44,6 +44,21 @@ describe("the hero visual of an effect", () => {
         expect(withParam("reverb", "decay", 0.6).fills.length).toBe(1);
         expect(withParam("gate", "threshold", -40).hlines.length).toBe(1);
         expect(withParam("limiter", "ceiling", -3).hlines[0]?.tone).toBe("destructive");
+
+        // The filter's curve drops as the low cut rises; 24 dB/octave is steeper than 12. Both are
+        // read at the bottom of the axis (20 Hz), where the high-pass actually acts — the maximum of
+        // the curve is the flat passband either way.
+        const lowEnd = (s: Shape) => s.lines[0]?.points[0]?.[1] ?? 0;
+        expect(lowEnd(withParam("filter", "hpf_freq", 300))).toBeLessThan(lowEnd(withParam("filter", "hpf_freq", 60)));
+        expect(lowEnd(withParam("filter", "slope", 1))).toBeLessThan(lowEnd(withParam("filter", "slope", 0)));
+
+        // The character's band follows its mode, and the drive rule moves with `drive`.
+        const band = (mode: number) => shapeFor("character", (id, fb) => (id === "mode" ? mode : fb));
+        expect(nonEmpty(band(1))).toBe(true);
+        expect(JSON.stringify(band(1))).not.toBe(JSON.stringify(band(0)));
+        expect(withParam("character", "drive", 0).hlines.at(-1)?.y).toBeLessThan(
+            withParam("character", "drive", 1).hlines.at(-1)?.y ?? 0,
+        );
     });
 
     it("keeps every point inside the box", () => {

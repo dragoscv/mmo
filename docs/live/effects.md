@@ -95,6 +95,62 @@ magnitude response for UI curves.
 
 <!-- params:eq:end -->
 
+## filter
+
+The plain tone filter: a high-pass and a low-pass, each switchable, at 12 or 24 dB/octave. The 24 dB setting
+cascades two Butterworth sections (Q 0.5412 / 1.3066) rather than pushing one biquad's Q, so the corner stays
+flat where a resonance would be a colour. Defaults are the useful pair: a rumble cut at 80 Hz in, no hiss cut
+out. `response_db` exposes the magnitude response for UI curves (the effect's hero visual draws it). Below the
+24 dB/octave low-pass you have the shaping half of a telephone or a megaphone — see `character`, which is the
+same machinery with a mode switch.
+
+<!-- params:filter:start (generated from live-dsp/src/filter.rs SPECS; do not edit by hand) -->
+
+| # | Param id | Range | Default | Unit | Curve |
+|---|---|---|---|---|---|
+| 0 | `hpf_on` | 0 / 1 | on | on/off | — |
+| 1 | `hpf_freq` | 20 … 500 | 80 | Hz | log |
+| 2 | `lpf_on` | 0 / 1 | off | on/off | — |
+| 3 | `lpf_freq` | 1000 … 20000 | 12000 | Hz | log |
+| 4 | `slope` | 0 `12`, 1 `24` | 0 (`12`) | choice | — |
+| 5 | `q` | 0.5 … 4 | 0.707 | — | log |
+| 6 | `mix` | 0 … 1 | 1 | 0–1 | linear |
+
+<!-- params:filter:end -->
+
+## character
+
+The shapes a voice takes when it is not a voice. One effect rather than five, because every mode is the same
+three moves in different proportions: a band (how much of the spectrum survives), a drive (how hard the
+surviving part is pushed) and, for `robot`, a ring modulator. The band edges of each mode are asserted in the
+tests, so what the label promises is what the filter does.
+
+| Mode | Band | What else |
+|---|---|---|
+| `clean` | none | drive + tilt only |
+| `telephone` | 300 Hz … 3.4 kHz | — |
+| `megaphone` | 500 Hz … 4 kHz, resonant (Q 1.4) | harder drive |
+| `radio` | 300 Hz … 5 kHz | drive + tilt |
+| `lofi` | 300 Hz … 6 kHz | sample-and-hold (`grit`) |
+| `robot` | 200 Hz … 4 kHz | ring modulator at `rate` |
+
+The drive law is `tanh(x·k)/k`: **small-signal gain stays at unity**, so switching a mode does not jump in level
+(normalising by `tanh(k)` instead would add up to +10 dB to quiet material — a hidden fader, not a character).
+`tone` is a tilt around 1 kHz: a low shelf down and a high shelf up as it rises, and the reverse as it falls.
+
+<!-- params:character:start (generated from live-dsp/src/character.rs SPECS; do not edit by hand) -->
+
+| # | Param id | Range | Default | Unit | Curve |
+|---|---|---|---|---|---|
+| 0 | `mode` | 0 `clean`, 1 `telephone`, 2 `megaphone`, 3 `radio`, 4 `lofi`, 5 `robot` | 1 (`telephone`) | choice | — |
+| 1 | `drive` | 0 … 1 | 0.35 | 0–1 | linear |
+| 2 | `tone` | -1 … 1 | 0 | — | linear |
+| 3 | `rate` | 20 … 2000 | 60 | Hz | log |
+| 4 | `grit` | 0 … 1 | 0.5 | 0–1 | linear |
+| 5 | `mix` | 0 … 1 | 1 | 0–1 | linear |
+
+<!-- params:character:end -->
+
 ## deesser
 
 Sibilance detector (band-pass at `frequency`). In `split` mode a 4th-order Linkwitz-Riley crossover at

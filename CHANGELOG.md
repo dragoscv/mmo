@@ -38,6 +38,34 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — a tone filter and a character effect (WP21-21 part 1, 2026-11-15)
+
+Two effects the audit named as missing, both pure DSP with no new dependency, so the chain is 15 effects.
+
+**`filter`** is the plain pair every voice needs: a switchable high-pass and low-pass at 12 or 24 dB/octave.
+The 24 dB setting cascades two Butterworth sections (Q 0.5412 / 1.3066) rather than pushing one biquad's Q, so
+the corner stays flat where a resonance would be a colour. Defaults are the useful pair — a rumble cut at 80 Hz
+in, no hiss cut out.
+
+**`character`** is the shapes a voice takes when it is not a voice, as one effect rather than five: every mode
+is the same three moves in different proportions — a band, a drive and, for the robot, a ring modulator. Clean,
+telephone (300 Hz – 3.4 kHz), megaphone (500 Hz – 4 kHz, resonant), radio (300 Hz – 5 kHz), lo-fi (300 Hz –
+6 kHz with sample-and-hold `grit`) and robot (200 Hz – 4 kHz with a ring modulator at `rate`), plus a `tone`
+tilt around 1 kHz.
+
+The drive is `tanh(x·k)/k`, which keeps **small-signal gain at unity** — switching a mode does not jump in
+level. The first version normalised by `tanh(k)` instead and added about 10 dB to quiet material; a test
+(a low tone through the telephone band, which has to be rejected by more than 20 dB) caught it, and the law is
+now stated where it is applied.
+
+Both are in the chain, the settings and the generated effects tables, and both draw their own hero visual — the
+filter plots the response it actually applies (same RBJ coefficients), the character draws its mode's band with
+the drive as a rule. Labels are in EN and RO. Verified: 81 `live-dsp` tests with 13 new ones (each mode's
+promised band, 24 against 12 dB/octave, the low-pass only when enabled, the drive's unity gain, the robot
+changing the waveform, no mode running away, `mix` as bypass, no click while a corner sweeps), the whole engine
+workspace at fmt + clippy `-D warnings` + 238 tests, and the desktop at typecheck 0, 43 tests and a green
+production build.
+
 ## MixAI Live — the desktop console seen on screen, and three defects it caught (WP21-20 part 4, 2026-11-15)
 
 The console had only ever been read, never looked at. It now runs a **rendered** pass on the cloud browser

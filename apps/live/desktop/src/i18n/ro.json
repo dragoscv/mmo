@@ -259,7 +259,9 @@
         "delay": "Delay",
         "reverb": "Reverb",
         "limiter": "Limitator",
-        "tuner": "Acordor"
+        "tuner": "Acordor",
+        "filter": "Filtru",
+        "character": "Caracter"
     },
     "param": {
         "voice": "Vocea {{n}} · {{name}}",
@@ -330,7 +332,12 @@
         "time": "Timp",
         "tone": "Timbru",
         "transpose": "Transpunere",
-        "width": "Lățime"
+        "width": "Lățime",
+        "lpf_on": "Tăiere înalte",
+        "lpf_freq": "Frecv. tăiere înalte",
+        "slope": "Pantă",
+        "q": "Q",
+        "grit": "Asprime"
     },
     "choice": {
         "off": "Oprit",
@@ -343,7 +350,13 @@
         "chromatic": "Cromatic",
         "midi": "Notă MIDI",
         "auto": "Automat",
-        "on": "Pornit"
+        "on": "Pornit",
+        "clean": "Curat",
+        "telephone": "Telefon",
+        "megaphone": "Megafon",
+        "radio": "Radio",
+        "lofi": "Lo-fi",
+        "robot": "Robot"
     },
     "scale": {
         "chromatic": "Cromatică",

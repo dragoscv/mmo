@@ -38,6 +38,31 @@ function bell(f: number, freq: number, q: number, gain: number) {
     return gain * Math.exp(-0.5 * (oct / (1 / q)) ** 2);
 }
 
+/**
+ * One 2nd-order section's magnitude in dB at `f`, the way `biquad.rs` builds it (RBJ cookbook), so the
+ * drawn edge is the filter's own edge rather than a shape that merely resembles it.
+ */
+export function biquadDb(f: number, fc: number, high: boolean, q: number): number {
+    if (fc <= 0) return 0;
+    const r = f / fc;
+    const denom = (1 - r * r) ** 2 + (r / Math.max(q, 0.05)) ** 2;
+    const mag = (high ? r * r : 1) / Math.sqrt(Math.max(denom, 1e-12));
+    return 20 * Math.log10(Math.max(mag, 1e-6));
+}
+
+/** Butterworth Q of a 4th-order cascade (two cascaded sections), as the engine's 24 dB setting uses. */
+const BUTTER_Q = [0.5412, 1.3066];
+
+/** The band each `character` mode keeps: (high-pass Hz, low-pass Hz), matching `character.rs`. */
+const CHARACTER_BANDS: [number, number][] = [
+    [20, 20000],
+    [300, 3400],
+    [500, 4000],
+    [300, 5000],
+    [300, 6000],
+    [200, 4000],
+];
+
 export function shapeFor(fx: string, p: ParamReader): Shape {
     const s = shape();
     const hz = (i: number) => 20 * 2 ** ((i / 32) * Math.log2(20000 / 20)); // log axis, 20 Hz .. 20 kHz
@@ -82,6 +107,42 @@ export function shapeFor(fx: string, p: ParamReader): Shape {
             line(s, [[0, 0], [knee, knee], [100, clamp(knee + (100 - knee) / ratio)]], "primary");
             line(s, [[0, 0], [100, 100]], "muted", 1, true);
             s.hlines.push({ y: knee, tone: "warning", dashed: true });
+            break;
+        }
+        case "filter": {
+            const fourth = p("slope", 0) >= 0.5;
+            const qs = fourth ? BUTTER_Q : [Math.max(0.5, p("q", 0.707))];
+            const hpf = p("hpf_on", 1) >= 0.5;
+            const lpf = p("lpf_on", 0) >= 0.5;
+            const pts: [number, number][] = xs().map((x, i) => {
+                const f = hz(i);
+                let db = 0;
+                for (const q of qs) {
+                    if (hpf) db += biquadDb(f, p("hpf_freq", 80), true, q);
+                    if (lpf) db += biquadDb(f, p("lpf_freq", 12000), false, q);
+                }
+                return [x, clamp(58 + db * 1.5, 3, 97)] as [number, number];
+            });
+            s.hlines.push({ y: 58, tone: "muted", dashed: true });
+            line(s, pts, "primary");
+            break;
+        }
+        case "character": {
+            const mode = Math.round(clamp(p("mode", 1), 0, CHARACTER_BANDS.length - 1));
+            const [lo, hi] = CHARACTER_BANDS[mode] ?? CHARACTER_BANDS[0]!;
+            // The megaphone is the resonant one.
+            const q = mode === 2 ? 1.4 : 0.707;
+            const pts: [number, number][] = xs().map((x, i) => {
+                const f = hz(i);
+                let db = 0;
+                if (lo > 20) db += biquadDb(f, lo, true, q);
+                if (hi < 20000) db += biquadDb(f, hi, false, q);
+                return [x, clamp(58 + db * 1.5, 3, 97)] as [number, number];
+            });
+            s.hlines.push({ y: 58, tone: "muted", dashed: true });
+            line(s, pts, "primary");
+            // The drive, as a rule: harder drive sits higher.
+            s.hlines.push({ y: clamp(12 + clamp(p("drive", 0.35), 0, 1) * 74), tone: "warning", dashed: true });
             break;
         }
         case "autotune": {

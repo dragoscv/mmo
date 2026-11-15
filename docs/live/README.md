@@ -13,8 +13,9 @@ A singer plugs a microphone into an audio interface, runs `mixai-live-engine`, a
 the in-ear monitor while the same voice (optionally with a different dry/wet balance) goes to the PA, stream
 or recording:
 
-- 13 built-in effects — gate, EQ, de-esser, compressor, pitch correction, harmonizer, saturator, doubler,
-  chorus, delay, reverb, limiter, tuner — allocation-free on the audio thread ([effects](effects.md)).
+- 15 built-in effects — gate, EQ, tone filter, character (telephone/megaphone/radio/lo-fi/robot), de-esser,
+  compressor, pitch correction, harmonizer, saturator, doubler, chorus, delay, reverb, limiter, tuner —
+  allocation-free on the audio thread ([effects](effects.md)).
 - 7 factory presets, user presets, songs with parts and setlists in a JSON format ([presets](presets.md)).
 - Two output buses: **main** (FOH / stream) and **monitor** (in-ear) with a dry blend for the singer.
 - Click-free scene/preset changes: the previous chain's reverb/delay tail rings out.

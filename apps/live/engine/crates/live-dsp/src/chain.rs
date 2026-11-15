@@ -1,9 +1,11 @@
 //! Effect registry and the insert chain run by the engine.
 
+use crate::character::Character;
 use crate::color::Saturator;
 use crate::delay::Delay;
 use crate::dynamics::{Compressor, DeEsser, Gate, Limiter};
 use crate::eq::Eq;
+use crate::filter::Filter;
 use crate::modulation::{Chorus, Doubler};
 use crate::param::{ParamSpec, Smoothed, param_index};
 use crate::processor::Processor;
@@ -18,6 +20,8 @@ pub enum FxKind {
     Limiter,
     DeEsser,
     Eq,
+    Filter,
+    Character,
     Saturator,
     Doubler,
     Chorus,
@@ -29,9 +33,11 @@ pub enum FxKind {
 }
 
 impl FxKind {
-    pub const ALL: [FxKind; 13] = [
+    pub const ALL: [FxKind; 15] = [
         FxKind::Gate,
         FxKind::Eq,
+        FxKind::Filter,
+        FxKind::Character,
         FxKind::DeEsser,
         FxKind::Compressor,
         FxKind::Autotune,
@@ -52,6 +58,8 @@ impl FxKind {
             FxKind::Limiter => "limiter",
             FxKind::DeEsser => "deesser",
             FxKind::Eq => "eq",
+            FxKind::Filter => "filter",
+            FxKind::Character => "character",
             FxKind::Saturator => "saturator",
             FxKind::Doubler => "doubler",
             FxKind::Chorus => "chorus",
@@ -75,6 +83,8 @@ impl FxKind {
             FxKind::Limiter => Box::new(Limiter::new(sample_rate)),
             FxKind::DeEsser => Box::new(DeEsser::new(sample_rate)),
             FxKind::Eq => Box::new(Eq::new(sample_rate)),
+            FxKind::Filter => Box::new(Filter::new(sample_rate)),
+            FxKind::Character => Box::new(Character::new(sample_rate)),
             FxKind::Saturator => Box::new(Saturator::new(sample_rate)),
             FxKind::Doubler => Box::new(Doubler::new(sample_rate)),
             FxKind::Chorus => Box::new(Chorus::new(sample_rate)),

@@ -259,7 +259,9 @@
         "delay": "Delay",
         "reverb": "Reverb",
         "limiter": "Limiter",
-        "tuner": "Tuner"
+        "tuner": "Tuner",
+        "filter": "Filter",
+        "character": "Character"
     },
     "param": {
         "voice": "Voice {{n}} · {{name}}",
@@ -330,7 +332,12 @@
         "time": "Time",
         "tone": "Tone",
         "transpose": "Transpose",
-        "width": "Width"
+        "width": "Width",
+        "lpf_on": "High cut",
+        "lpf_freq": "High cut freq",
+        "slope": "Slope",
+        "q": "Q",
+        "grit": "Grit"
     },
     "choice": {
         "off": "Off",
@@ -343,7 +350,13 @@
         "chromatic": "Chromatic",
         "midi": "MIDI note",
         "auto": "Auto",
-        "on": "On"
+        "on": "On",
+        "clean": "Clean",
+        "telephone": "Telephone",
+        "megaphone": "Megaphone",
+        "radio": "Radio",
+        "lofi": "Lo-fi",
+        "robot": "Robot"
     },
     "scale": {
         "chromatic": "Chromatic",

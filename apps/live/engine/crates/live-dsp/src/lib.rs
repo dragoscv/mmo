@@ -10,12 +10,14 @@
 
 pub mod biquad;
 pub mod chain;
+pub mod character;
 pub mod color;
 pub mod delay;
 pub mod delay_line;
 pub mod denormal;
 pub mod dynamics;
 pub mod eq;
+pub mod filter;
 pub mod modulation;
 pub mod param;
 pub mod pitch;
