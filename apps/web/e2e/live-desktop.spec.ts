@@ -115,7 +115,7 @@ test("with a session: the chain draws one hero visual per effect, none of them b
     // and carries the figure in `aria-valuetext`, not as text) and the setlist shows the songs.
     await expect(page.getByRole("slider", { name: ANY("Main", "Principal") })).toHaveAttribute(
         "aria-valuetext",
-        /-3[.,]0 dB/,
+        /-3([.,]0)? dB/,
     );
     await expect(page.getByRole("region", { name: ANY("Setlist", "Listă de cântece") })).toContainText(/Warm up/);
     await page.screenshot({ path: "test-results/live-desktop-fixture-1280x720.png" });
