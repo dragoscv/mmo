@@ -1,8 +1,9 @@
-# Design review — MixAI Live desktop, "Stage Console" first slice (WP21-20)
+# Design review — MixAI Live desktop, "Stage Console" (WP21-20)
 
-CODE-LEVEL REVIEW. No rendered screenshot: browser rendering and screenshots on this machine are
-cloud-only by policy, so this scores the source and the layout maths, not pixels. A rendered pass is
-still owed (see "Still owed").
+Two passes: a **code-level** one (scoring the source and the layout maths) and, added 2026-11-14, a
+**RENDERED** one on the cloud browser runner — `pnpm e2e:cloud --target vm-live`, 3 Playwright tests
+at 1280x720 against the app's own production build, with axe. The rendered pass is the one that
+counts; the code-level score below is kept because it is what the prescriptions came from.
 
 Scope reviewed: `apps/live/desktop/src/App.tsx`, `components/SafetyBar.tsx`, `components/PitchRibbon.tsx`,
 `components/MixStrip.tsx`, `components/Header.tsx`, `components/Tuner.tsx`, `lib/palette.ts`.
@@ -65,6 +66,70 @@ ring, the FFT runs on the engine's control thread — drawn on a log frequency a
 curve, the EQ's response, the de-esser's notch, the delay's taps, the reverb's decay, the limiter's ceiling … one
 shape per effect, driven by the insert's parameters, in the insert panel and small on each chain card). Both are
 unit-tested for geometry rather than looked at, which is the same caveat as above.
+
+---
+
+## RENDERED PASS (2026-11-14, cloud runner, the one that counts)
+
+`pnpm e2e:cloud --target vm-live` — the desktop app's own `pnpm build` served by `vite preview` on an
+ephemeral GCE spot VM, with Playwright + axe. **3 passed, exit 0**, 25 s, ~$0.001. Artifacts:
+`.copilot-tmp/e2e-live/out/test-results/live-desktop-{1280x720,stage-1280x720}.png` (screenshots were
+brought back and looked at) and `pw-results.json`. Spec: `apps/web/e2e/live-desktop.spec.ts`; the mode
+and the bundle change are in `scripts/e2e-cloud/{run.mjs,vm-run.sh}` (commit `749da286`).
+
+**What the rendered screen confirms.**
+
+- The console lays out at its target size with **no horizontal overflow** (measured, not eyeballed) and
+  **no page error**, and ships both languages (`document.title` = MixAI; the runner rendered RO).
+- The **safety bar** is on screen in both modes: `CURAT` / `MOTOR OPRIT` badges, the engine status, and
+  `LIMITATOR 0 dB` reading through a real `role="meter"`. The header also offers `Scenă` / `Ieși din
+  scenă` (Stage / Exit stage, i.e. `aria-pressed` works).
+- The **spine of direction A** is visible and in the intended order: level meters left, the tuner strip
+  and the **pitch ribbon** (with its in-tune bands) in the middle column, **SPECTRU** directly under it
+  with its 100 / 1k / 10k log marks, the setlist panel right, and the mix strip at the bottom (Intrare /
+  Principal / Monitor / Monitor sec, `Urechi netunate`, `Panică`, `Ocolire`, `Mut`).
+- **Stage mode** removes the chain and the setlist editing and keeps the safety bar, the ribbon, the
+  spectrum and the mix — seen in the second screenshot, and asserted (the chain region goes from present
+  to absent and back).
+- **axe reports no serious or critical violation** (WCAG 2.0/2.1 A + AA tags) on the console.
+
+**Two real defects the render caught — both fixed the same hour (`67764bbe`).**
+
+1. **Escape was a no-op after entering Stage mode.** The dialog's own handler and the app's window-level
+   shortcut ran in an order that could lose the key, so the console stayed in Stage mode with a dialog
+   that reopened: `expect(Chain).toBeVisible()` after Escape failed, twice (both attempts, 5 s each). The
+   handler now closes an open panel itself, so the outcome no longer depends on listener order. This is
+   exactly the class of bug the source review cannot see, and it was the only failing assertion — the
+   first cloud run was 2 passed / 1 failed.
+2. **Stale copy on the measure button**: `setup.measureHint` still promised "The live engine stops while
+   it measures", which stopped being true in WP21-19 part 3 (measuring now refuses while the engine
+   runs). Visible in the rendered Setup panel; both languages corrected.
+
+**Not visible in this pass, and still only code-level.** There is no Tauri runtime in a browser, so the
+app opens Setup and reports it (`errors.notTauri` toast, visible in both screenshots): there is no
+engine, no catalogue, no session state. Therefore the following are **still unseen on screen**: the
+**hero visual per effect** and the chain cards that carry them (the chain renders "Lanțul e gol"), the
+**pitch ribbon and spectrum with real data**, and the meters moving. Closing that needs a real desktop
+run, or a stub that feeds the console a synthetic session — a follow-up, not a claim.
+
+**Score, rendered (rubric /60; the cinematic criteria 3, 6, 8, 9, 10 are not applicable to a
+performance console and are scored 1-2 as the rubric demands, not by intent).**
+
+| | Code-level | Rendered |
+|---|---|---|
+| Craft (25) | 15 | **17** — composition and typography confirmed in pixels; "subject presence" is still the ribbon as a card, not a hero |
+| Game feel (25) | 7 | **7** — unchanged: no entrance, no living background, no morphing, by design |
+| Discipline (10) | 8 | **9** — axe clean and the overflow measured; the initial bundle is unchanged |
+| **Total** | 30/60 | **33/60** (≈ 33/42 on the criteria that apply) |
+
+**Remaining prescriptions.**
+
+1. `lib/` — a synthetic session fixture so the rendered pass can also *see* the chain, the hero visuals,
+   the ribbon and the spectrum with data (the one real gap in this pass).
+2. `components/Presets.tsx` — the Stage-mode recall row still shows a truncated `Salvează ca...` on a
+   narrow window in normal mode; check at 1280 px with a long preset list.
+3. `components/SafetyBar.tsx` — the `LIMITATOR` bar and its `0 dB` readout are the smallest type on the
+   screen; size them up one step so they read from a metre away on stage.
 
 ## User-intent gap
 

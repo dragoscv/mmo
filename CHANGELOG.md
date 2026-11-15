@@ -38,6 +38,34 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
+## MixAI Live — the desktop console seen on screen, and two defects it caught (WP21-20 part 4, 2026-11-14)
+
+The console had only ever been read, never looked at. It now runs a **rendered** pass on the cloud browser
+runner — `pnpm e2e:cloud --target vm-live`, which ships and serves the desktop app's own production build on an
+ephemeral GCE spot VM and drives it with Playwright + axe at 1280x720 (3 tests, ~25 s, about a tenth of a cent).
+The harness gained that target: `apps/live/desktop` is now kept in the bundle (it has no workspace deps of its
+own) and built and served there.
+
+What it confirmed: the layout at its target size with **no horizontal overflow** (measured) and no page error;
+the **safety bar** in both modes with the limiter read through a real `role="meter"`; the **pitch ribbon** and
+the **spectrum** in the middle column in the intended order, with the setlist right and the mix strip at the
+bottom; **Stage mode** removing the chain and the setlist while keeping the safety bar, the ribbon, the spectrum
+and the mix; and **no serious or critical axe violation**.
+
+What it caught, both fixed the same hour (commit `67764bbe`):
+
+- **Escape was a no-op after entering Stage mode.** The dialog's own Escape handler and the app's window-level
+  shortcut could run in either order and lose the key, so the console stayed in Stage mode while a dialog
+  reopened — the failure was the only failing assertion of the first run. The shortcut handler now closes an
+  open panel itself, so the outcome no longer depends on listener order.
+- The measure button still said "the live engine stops while it measures", which stopped being true when
+  measuring learned to refuse while the engine runs (WP21-19 part 3). Both languages corrected.
+
+Stated plainly: without a Tauri runtime the app opens Setup and says so, so the **hero visual per effect**, the
+chain cards that carry them, and the ribbon and spectrum **with real data** are still unseen — that needs a
+desktop run or a synthetic session fixture. The rendered review (score, evidence and the remaining
+prescriptions) is in `docs/design-critic/live-desktop-wp21-20.md`.
+
 ## MixAI Live — every effect draws its own shape (WP21-20 part 3, 2026-11-14)
 
 The chain used to be a list of names with a gain-reduction bar. Each effect now has a **hero visual**: its own
