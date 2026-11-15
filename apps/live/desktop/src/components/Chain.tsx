@@ -64,7 +64,15 @@ function Card({ insert, index, count, onMove }: { insert: InsertState; index: nu
                     onCheckedChange={(on) => send({ type: "set_enabled", insert: insert.id, on })}
                 />
             </div>
-            <button type="button" tabIndex={-1} className="min-h-0 flex-1 text-left" onClick={() => select(selected ? null : insert.id)}>
+            {/* `aria-label`: the summary can be empty (no catalogue), and the visual is decorative — the
+                button would otherwise have no accessible name (axe `button-name`). */}
+            <button
+                type="button"
+                tabIndex={-1}
+                aria-label={name}
+                className="min-h-0 flex-1 text-left"
+                onClick={() => select(selected ? null : insert.id)}
+            >
                 <div className="flex h-full flex-col gap-1">
                     {/* The effect's own shape at its current settings, small; the parameters below. */}
                     <div className="h-8 w-full opacity-80">

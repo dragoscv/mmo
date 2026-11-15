@@ -112,7 +112,8 @@ test("with a session: the chain draws one hero visual per effect, none of them b
     expect(new Set(drawn.map((d) => d.fx)).size, "distinct effects drawn").toBeGreaterThanOrEqual(9);
 
     // The mix the fixture set is what the strip shows, so the state really reached the UI.
-    await expect(page.getByText(/\s-\s?3(\.0)? dB/).first()).toBeVisible();
+    // `formatValue` renders dB as `-3.0 dB` (and a locale may use a comma).
+    await expect(page.getByText(/-3[.,]0 dB/).first()).toBeVisible();
     await page.screenshot({ path: "test-results/live-desktop-fixture-1280x720.png" });
 
     // And the panels that need live frames are drawn: the ribbon and spectrum canvases have ink.
