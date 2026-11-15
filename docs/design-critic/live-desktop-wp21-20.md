@@ -69,7 +69,7 @@ unit-tested for geometry rather than looked at, which is the same caveat as abov
 
 ---
 
-## RENDERED PASS (2026-11-14, cloud runner, the one that counts)
+## RENDERED PASS (2026-11-15, cloud runner, the one that counts)
 
 `pnpm e2e:cloud --target vm-live` — the desktop app's own `pnpm build` served by `vite preview` on an
 ephemeral GCE spot VM, with Playwright + axe. **3 passed, exit 0**, 25 s, ~$0.001. Artifacts:
@@ -105,7 +105,7 @@ and the bundle change are in `scripts/e2e-cloud/{run.mjs,vm-run.sh}` (commit `74
    it measures", which stopped being true in WP21-19 part 3 (measuring now refuses while the engine
    runs). Visible in the rendered Setup panel; both languages corrected.
 
-### Second rendered pass, with a session (`0a707a03` + `39c6be34`): **5 passed, exit 0**
+### Second rendered pass, with a session (`39c6be34` … `d79b3f05`): **5 passed, exit 0**
 
 The first pass could only see an empty console, because a browser has no Tauri runtime: the app opens
 Setup and says so, and the chain renders "Lanțul e gol". So the console gained a **session fixture**
@@ -133,7 +133,7 @@ accessible name**, because the parameter summary is empty whenever the catalogue
 state: `catalogueError`). Fixed with an explicit `aria-label` on that button (`ea465c50`). Both axe
 tests now pass **against the console itself**.
 
-**One design weakness the render showed, fixed** (`0a707a03`): the spectrum's floor was the engine's
+**One design weakness the render showed, fixed** (`d79b3f05`): the spectrum's floor was the engine's
 -90 dB, so ordinary material (the fixture's voice sits at -60…-45 dB) drew as a hairline. The desktop
 now rescales from **-70 dB**, where the same frames read as bars.
 

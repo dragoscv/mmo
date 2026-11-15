@@ -38,13 +38,13 @@ the landing and a product host, the Decks page's open middle zone, pointer paral
 fixed Maestro button over the cards at 390 px are open, in `docs/design-critic/wp22-brand.md`. Reduced motion
 leaves 0 animations running and axe reports no serious or critical violation on either page in either theme.
 
-## MixAI Live — the desktop console seen on screen, and two defects it caught (WP21-20 part 4, 2026-11-14)
+## MixAI Live — the desktop console seen on screen, and three defects it caught (WP21-20 part 4, 2026-11-15)
 
 The console had only ever been read, never looked at. It now runs a **rendered** pass on the cloud browser
 runner — `pnpm e2e:cloud --target vm-live`, which ships and serves the desktop app's own production build on an
-ephemeral GCE spot VM and drives it with Playwright + axe at 1280x720 (3 tests, ~25 s, about a tenth of a cent).
-The harness gained that target: `apps/live/desktop` is now kept in the bundle (it has no workspace deps of its
-own) and built and served there.
+ephemeral GCE spot VM and drives it with Playwright + axe at 1280x720 (a run is ~26 s and about a tenth of a
+cent). The harness gained that target: `apps/live/desktop` is now kept in the bundle (it has no workspace deps
+of its own) and built and served there.
 
 What it confirmed: the layout at its target size with **no horizontal overflow** (measured) and no page error;
 the **safety bar** in both modes with the limiter read through a real `role="meter"`; the **pitch ribbon** and
@@ -52,7 +52,7 @@ the **spectrum** in the middle column in the intended order, with the setlist ri
 bottom; **Stage mode** removing the chain and the setlist while keeping the safety bar, the ribbon, the spectrum
 and the mix; and **no serious or critical axe violation**.
 
-What it caught, both fixed the same hour (commit `67764bbe`):
+What it caught on the first run, both fixed the same hour (commit `67764bbe`):
 
 - **Escape was a no-op after entering Stage mode.** The dialog's own Escape handler and the app's window-level
   shortcut could run in either order and lose the key, so the console stayed in Stage mode while a dialog
@@ -61,12 +61,31 @@ What it caught, both fixed the same hour (commit `67764bbe`):
 - The measure button still said "the live engine stops while it measures", which stopped being true when
   measuring learned to refuse while the engine runs (WP21-19 part 3). Both languages corrected.
 
-Stated plainly: without a Tauri runtime the app opens Setup and says so, so the **hero visual per effect**, the
-chain cards that carry them, and the ribbon and spectrum **with real data** are still unseen — that needs a
-desktop run or a synthetic session fixture. The rendered review (score, evidence and the remaining
-prescriptions) is in `docs/design-critic/live-desktop-wp21-20.md`.
+A browser has no Tauri runtime, so the first pass could only ever see an empty console (the app opens Setup and
+says so, and the chain reads "the chain is empty"). The console therefore gained a **synthetic session fixture**
+(`lib/fixture.ts`, gated on a build-time flag only the render mode sets, so it is dead code in a real build) and
+the pass now checks the console **with data**: **5 tests, exit 0**. It finally saw what reading the source could
+not — **the hero visual per effect** (`svg[data-fx]` on every chain card, nine distinct effects drawn), the
+**ribbon and the spectrum with live frames** (asserted by reading the canvas pixels) and the meters moving, and
+state reaching the UI (the mix knob reports `-3 dB` through `aria-valuetext`, the setlist reads `Warm up`).
 
-## MixAI Live — every effect draws its own shape (WP21-20 part 3, 2026-11-14)
+**The third defect is the instructive one: the first pass's axe result was vacuous.** With the Setup dialog open,
+Base UI marks the rest of the page inert, so axe had only scanned the dialog. Once Escape genuinely closed it, axe
+found `button-name` on **nine chain-card buttons**, whose parameter summary is empty whenever the catalogue is
+missing — a state that really occurs. Fixed with an explicit `aria-label` (`ea465c50`); both axe tests now pass
+**against the console itself**. One design weakness the render showed was fixed too (`d79b3f05`): the spectrum drew
+from the engine's -90 dB floor, so ordinary material came out as a hairline — it now rescales from -70 dB. And two
+harness defects were fixed so the pass repeats (a cold pnpm store raced on parallel installs; it is retried
+serially now).
+
+Rendered score **37/60** (craft 19, game feel 8, discipline 10; the five cinematic criteria are not applicable to
+a console), up from 33/60 on the empty console and 30/60 read from the source. Still unseen, and stated as such:
+everything needing the real engine — meters ballistics, the ribbon and spectrum driven by an actual voice, the
+visuals' contrast at stage level — and the whole Tauri shell (window, installer, pairing QR), which is what the rig
+measurement with the owner is for. The review, its evidence and the remaining prescriptions are in
+`docs/design-critic/live-desktop-wp21-20.md`.
+
+## MixAI Live — every effect draws its own shape (WP21-20 part 3, 2026-11-15)
 
 The chain used to be a list of names with a gain-reduction bar. Each effect now has a **hero visual**: its own
 drawing, at its current settings, in the insert panel and small on every card in the chain. The gate shows its
@@ -84,7 +103,7 @@ compressor's rule with `threshold`, the EQ curve with a band gain, the delay's t
 limiter's ceiling), and every point stays inside the box. Desktop typecheck 0, 43 tests, i18n parity 329 keys,
 production build green.
 
-## MixAI Live — the engine has a spectrum now (WP21-20 part 2, 2026-11-14)
+## MixAI Live — the engine has a spectrum now (WP21-20 part 2, 2026-11-15)
 
 The spectrum on the performance screen is the engine's own analysis, not a guess made in the browser. The output
 callback only **copies** the mono main bus into one more lock-free ring — the audio thread never runs the maths —
@@ -102,7 +121,7 @@ in bin 0; the FFT of an impulse is flat; the UI's frequency scale agrees with th
 4 kHz; and the whole tap → drain → FFT → frame path runs on the simulated device. Engine workspace 225 tests,
 clippy `-D warnings` clean; desktop typecheck 0, 39 tests, i18n parity 329 keys, production build green.
 
-## MixAI Live — pairing is per device, and one lost phone can be revoked (WP21-19 part 5, 2026-11-14)
+## MixAI Live — pairing is per device, and one lost phone can be revoked (WP21-19 part 5, 2026-11-15)
 
 Pairing used to hand out **one token per role**: every phone scanning the performer code shared it, so the only
 way to unpair a lost one was to rotate the whole role — which re-paired the entire band. The engine now keeps
