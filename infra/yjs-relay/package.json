@@ -7,13 +7,13 @@
     "dev": "wrangler dev"
   },
   "dependencies": {
-    "lib0": "^0.2.99",
+    "lib0": "^0.2.120",
     "y-protocols": "^1.0.6",
     "yjs": "^13.6.20"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261108.1",
+    "@cloudflare/workers-types": "^5.20261113.1",
     "typescript": "^7.0.2",
-    "wrangler": "^4.158.0"
+    "wrangler": "^4.162.0"
   }
 }
