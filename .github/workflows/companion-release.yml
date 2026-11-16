@@ -352,4 +352,7 @@ jobs:
             server/release/*.rpm
             server/release/latest*.yml
           if-no-files-found: warn
-          retention-days: 14
+          # 1 GB per OS per run: 14 days of these was the single largest consumer
+          # of the account's Actions artifact storage (20.8 GB in dragoscv/mmo on
+          # 2026-11-16, which blocked every artifact upload in the org).
+          retention-days: 7
