@@ -72,7 +72,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                     setActive(null);
                 } else if (p.status === "error") {
                     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-                    toast.error("Scan failed on companion");
+                    toast.error("Scan failed on the server");
                     setActive(null);
                 }
             }, 1500);
@@ -95,7 +95,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                         .join(" · "),
                 });
                 if (skipped.length === r.results.length && r.totalPruned === 0) {
-                    toast.message("Nothing pruned", { description: "All online companions were skipped or already in sync." });
+                    toast.message("Nothing pruned", { description: "All online servers were skipped or already in sync." });
                 }
             } finally {
                 setReconciling(false);
@@ -126,7 +126,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {c.error && (
-                            <p className="text-sm text-amber-500">Could not reach companion: {c.error} (showing cached folders)</p>
+                            <p className="text-sm text-amber-500">Could not reach the server: {c.error} (showing cached folders)</p>
                         )}
                         {c.folders.length > 0 ? (
                             c.folders.map((f) => {
@@ -145,7 +145,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                                             size="sm"
                                             onClick={() => runScan(c.deviceId, f.path, f.kind)}
                                             disabled={busy || !c.online}
-                                            title={!c.online ? "Companion offline" : undefined}
+                                            title={!c.online ? "Server offline" : undefined}
                                         >
                                             {isActive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2 h-4 w-4" />}
                                             {isActive ? "Scanning…" : "Scan"}
@@ -155,7 +155,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                             })
                         ) : (
                             <p className="text-sm text-[var(--muted-foreground)]">
-                                No folders configured on this companion. Add one from the Devices page.
+                                No folders configured on this server. Add one from the Devices page.
                             </p>
                         )}
                     </CardContent>
@@ -207,7 +207,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-[var(--muted-foreground)]">
                         Prune cloud tracks whose files no longer exist on an online
-                        companion. Offline companions and empty libraries are never pruned.
+                        server. Offline servers and empty libraries are never pruned.
                     </p>
                     <Button variant="outline" onClick={runReconcile} disabled={reconciling || busy}>
                         {reconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
@@ -218,7 +218,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
 
             {!active && !isPending && (
                 <p className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
-                    <CheckCircle className="h-3.5 w-3.5" /> Scans run on the companion machine; files are read locally and ingested into your library.
+                    <CheckCircle className="h-3.5 w-3.5" /> Scans run on the server; files are read locally and ingested into your library.
                 </p>
             )}
         </div>

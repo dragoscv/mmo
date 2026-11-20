@@ -136,13 +136,13 @@ export function VoiceWizardClient({ snapshot }: { snapshot: VoiceWizardSnapshot 
             <div className="mx-auto max-w-3xl p-6">
                 <h1 className="text-3xl font-semibold tracking-tight">Voice Wizard</h1>
                 <p className="text-muted-foreground mt-2">
-                    Voice cloning runs entirely on your own computer through the MixAI
-                    Companion app. Pair this browser with a companion to continue.
+                    Voice cloning runs entirely on your own computer through MixAI
+                    Server. Pair this browser with your server to continue.
                 </p>
                 <Card className="mt-6 p-6">
-                    <h2 className="text-lg font-medium">No companion paired</h2>
+                    <h2 className="text-lg font-medium">No server paired</h2>
                     <p className="text-sm text-muted-foreground mt-2">
-                        Open the companion app and pair this browser from Settings →
+                        Open MixAI Server and pair this browser from Settings →
                         Devices. Once paired, this page will detect the local sidecar
                         and let you train a new voice.
                     </p>
@@ -188,7 +188,7 @@ export function VoiceWizardClient({ snapshot }: { snapshot: VoiceWizardSnapshot 
                 </Button>
                 {!snap.canTrain && (
                     <span className="text-xs text-amber-500 ml-2">
-                        No voice engine detected. On the companion machine run:&nbsp;
+                        No voice engine detected. On the server machine run:&nbsp;
                         <code className="rounded bg-muted px-1.5 py-0.5">pip install coqui-tts soundfile numpy librosa</code>
                     </span>
                 )}
@@ -305,12 +305,12 @@ function VoiceCard({ voice, onChange }: { voice: VoiceMeta; onChange: () => void
     }, [voice.id, voice.name, name, onChange]);
 
     const remove = useCallback(async () => {
-        if (!confirm(`Delete voice "${voice.name}"? Reference clip and samples are removed from your companion.`)) return;
+        if (!confirm(`Delete voice "${voice.name}"? Reference clip and samples are removed from your server.`)) return;
         setBusy(true);
         try {
             const ok = await deleteClonedVoice(voice.id);
             if (ok) onChange();
-            else toast.error("Failed to delete voice on companion.");
+            else toast.error("Failed to delete voice on the server.");
         } catch (e) {
             toast.error(e instanceof Error ? e.message : String(e));
         } finally {
@@ -333,7 +333,7 @@ function VoiceCard({ voice, onChange }: { voice: VoiceMeta; onChange: () => void
                 toast.success(`Added ${stagedIds.length} sample${stagedIds.length === 1 ? "" : "s"}.`);
                 onChange();
             } else {
-                toast.error("Companion rejected the append.");
+                toast.error("Server rejected the append.");
             }
         } catch (e) {
             toast.error(e instanceof Error ? e.message : String(e));
@@ -351,7 +351,7 @@ function VoiceCard({ voice, onChange }: { voice: VoiceMeta; onChange: () => void
                 toast.success("Reference clip updated.");
                 onChange();
             } else {
-                toast.error("Failed to set reference on companion.");
+                toast.error("Failed to set reference on the server.");
             }
         } catch (e) {
             toast.error(e instanceof Error ? e.message : String(e));
@@ -505,7 +505,7 @@ function NewVoiceWizard({ availableEngines, onSaved }: { availableEngines: { xtt
                     intent: clip.promptIntent,
                 });
                 if (!analysis) {
-                    setAnalyses((prev) => ({ ...prev, [clip.stagedId]: { loading: false, error: "Companion unreachable" } }));
+                    setAnalyses((prev) => ({ ...prev, [clip.stagedId]: { loading: false, error: "Server unreachable" } }));
                     return;
                 }
                 setAnalyses((prev) => ({
@@ -1518,7 +1518,7 @@ function PitchCoverageBlock({ stagedIds }: { stagedIds: string[] }) {
             try {
                 const r = await analyzeVoicePitchCoverage({ stagedIds });
                 setReport(r);
-                if (!r) setErr("Companion unreachable or no voiced audio detected.");
+                if (!r) setErr("Server unreachable or no voiced audio detected.");
             } catch (e) {
                 setErr(e instanceof Error ? e.message : String(e));
             } finally {
@@ -1548,7 +1548,7 @@ function PitchCoverageBlock({ stagedIds }: { stagedIds: string[] }) {
                 )}
             </div>
 
-            {loading && <p className="text-xs text-muted-foreground">Analyzing pitch on companion…</p>}
+            {loading && <p className="text-xs text-muted-foreground">Analyzing pitch on the server…</p>}
             {err && !loading && <p className="text-xs text-amber-500">{err}</p>}
 
             {report && !loading && (
@@ -1692,12 +1692,12 @@ function RVCConvertPanel() {
             <Card className="p-6 space-y-3">
                 <h3 className="text-lg font-medium">No RVC voice models installed</h3>
                 <p className="text-sm text-muted-foreground">
-                    Drop trained RVC v2 model folders into the companion's voices directory under{" "}
+                    Drop trained RVC v2 model folders into the server's voices directory under{" "}
                     <code className="rounded bg-muted px-1.5 py-0.5">.rvc-models/&lt;model-id&gt;/</code>.
                     Each folder needs a <code>model.pth</code> and (optionally) an <code>added_*.index</code>.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    The companion sidecar will try <code>rvc_python</code> first, then fall back to an Applio
+                    The server sidecar will try <code>rvc_python</code> first, then fall back to an Applio
                     install pointed at by the <code>MMO_APPLIO_DIR</code> environment variable.
                 </p>
             </Card>

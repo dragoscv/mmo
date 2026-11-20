@@ -2,6 +2,11 @@
 
 All notable changes to MixAI Server (Electron desktop app + local Express server; technical name `mmo-server`, called "MixAI Companion" up to 3.15) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.17.1 — Docker image context and Pi deploy
+
+- `server/.dockerignore` keeps node_modules, build output, native targets, Python venvs, logs and `.env*` out of the image build context.
+- Raspberry Pi deployment: `infra/pi/compose.mmo.yaml` and `scripts/deploy-mmo-server-pi.ps1` (image built locally, shipped as a tar).
+
 ## 3.17.0 — the server as the hub for Decks crates and cue points (WP19-28, phase 1)
 
 First half of the crate / cue sync (`docs/decks/crate-sync-design.md`): the MMO Server can now hold DJ cue

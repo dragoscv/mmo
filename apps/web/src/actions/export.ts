@@ -31,7 +31,7 @@ export async function exportRekordboxXml(outputPath?: string) {
     if (!link) {
         return {
             success: false,
-            error: "Companion not connected",
+            error: "Server not connected",
             outputPath: null,
             count: 0,
         };

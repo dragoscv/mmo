@@ -64,7 +64,7 @@ export async function scanPlugins(extraPaths: string[] = []): Promise<{
         return { ok: false, error: pathsCheck.error.issues[0]?.message ?? "Invalid extraPaths" };
     }
     const link = await getCompanionLink();
-    if (!link) return { ok: false, error: "No companion linked" };
+    if (!link) return { ok: false, error: "No server connected" };
     try {
         const result = await companionPlugins.scan(link, pathsCheck.data);
         return { ok: true, result };
@@ -85,7 +85,7 @@ export async function describePlugin(path: string): Promise<{
         return { ok: false, error: pathCheck.error.issues[0]?.message ?? "Invalid path" };
     }
     const link = await getCompanionLink();
-    if (!link) return { ok: false, error: "No companion linked" };
+    if (!link) return { ok: false, error: "No server connected" };
     try {
         const plugin = await companionPlugins.describe(link, pathCheck.data);
         return { ok: true, plugin };
@@ -109,7 +109,7 @@ export async function renderWithPlugins(
         return { ok: false, error: chainCheck.error.issues[0]?.message ?? "Invalid chain" };
     }
     const link = await getCompanionLink();
-    if (!link) return { ok: false, error: "No companion linked" };
+    if (!link) return { ok: false, error: "No server connected" };
     try {
         const job = await companionPlugins.render(link, inputCheck.data, chainCheck.data);
         return { ok: true, jobId: job.id };

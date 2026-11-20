@@ -72,7 +72,7 @@ export function PreRemuxButton({ fileId, className }: Props) {
         start(async () => {
             const r = await triggerPreRemux(fileId);
             if (!r) {
-                toast.error("Could not start pre-remux. Is the companion online?");
+                toast.error("Could not start pre-remux. Is the server online?");
                 return;
             }
             if (r.job.status === "skipped") {

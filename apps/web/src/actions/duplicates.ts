@@ -281,7 +281,7 @@ export async function resolveDuplicatesHide(
     const parsed = idsSchema.safeParse(ids);
     if (!parsed.success) return { ok: false, count: 0, error: "invalid ids" };
     const link = await getCompanionLink();
-    if (!link) return { ok: false, count: 0, error: "companion not linked" };
+    if (!link) return { ok: false, count: 0, error: "server not connected" };
     try {
         for (const id of parsed.data) {
             await companionLibrary.updateTrack(link, id, { isHidden: true });
@@ -291,7 +291,7 @@ export async function resolveDuplicatesHide(
         return { ok: true, count: parsed.data.length };
     } catch (err) {
         log.warn("duplicates.resolve.hide failed", undefined, err);
-        return { ok: false, count: 0, error: "companion error" };
+        return { ok: false, count: 0, error: "server error" };
     }
 }
 
@@ -301,7 +301,7 @@ export async function resolveDuplicatesDelete(
     const parsed = idsSchema.safeParse(ids);
     if (!parsed.success) return { ok: false, count: 0, error: "invalid ids" };
     const link = await getCompanionLink();
-    if (!link) return { ok: false, count: 0, error: "companion not linked" };
+    if (!link) return { ok: false, count: 0, error: "server not connected" };
     try {
         for (const id of parsed.data) {
             await companionLibrary.deleteTrack(link, id);
@@ -311,6 +311,6 @@ export async function resolveDuplicatesDelete(
         return { ok: true, count: parsed.data.length };
     } catch (err) {
         log.warn("duplicates.resolve.delete failed", undefined, err);
-        return { ok: false, count: 0, error: "companion error" };
+        return { ok: false, count: 0, error: "server error" };
     }
 }

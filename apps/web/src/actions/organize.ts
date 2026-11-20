@@ -31,7 +31,7 @@ export async function organizeTrack(trackId: number, genre: string) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "unauthorized" };
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
 
     // Path-traversal guard: `genre` previously flowed straight into
     // `targetFolder = genreFolders[genre] || \`DJ/${genre}\`` and then into

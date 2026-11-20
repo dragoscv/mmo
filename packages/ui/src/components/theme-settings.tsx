@@ -130,7 +130,7 @@ export interface ThemeSettingsProps {
 /**
  * Complete appearance panel: mode, accent (presets + custom hue + artwork),
  * surface, density, radius, motion, feedback, locale — with live preview.
- * Used by web Settings › Appearance, MixAI DJ settings and the Companion.
+ * Used by web Settings › Appearance, MixAI Decks settings and the Companion.
  */
 export function ThemeSettings({ hide = [], allowArtworkAccent = false, children, className }: ThemeSettingsProps) {
   const t = useUiT();

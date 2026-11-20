@@ -194,7 +194,7 @@ async function call<T>(
     if (!res.ok) {
         let detail = "";
         try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
-        throw new Error(`Companion ${method} /library${pathAndQuery} failed (${res.status})${detail ? ": " + detail : ""}`);
+        throw new Error(`Server ${method} /library${pathAndQuery} failed (${res.status})${detail ? ": " + detail : ""}`);
     }
     return await res.json() as T;
 }
@@ -357,7 +357,7 @@ export const companionLibrary = {
             cache: "no-store",
         });
         if (!res.ok) {
-            throw new Error(`Companion GET /library/tracks/${id}/audio failed (${res.status})`);
+            throw new Error(`Server GET /library/tracks/${id}/audio failed (${res.status})`);
         }
         return res;
     },

@@ -959,7 +959,7 @@ export function buildTools(ctx: ToolContext): Record<string, Tool> {
                     projectExternalId: p.externalId,
                     format,
                     sampleRate,
-                    note: "Full-graph offline render lands in P6 phase B (engine.exportProject rewrite) and phase E (companion /render router).",
+                    note: "Full-graph offline render lands in P6 phase B (engine.exportProject rewrite) and phase E (server /render router).",
                 };
             },
         }),
@@ -1480,7 +1480,7 @@ export function buildTools(ctx: ToolContext): Record<string, Tool> {
 
         generateMusic: tool({
             description:
-                "Generate a song from a text prompt. Default tier='T0' runs ACE-Step locally on the user's companion " +
+                "Generate a song from a text prompt. Default tier='T0' runs ACE-Step locally on the user's MixAI Server " +
                 "(free, GPU) and automatically splits the result into 4 Demucs stems (drums/bass/other/vocals). " +
                 "When `splitToTracks` (default true) is set on T0, the 4 stems are placed on 4 new audio tracks " +
                 "at the current cursor position so the user can mix them immediately. " +
@@ -1495,7 +1495,7 @@ export function buildTools(ctx: ToolContext): Record<string, Tool> {
                     .describe("T1 only: Replicate model id (default 'meta/musicgen'). Ignored for T0."),
                 seed: z.number().int().optional(),
                 loraPath: z.string().optional()
-                    .describe("T0 only: absolute path to a trained ACE-Step LoRA checkpoint on the companion. " +
+                    .describe("T0 only: absolute path to a trained ACE-Step LoRA checkpoint on the server. " +
                         "Discover via listAceStepLoras."),
                 loraWeight: z.number().min(0).max(2).default(1.0),
                 splitToTracks: z.boolean().default(true)
@@ -1864,7 +1864,7 @@ export function buildTools(ctx: ToolContext): Record<string, Tool> {
                     // concrete actionable error instead of a sidecar 500.
                     const models = await mod.listVoiceConversionModels();
                     if (!models.length) {
-                        return { ok: false as const, error: "no-rvc-models-installed: drop a trained RVC v2 model folder under <companion>/voices/.rvc-models/<id>/ first" };
+                        return { ok: false as const, error: "no-rvc-models-installed: drop a trained RVC v2 model folder under <MixAI Server data folder>/voices/.rvc-models/<id>/ first" };
                     }
                     if (!models.some((m) => m.id === modelId)) {
                         return { ok: false as const, error: `rvc-model-not-found: ${modelId}. Available: ${models.map((m) => m.id).join(", ")}` };
@@ -2092,10 +2092,10 @@ export function buildTools(ctx: ToolContext): Record<string, Tool> {
         synthesizeVocal: tool({
             description:
                 "Synthesize a spoken or sung vocal stem from text. Pick a provider:\n" +
-                "  • `piper`             — free offline TTS via the companion (robotic, single pitch).\n" +
+                "  • `piper`             — free offline TTS via MixAI Server (robotic, single pitch).\n" +
                 "  • `piper-melody`      — offline melody-aligned singing on Piper. Pass `melodyClipId`.\n" +
                 "  • `xtts`              — cloned-voice spoken speech (XTTS-v2). Pass `clonedVoiceId` + `language`.\n" +
-                "  • `xtts-melody`       — cloned-voice SINGING. Pass `clonedVoiceId` + `melodyClipId`. The companion\n" +
+                "  • `xtts-melody`       — cloned-voice SINGING. Pass `clonedVoiceId` + `melodyClipId`. The server\n" +
                 "                          re-synthesizes each syllable in the user’s timbre and pitch-shifts to the\n" +
                 "                          target MIDI notes — use this for personalised vocal hooks and ad-libs.\n" +
                 "  • `f5`               — cloned-voice via F5-TTS (only when the user has it installed).\n" +
@@ -2230,14 +2230,14 @@ export function buildTools(ctx: ToolContext): Record<string, Tool> {
                             (provider === "elevenlabs"
                                 ? "Submitted to ElevenLabs. Should be ready in a few seconds."
                                 : provider === "xtts"
-                                    ? "Submitted to XTTS-v2 on the companion. First render warms the model (~10s)."
+                                    ? "Submitted to XTTS-v2 on the server. First render warms the model (~10s)."
                                     : provider === "xtts-melody"
                                         ? `Submitted ${melody!.length}-note cloned-voice melody. Per-syllable XTTS + pitch-shift takes a few minutes for long passages.`
                                         : provider === "f5"
-                                            ? "Submitted to F5-TTS on the companion."
+                                            ? "Submitted to F5-TTS on the server."
                                             : provider === "piper-melody"
-                                                ? `Submitted ${melody!.length}-note melody to companion. Singing pass takes 30-90s.`
-                                                : "Submitted to companion TTS. Should be ready in a few seconds."),
+                                                ? `Submitted ${melody!.length}-note melody to the server. Singing pass takes 30-90s.`
+                                                : "Submitted to TTS on the server. Should be ready in a few seconds."),
                         params: { voice, rate, pitchSemitones, noteCount: melody?.length ?? 0, clonedVoiceId, language },
                     };
                 } catch (err) {

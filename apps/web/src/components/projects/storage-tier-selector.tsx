@@ -55,8 +55,8 @@ export function StorageTierSelector({ kind, externalId, onChange, className }: S
 
     const options: Array<{ value: StorageTier; label: string; hint: string }> = [
         { value: "cloud", label: "Cloud", hint: "Postgres + GCS. Works on any device." },
-        { value: "companion", label: "Companion only", hint: "Local to this machine. Maximum privacy." },
-        { value: "both", label: "Mirror", hint: "Cloud + Companion. Best of both, uses more storage." },
+        { value: "companion", label: "MixAI Server only", hint: "Local to this machine. Maximum privacy." },
+        { value: "both", label: "Mirror", hint: "Cloud + MixAI Server. Best of both, uses more storage." },
     ];
 
     return (

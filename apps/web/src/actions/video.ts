@@ -25,7 +25,7 @@ export async function importLocalVideoLibrary(roots?: string[]): Promise<ImportR
     if (!userId) return { error: "unauthorized" };
 
     const scan = await scanCompanionVideos(roots);
-    if (!scan) return { error: "no companion reachable" };
+    if (!scan) return { error: "no server reachable" };
 
     const result: ImportResult = {
         moviesAdded: 0, moviesUpdated: 0, showsAdded: 0, showsUpdated: 0,

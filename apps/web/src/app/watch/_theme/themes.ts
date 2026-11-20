@@ -20,7 +20,7 @@ const accent = (h: number | string) => `oklch(var(--primary-l) var(--primary-c) 
 export const WATCH_THEMES = [
     {
         id: "mmo",
-        label: "MMO Cinematic",
+        label: "MixAI Cinematic",
         blurb: "Follows your app accent and theme, soft grain.",
         hue: "var(--accent-h)",
         swatch: ["var(--background)", accent("var(--accent-h)"), accent("calc(var(--accent-h) + 45)")],

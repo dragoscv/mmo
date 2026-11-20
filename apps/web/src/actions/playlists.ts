@@ -108,7 +108,7 @@ export async function createPlaylist(
     const descCheck = playlistDescriptionSchema.safeParse(description);
     if (!descCheck.success) throw new Error(failedValidation(descCheck.error).error);
     const link = await getCompanionLink();
-    if (!link) throw new Error("Companion not connected");
+    if (!link) throw new Error("Server not connected");
     const pl = await companionLibrary.createPlaylist(link, nameCheck.data, descCheck.data);
     revalidatePath("/playlists");
     return pl;
@@ -123,7 +123,7 @@ export async function updatePlaylist(
     const dataCheck = playlistUpdateSchema.safeParse(data);
     if (!dataCheck.success) return failedValidation(dataCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.updatePlaylist(link, id, dataCheck.data);
         revalidatePath("/playlists");
@@ -139,7 +139,7 @@ export async function deletePlaylist(
     const idCheck = playlistIdSchema.safeParse(id);
     if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.deletePlaylist(link, id);
         revalidatePath("/playlists");
@@ -158,7 +158,7 @@ export async function addTracksToPlaylist(
     const tracksCheck = trackIdsSchema.safeParse(trackIds);
     if (!tracksCheck.success) return { success: false, added: 0, error: failedValidation(tracksCheck.error).error };
     const link = await getCompanionLink();
-    if (!link) return { success: false, added: 0, error: "Companion not connected" };
+    if (!link) return { success: false, added: 0, error: "Server not connected" };
     try {
         const r = await companionLibrary.addTracksToPlaylist(link, playlistId, trackIds);
         revalidatePath("/playlists");
@@ -177,7 +177,7 @@ export async function removeTrackFromPlaylist(
     const trCheck = trackIdSchema.safeParse(trackId);
     if (!trCheck.success) return failedValidation(trCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.removeTrackFromPlaylist(link, playlistId, trackId);
         revalidatePath("/playlists");
@@ -195,7 +195,7 @@ export async function moveTrackInPlaylist(
     const idCheck = playlistIdSchema.safeParse(playlistId);
     if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         // Pull the full ordered list, swap the target with its neighbour,
         // and POST the whole thing back. The companion's /reorder
@@ -228,7 +228,7 @@ export async function reorderPlaylistTracks(
         return { success: false, error: "trackIds must be an array of integers" };
     }
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.reorderPlaylist(link, playlistId, trackIds);
         revalidatePath("/playlists");
@@ -244,7 +244,7 @@ export async function clearPlaylist(
     const idCheck = playlistIdSchema.safeParse(playlistId);
     if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         // Always re-read page 1: removing a track shifts the rest of the
         // list down, so paging forward would skip every other track. Loop
@@ -274,7 +274,7 @@ export async function duplicatePlaylist(
     const idCheck = playlistIdSchema.safeParse(playlistId);
     if (!idCheck.success) throw new Error(failedValidation(idCheck.error).error);
     const link = await getCompanionLink();
-    if (!link) throw new Error("Companion not connected");
+    if (!link) throw new Error("Server not connected");
     const all = await companionLibrary.getPlaylists(link);
     const original = all.find((p) => p.id === playlistId);
     if (!original) throw new Error("Playlist not found");
@@ -307,7 +307,7 @@ function encodeRekordboxLocation(filepath: string): string {
 
 export async function exportPlaylistToXml(playlistId: number): Promise<string> {
     const link = await getCompanionLink();
-    if (!link) throw new Error("Companion not connected");
+    if (!link) throw new Error("Server not connected");
     const all = await companionLibrary.getPlaylists(link);
     const playlist = all.find((p) => p.id === playlistId);
     if (!playlist) throw new Error("Playlist not found");
@@ -349,7 +349,7 @@ ${xmlPlaylistTracks}
 
 export async function exportAllPlaylistsToXml(): Promise<string> {
     const link = await getCompanionLink();
-    if (!link) throw new Error("Companion not connected");
+    if (!link) throw new Error("Server not connected");
     const playlists = await companionLibrary.getPlaylists(link);
 
     type AnyTrack = NonNullable<Awaited<ReturnType<typeof companionLibrary.getPlaylistTracks>>>["tracks"][number];
@@ -493,7 +493,7 @@ export async function createRecommendedPlaylists(
     names: string[],
 ): Promise<{ created: number; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { created: 0, error: "Companion not connected" };
+    if (!link) return { created: 0, error: "Server not connected" };
     try {
         const valid = RECOMMENDED_PLAYLISTS.filter((r) => names.includes(r.name));
         const existing = await companionLibrary.getPlaylists(link);
@@ -664,7 +664,7 @@ export async function populateSmartPlaylist(
     const idCheck = playlistIdSchema.safeParse(playlistId);
     if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         // Wide fetch — pull the user's whole library and filter in
         // memory. The companion's /tracks endpoint already paginates;
@@ -702,7 +702,7 @@ export async function createAndPopulateRecommended(
     names: string[],
 ): Promise<{ created: number; populated: number; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { created: 0, populated: 0, error: "Companion not connected" };
+    if (!link) return { created: 0, populated: 0, error: "Server not connected" };
     const create = await createRecommendedPlaylists(names);
     if (create.error) return { created: create.created, populated: 0, error: create.error };
     try {
@@ -743,7 +743,7 @@ export async function exportPlaylistToCrate(
     musicSubdir: string = "Music",
 ): Promise<{ success: false; error: string } | { success: true; base64: string; filename: string; trackCount: number }> {
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
 
     const all = await companionLibrary.getPlaylists(link);
     const playlist = all.find((p) => p.id === playlistId);
@@ -768,7 +768,7 @@ export async function exportAllPlaylistsToCrates(
     musicSubdir: string = "Music",
 ): Promise<{ success: false; error: string } | { success: true; crates: Array<{ filename: string; base64: string; trackCount: number }> }> {
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
 
     const playlists = await companionLibrary.getPlaylists(link);
     const sub = (musicSubdir || "Music").replace(/^\/+|\/+$/g, "");

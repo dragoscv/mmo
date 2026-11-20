@@ -17,7 +17,7 @@ export function ProfileMenu() {
     const { profile, clients, server, servers, guest, signedIn, selectServer, forgetGuest, hubStatus, devices, profileChanged } = useMmo();
     const [linking, setLinking] = useState(false);
     const others = devices.filter((d) => !d.guest).length;
-    const serverName = server?.name || "MMO Server";
+    const serverName = server?.name || "MixAI Server";
     const statusLabel = t(`hub.${hubStatus}`, { server: serverName });
     const addToAccount = async () => {
         if (!server || linking) return;

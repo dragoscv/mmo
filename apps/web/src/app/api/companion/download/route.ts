@@ -242,7 +242,7 @@ export async function GET(req: NextRequest) {
     const release = await fetchLatestCompanionRelease();
     if (!release) {
         return NextResponse.json(
-            { error: "No companion release available yet." },
+            { error: "No MixAI Server release available yet." },
             { status: 503 },
         );
     }

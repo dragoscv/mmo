@@ -1336,11 +1336,11 @@ function VoicePanel() {
                             disabled={!nativeAvailable || !live.voiceActive}
                             title={
                                 !nativeAvailable
-                                    ? "MixAI Companion not detected. Install + sign in on this device to enable native low-latency audio."
+                                    ? "MixAI Server not detected. Install + sign in on this device to enable native low-latency audio."
                                     : !live.voiceActive
                                         ? "Turn the Voice Processor ON first to enable the native engine."
                                         : nativeMode
-                                            ? "Native mode ON — mic and speakers handled by the companion (RtAudio direct). Browser is bypassed for the autocorrect path."
+                                            ? "Native mode ON — mic and speakers handled by MixAI Server (RtAudio direct). Browser is bypassed for the autocorrect path."
                                             : "Browser mode — Web Audio worklet (~25 ms total round-trip on Windows, ~12 ms on macOS). Enable native for the lowest possible latency."
                             }
                             className={cn(
@@ -1355,7 +1355,7 @@ function VoicePanel() {
                         </button>
                         <span className="text-[9px] tabular-nums text-white/60">
                             {!nativeAvailable
-                                ? <span className="text-white/30">no companion</span>
+                                ? <span className="text-white/30">no server</span>
                                 : !live.voiceActive
                                     ? <span className="text-white/30">voice off</span>
                                     : !nativeMode

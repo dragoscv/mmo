@@ -17,7 +17,7 @@
 // state without recreating them. After the first `terraform apply`
 // the imports become no-ops and the resources are managed from here.
 //
-// Subscription: a2845388-ce62-4b42-a6ea-e32e7441e635 (MuzicAI)
+// Subscription: a2845388-ce62-4b42-a6ea-e32e7441e635 (MixAI; Azure subscription display name may still read "MuzicAI")
 // Region:       westeurope (closest EU region to RO with broadest SKU
 //               availability; A100 quota request pending — file via
 //               portal, see README).

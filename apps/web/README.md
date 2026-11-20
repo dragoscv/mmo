@@ -72,7 +72,8 @@ apps/web/
 ├── public/
 │   ├── samples/                Sample pack pentru DAW
 │   ├── worklets/               AudioWorklet processors
-│   ├── manifest.webmanifest    PWA manifest
+│   ├── manifest*.webmanifest   PWA manifests, one per product host (src/lib/host/brand.ts)
+│   ├── icon-*.png|svg, og-image-*.png   Generated brand files (brand/scripts/build.mjs — do not edit)
 │   └── sw.js                   Service worker
 ├── drizzle/                    Migrations generate
 ├── data/                       Local data (downloads, cache)

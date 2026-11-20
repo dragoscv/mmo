@@ -8,9 +8,9 @@ import { setProcessingModeAction } from "@/actions/processing-mode";
 import type { ProcessingMode } from "@/lib/processing-mode";
 
 const OPTIONS: { value: ProcessingMode; label: string; desc: string; Icon: typeof Cloud }[] = [
-    { value: "auto", label: "Auto", desc: "Try the companion first, fall back to cloud if offline.", Icon: Sparkles },
-    { value: "companion", label: "Companion only", desc: "Always use the local companion. Never call the cloud.", Icon: HardDrive },
-    { value: "cloud", label: "Cloud only", desc: "Always use Cloud Run GPUs. Companion is bypassed.", Icon: Cloud },
+    { value: "auto", label: "Auto", desc: "Try MixAI Server first, fall back to cloud if offline.", Icon: Sparkles },
+    { value: "companion", label: "MixAI Server only", desc: "Always use your local server. Never call the cloud.", Icon: HardDrive },
+    { value: "cloud", label: "Cloud only", desc: "Always use Cloud Run GPUs. Your server is bypassed.", Icon: Cloud },
 ];
 
 export function ProcessingModeSwitch({ initial }: { initial: ProcessingMode }) {
@@ -27,7 +27,7 @@ export function ProcessingModeSwitch({ initial }: { initial: ProcessingMode }) {
                 setMode(prev);
                 toast.error(`Could not update processing mode: ${r.error}`);
             } else {
-                toast.success(`Processing mode → ${next}`);
+                toast.success(`Processing mode → ${OPTIONS.find((o) => o.value === next)?.label ?? next}`);
             }
         });
     }

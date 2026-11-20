@@ -17,8 +17,8 @@ export default async function ScannerPage() {
             <div className="shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-3 border-b border-border">
                 <h1 className="text-3xl font-bold">Scanner</h1>
                 <p className="text-[var(--muted-foreground)]">
-                    Scan your music folders on each connected companion. Files
-                    are read on the companion machine and ingested into your library.
+                    Scan your music folders on each connected server. Files
+                    are read on the server and ingested into your library.
                 </p>
             </div>
 

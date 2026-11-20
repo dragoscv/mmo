@@ -59,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const link = await getCompanionLink();
     if (!link) {
-        return new Response(JSON.stringify({ error: "companion not linked" }), {
+        return new Response(JSON.stringify({ error: "server not connected" }), {
             status: 400,
             headers: { "Content-Type": "application/json" },
         });

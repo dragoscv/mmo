@@ -56,7 +56,7 @@
 2. Vei vedea un buton **„MixAI”** lângă track / video (sau plutitor, jos-dreapta)
 3. Click → se deschide pagina `/download` din MixAI cu linkul precompletat
 4. Cu *Descărcare automată* activă, descărcarea pornește imediat
-5. Dacă ai **MixAI Companion** instalat, fișierul ajunge direct pe disc
+5. Dacă ai **MixAI Server** instalat, fișierul ajunge direct pe disc
 6. Când e gata, track-ul apare în bibliotecă (`/library`)
 
 ---

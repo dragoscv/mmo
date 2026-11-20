@@ -106,7 +106,7 @@ export async function analyzeTrackAi(
     }
 
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
 
     const track = await companionLibrary.getTrackById(link, idCheck.data);
     if (!track) return { success: false, error: "Track not found" };
@@ -175,7 +175,7 @@ export async function acceptAiSuggestion(
     if (!session?.user?.id) return { success: false, error: "Not signed in", applied };
 
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected", applied };
+    if (!link) return { success: false, error: "Server not connected", applied };
     const track = await companionLibrary.getTrackById(link, idCheck.data);
     if (!track || !track.sha256) return { success: false, error: "Track not found", applied };
 

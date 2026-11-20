@@ -122,7 +122,7 @@ export const navTree: NavNode[] = [
             { kind: "leaf", key: "settings-daw", href: "/settings/daw", label: "DAW", icon: Piano },
             { kind: "leaf", key: "settings-editor", href: "/settings/sound-editor", label: "Sound Editor", icon: Waves },
             { kind: "leaf", key: "settings-live", href: "/settings/live", label: "Live", icon: Mic },
-            { kind: "leaf", key: "settings-companions", href: "/settings/companions", label: "Companions", icon: Monitor },
+            { kind: "leaf", key: "settings-companions", href: "/settings/companions", label: "Servers", icon: Monitor },
             { kind: "leaf", key: "settings-devices", href: "/settings/devices", label: "Devices & remote", icon: Smartphone },
             { kind: "leaf", key: "settings-github", href: "/settings/github", label: "GitHub", icon: GitBranch },
             { kind: "leaf", key: "settings-notifications", href: "/settings/notifications", label: "Notifications", icon: Bell },

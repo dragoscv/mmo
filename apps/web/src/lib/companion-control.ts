@@ -99,7 +99,7 @@ async function call<T>(
     if (!res.ok) {
         let detail = "";
         try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
-        throw new Error(`Companion ${method} ${pathAndQuery} failed (${res.status})${detail ? ": " + detail : ""}`);
+        throw new Error(`Server ${method} ${pathAndQuery} failed (${res.status})${detail ? ": " + detail : ""}`);
     }
     return (await res.json()) as T;
 }

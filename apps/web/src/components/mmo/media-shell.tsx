@@ -9,7 +9,7 @@ import Link, { usePathname, useRouter } from "@/components/host/host-context";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { BarChart3, Clapperboard, Download, Film, Grid3x3, Heart, Home, Library, Music2, Radio, Search, Tv } from "lucide-react";
-import { Button, EmptyState } from "@mmo/ui";
+import { BRAND_NAMES, BrandMark, Button, EmptyState } from "@mmo/ui";
 import { useMmo } from "./mmo-provider";
 import { ProfileGate } from "./profile-gate";
 import { ProfileMenu } from "./profile-menu";
@@ -43,6 +43,8 @@ export function MediaShell({ children, loginHref = null }: { children: ReactNode
     const { kind, root } = useHost();
     // On product hosts the TV shell is the whole app: give it a way back to the suite launcher.
     const standalone = kind !== "legacy" && kind !== "studio";
+    // music.mixai.ro mounts this shell too: there the brand is MixAI Music and goes to the Music home.
+    const brand = kind === "music" ? "music" : "tv";
     // The guest join page and the full-screen player have their own chrome.
     const bare = pathname.startsWith("/media/together") || pathname.startsWith("/media/play/") || pathname.startsWith("/media/live/play");
 
@@ -95,9 +97,9 @@ export function MediaShell({ children, loginHref = null }: { children: ReactNode
     return (
         <div className="mx-shell">
             <header className="mx-topbar">
-                <Link href="/media" className="mx-brand" aria-label={t("nav.label")}>
-                    <Clapperboard aria-hidden className="size-5" />
-                    <span>{t("nav.label")}</span>
+                <Link href={brand === "music" ? "/media/music" : "/media"} className="mx-brand" aria-label={BRAND_NAMES[brand]}>
+                    <BrandMark product={brand} size={20} decorative />
+                    <span>{BRAND_NAMES[brand]}</span>
                 </Link>
                 <nav ref={navRef} aria-label={t("nav.label")} className="mx-nav" onKeyDown={onNavKey}>
                     {MEDIA_NAV.map((n) => {

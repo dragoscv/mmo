@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
     const link = await getCompanionLink();
     if (!link) {
-        return new Response(JSON.stringify({ error: "companion not linked" }), {
+        return new Response(JSON.stringify({ error: "server not connected" }), {
             status: 400,
             headers: { "Content-Type": "application/json" },
         });
@@ -36,13 +36,13 @@ export async function GET(request: Request): Promise<Response> {
         });
     } catch (err) {
         return new Response(
-            JSON.stringify({ error: err instanceof Error ? err.message : "companion unreachable" }),
+            JSON.stringify({ error: err instanceof Error ? err.message : "server unreachable" }),
             { status: 502, headers: { "Content-Type": "application/json" } },
         );
     }
 
     if (!upstream.ok || !upstream.body) {
-        return new Response(JSON.stringify({ error: `companion responded ${upstream.status}` }), {
+        return new Response(JSON.stringify({ error: `server responded ${upstream.status}` }), {
             status: 502,
             headers: { "Content-Type": "application/json" },
         });

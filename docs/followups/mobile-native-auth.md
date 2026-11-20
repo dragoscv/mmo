@@ -1,6 +1,6 @@
 # Mobile native Google sign-in
 
-The Capacitor Android shell currently loads `https://muzicai.ro` directly in
+The Capacitor Android shell currently loads `https://mixai.ro` directly in
 the WebView and lets NextAuth handle sign-in inside the WebView. That works,
 but the OAuth redirect to `accounts.google.com` happens inside the embedded
 WebView — Google increasingly blocks this for security reasons and the UX
@@ -16,7 +16,7 @@ native Google sign-in flow that mints a NextAuth session for the WebView.
   Upgrading is a separate, larger task (peer-bumping, plugin compat,
   potential Gradle / Android Gradle Plugin bumps).
 - Requires Google Cloud Console setup that the operator must perform:
-  - Android OAuth 2.0 client ID bound to `ro.muzicai.app` + SHA-1
+  - Android OAuth 2.0 client ID bound to `ro.mixai.app` + SHA-1
     fingerprint of the debug keystore (and release later).
   - Web OAuth 2.0 client ID used for **server-side ID token verification**
     (`aud` claim check).
@@ -64,7 +64,7 @@ const config: CapacitorConfig = {
 ```
 
 Operator steps in Google Cloud Console:
-1. Create OAuth Android client; supply `ro.muzicai.app` + SHA-1 from
+1. Create OAuth Android client; supply `ro.mixai.app` + SHA-1 from
    `apps/native/android/app/`'s debug keystore (`keytool -list -v -keystore ~/.android/debug.keystore`).
 2. Create OAuth Web client (or reuse the existing one used by NextAuth).
 3. Set `GOOGLE_WEB_CLIENT_ID` in `apps/native/.env` (Capacitor build env).

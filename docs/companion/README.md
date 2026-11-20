@@ -1,6 +1,6 @@
 # 🖥️ MMO Companion — Ghid utilizator
 
-> Aplicația desktop (MMO Server / MixAI Companion) care extinde MixAI cu capabilități native: MIDI, audio low-latency, watch folders, scriere USB.
+> Aplicația desktop (MMO Server / MixAI Server) care extinde MixAI cu capabilități native: MIDI, audio low-latency, watch folders, scriere USB.
 
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md)
 
@@ -32,10 +32,10 @@
 # 1. Descarcă pentru OS-ul tău:
 #    https://github.com/dragoscv/mmo/releases/latest
 #
-#    - Windows:  MixAI Companion-Setup-X.Y.Z.exe
-#    - macOS:    MixAI Companion-X.Y.Z-arm64.dmg (Apple Silicon)
-#                MixAI Companion-X.Y.Z-x64.dmg   (Intel)
-#    - Linux:    MixAI Companion-X.Y.Z-x64.AppImage / .deb / .rpm
+#    - Windows:  MixAI Server-Setup-X.Y.Z.exe
+#    - macOS:    MixAI Server-X.Y.Z-arm64.dmg (Apple Silicon)
+#                MixAI Server-X.Y.Z-x64.dmg   (Intel)
+#    - Linux:    MixAI Server-X.Y.Z-x64.AppImage / .deb / .rpm
 
 # 2. Rulează installer / mount DMG / chmod +x AppImage
 

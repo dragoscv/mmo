@@ -35,7 +35,7 @@ async function fetchAllTracks(link: NonNullable<Awaited<ReturnType<typeof getCom
 export async function GET(req: Request) {
     const link = await getCompanionLink();
     if (!link) {
-        return NextResponse.json({ error: "Companion not connected" }, { status: 401 });
+        return NextResponse.json({ error: "Server not connected" }, { status: 401 });
     }
     const url = new URL(req.url);
     const scope = url.searchParams.get("scope") ?? "all";

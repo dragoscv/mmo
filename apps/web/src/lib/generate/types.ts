@@ -8,7 +8,7 @@ export const GEN_TIERS = ["T0", "T1", "T2"] as const;
 export type GenTier = (typeof GEN_TIERS)[number];
 
 export const GEN_TIER_LABELS: Record<GenTier, string> = {
-    T0: "Local (companion)",
+    T0: "Local (MixAI Server)",
     T1: "Cloud (Replicate)",
     T2: "External (manual)",
 };

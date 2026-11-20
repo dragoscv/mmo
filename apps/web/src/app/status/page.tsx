@@ -85,7 +85,7 @@ async function StatusBody() {
             <section className="rounded-xl border border-border bg-card p-5 space-y-3">
                 <h2 className="text-base font-semibold">Diagnostics</h2>
                 <p className="text-sm text-muted-foreground">
-                    Companion connectivity is per-device — see <a href="/devices" className="underline decoration-dotted">Devices</a>.
+                    Server connectivity is per-device — see <a href="/devices" className="underline decoration-dotted">Devices</a>.
                     TURN credentials are issued on demand via <code className="rounded bg-muted px-1 py-0.5 text-xs">/api/turn-credentials</code>.
                 </p>
                 <a href="/api/health" className="inline-block text-sm underline decoration-dotted text-purple-300">View raw /api/health JSON →</a>

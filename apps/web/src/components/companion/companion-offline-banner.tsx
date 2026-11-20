@@ -19,10 +19,10 @@ export function CompanionOfflineBanner({ context = "watch" }: { context?: "watch
     if (status !== "offline") return null;
 
     const reason =
-        context === "watch" ? "Fără companion local, redarea fișierelor de pe disc + sincronizarea bibliotecii sunt dezactivate."
-        : context === "live" ? "Companion-ul oferă latența ultra-scăzută pentru voce live. Fără el, lucrăm pe Web Audio (latență mai mare)."
-        : context === "devices" ? "Niciun companion detectat pe această mașină. Pornește aplicația desktop sau adaugă unul din altă rețea."
-        : "Companion-ul desktop nu rulează pe mașina asta.";
+        context === "watch" ? "Fără MixAI Server, redarea fișierelor de pe disc + sincronizarea bibliotecii sunt dezactivate."
+        : context === "live" ? "MixAI Server oferă latența ultra-scăzută pentru voce live. Fără el, lucrăm pe Web Audio (latență mai mare)."
+        : context === "devices" ? "Niciun server detectat pe această mașină. Pornește aplicația desktop sau adaugă unul din altă rețea."
+        : "MixAI Server nu rulează pe mașina asta.";
 
     return (
         <div
@@ -53,7 +53,7 @@ export function CompanionOfflineBanner({ context = "watch" }: { context?: "watch
                 }}
             />
             <div style={{ flex: 1, minWidth: 220 }}>
-                <strong style={{ display: "block" }}>Companion offline</strong>
+                <strong style={{ display: "block" }}>Server deconectat</strong>
                 <span style={{ color: "var(--watch-fg-dim, #cbd5e1)" }}>{reason}</span>
             </div>
             <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
@@ -83,7 +83,7 @@ export function CompanionOfflineBanner({ context = "watch" }: { context?: "watch
                         textDecoration: "none",
                     }}
                 >
-                    Descarcă companion
+                    Descarcă MixAI Server
                 </Link>
             </div>
         </div>

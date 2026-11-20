@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MMO — Connecting</title>
+    <title>MixAI — Connecting</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
                 root.innerHTML =
                     '<div class="icon">\\u{1F511}</div>' +
                     '<h2>Authorize this device?</h2>' +
-                    '<p style="margin-top:10px">A companion app is asking to sign in as you and sync your library.</p>' +
+                    '<p style="margin-top:10px">MixAI Server is asking to sign in as you and sync your library.</p>' +
                     '<div style="margin:18px 0;padding:14px;background:#171717;border:1px solid #262626;border-radius:8px;text-align:left;font-size:12px;line-height:1.6">' +
                         '<div><span style="color:#71717a">Device:</span> <span class="name">' + escHtml(prettyName) + '</span></div>' +
                         '<div><span style="color:#71717a">OS:</span> ' + escHtml(prettyOs) + '</div>' +
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
                         '<button id="cancelBtn" style="padding:9px 18px;background:#262626;color:#fafafa;border:0;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>' +
                         '<button id="okBtn" style="padding:9px 18px;background:#a855f7;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Authorize</button>' +
                     '</div>' +
-                    '<p style="margin-top:14px;font-size:11px;color:#52525b">Only authorize devices you recognize. The companion will receive a token that can read and write your library.</p>';
+                    '<p style="margin-top:14px;font-size:11px;color:#52525b">Only authorize devices you recognize. The server will receive a token that can read and write your library.</p>';
                 document.getElementById("cancelBtn").addEventListener("click", function() {
                     root.innerHTML = '<div class="icon">\\u2717</div><h2>Cancelled</h2><p>You can close this tab.</p>';
                 });
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
                         userImage: data.userImage || "",
                         webAppUrl: WEB_APP_URL,
                     });
-                    status.textContent = "Redirecting to companion app\\u2026";
+                    status.textContent = "Redirecting to MixAI Server\\u2026";
                     window.location.href = CALLBACK + "?" + cbParams.toString();
                 } else {
                     root.innerHTML =

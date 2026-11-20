@@ -30,11 +30,11 @@ export function WatchHero({ feature }: Props) {
                     <div className="watch-hero-eyebrow"><Sparkles size={12} /> Welcome to your library</div>
                     <h1 className="watch-hero-title">Your cinema. Your rules.</h1>
                     <p className="watch-hero-overview">
-                        Scan a folder of films or TV episodes from a paired companion to start. Posters, plots, cast and trailers are fetched automatically.
+                        Scan a folder of films or TV episodes from a paired server to start. Posters, plots, cast and trailers are fetched automatically.
                     </p>
                     <div className="watch-hero-actions">
                         <Link href="/devices" className="watch-btn watch-btn-primary">
-                            <Play size={16} fill="currentColor" /> Pair a companion
+                            <Play size={16} fill="currentColor" /> Pair MixAI Server
                         </Link>
                         <Link href="/watch/settings" className="watch-btn watch-btn-ghost">
                             <Info size={16} /> Pick a theme

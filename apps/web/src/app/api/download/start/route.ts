@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
  */
 export async function POST() {
     return NextResponse.json(
-        { error: "Downloads are temporarily disabled while the library is migrated to the companion." },
+        { error: "Downloads are temporarily disabled while the library is migrated to MixAI Server." },
         { status: 501 },
     );
 }

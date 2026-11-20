@@ -69,7 +69,7 @@ export async function createSmartPlaylist(
     const rules = rulesCheck.data;
 
     const link = await getCompanionLink();
-    if (!link) return err("Companion not connected");
+    if (!link) return err("Server not connected");
 
     let playlistId: number | null = null;
     try {
@@ -119,7 +119,7 @@ export async function updateSmartPlaylistRules(
     if (!rulesCheck.success) return err(`Invalid rules: ${rulesCheck.error.issues[0]?.message ?? "unknown"}`);
 
     const link = await getCompanionLink();
-    if (!link) return err("Companion not connected");
+    if (!link) return err("Server not connected");
 
     try {
         await db.insert(smartPlaylistRules)
@@ -170,7 +170,7 @@ export async function refreshSmartPlaylist(
     if (!rulesCheck.success) return err("Stored rules are invalid");
 
     const link = await getCompanionLink();
-    if (!link) return err("Companion not connected");
+    if (!link) return err("Server not connected");
 
     try {
         const count = await runSmartPopulation(link, id, rulesCheck.data);
@@ -201,7 +201,7 @@ export async function previewSmartRules(
     if (!rulesCheck.success) return err(`Invalid rules: ${rulesCheck.error.issues[0]?.message ?? "unknown"}`);
 
     const link = await getCompanionLink();
-    if (!link) return err("Companion not connected");
+    if (!link) return err("Server not connected");
 
     try {
         const page = await companionLibrary.getTracks(link, { page: 1, pageSize: 10000 });

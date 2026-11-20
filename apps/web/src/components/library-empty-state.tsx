@@ -55,8 +55,8 @@ export function NoCompanion({
     return (
         <EmptyState
             icon={<Laptop aria-hidden />}
-            title={title ?? `Connect a companion to see ${feature}`}
-            description={description ?? `${feature} now lives on your local companion app. Install it and pair it with this account to get going.`}
+            title={title ?? `Connect MixAI Server to see ${feature}`}
+            description={description ?? `${feature} now lives on your server. Install MixAI Server and pair it with this account to get going.`}
             actions={
                 <Button render={<Link href="/devices" />}>
                     <Laptop aria-hidden /> {ctaLabel ?? "Manage devices"}

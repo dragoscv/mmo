@@ -49,7 +49,7 @@ export async function importRekordboxAction(xmlPath?: string) {
     if (!link) {
         return {
             success: false,
-            error: "Companion not connected. Sign in and link a companion to import.",
+            error: "Server not connected. Sign in and pair MixAI Server to import.",
             imported: 0, updated: 0, playlistsCreated: 0,
         };
     }

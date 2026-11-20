@@ -14,7 +14,7 @@ Service Worker (background.js)
 Aplicația web MixAI (/download)
     │  afișează info media, pornește descărcarea (auto=1 = imediat)
     ▼
-MixAI Companion (dacă e instalat) → fișierul ajunge în bibliotecă (/library)
+MixAI Server (dacă e instalat) → fișierul ajunge în bibliotecă (/library)
 ```
 
 - Extensia **nu** descarcă și **nu** trimite metadate singură — doar deschide pagina potrivită în MixAI.

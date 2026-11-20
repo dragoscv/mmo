@@ -507,7 +507,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                 <div className="flex-1 min-w-0">
                                     {companion?.ok ? (
                                         <span>
-                                            Companion analyzer ready — DSP, Stems and AcoustID
+                                            Server analyzer ready — DSP, Stems and AcoustID
                                             options are available.{" "}
                                             <a
                                                 href="/analysis"
@@ -518,7 +518,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                         </span>
                                     ) : companion?.transient ? (
                                         <span>
-                                            <strong className="font-semibold">Reconnecting to companion…</strong>{" "}
+                                            <strong className="font-semibold">Reconnecting to the server…</strong>{" "}
                                             {companion?.reason ?? "The connection dropped momentarily."}{" "}
                                             <button
                                                 type="button"
@@ -530,7 +530,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                         </span>
                                     ) : (
                                         <span>
-                                            <strong className="font-semibold">Companion analyzer offline.</strong>{" "}
+                                            <strong className="font-semibold">Server analyzer offline.</strong>{" "}
                                             {companion?.reason ?? "probing…"} — install with{" "}
                                             <code className="rounded bg-black/40 px-1 py-0.5 text-[10px] text-amber-100">
                                                 pip install audio-separator[cpu] librosa pyloudnorm pyacoustid soundfile numpy
@@ -753,7 +753,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                             <button
                                                 key={opt.key}
                                                 disabled={blocked}
-                                                title={blocked ? "Requires companion analyzer" : undefined}
+                                                title={blocked ? "Requires the server analyzer" : undefined}
                                                 onClick={() =>
                                                     setOptions((prev) => ({
                                                         ...prev,
@@ -788,7 +788,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                                         {opt.label}
                                                         {opt.companion && (
                                                             <span className="ml-auto rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-300">
-                                                                companion
+                                                                server
                                                             </span>
                                                         )}
                                                     </div>

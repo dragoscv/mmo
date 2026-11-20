@@ -79,7 +79,7 @@ async function call<T>(
         try { detail = ((await res.json()) as { error?: string }).error ?? ""; } catch { /* ignore */ }
         // The companion may express "expired" as a 4xx with a message.
         const code = /expire/i.test(detail) ? "expired" : statusToCode(res.status);
-        throw new PairError(code, detail || `Companion ${method} ${path} failed (${res.status})`);
+        throw new PairError(code, detail || `Server ${method} ${path} failed (${res.status})`);
     }
     return (await res.json()) as T;
 }

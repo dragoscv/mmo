@@ -4,10 +4,10 @@
  * Download Hub — single button in the sidebar that opens a modal showing
  * every way to get MixAI on the user's machine / phone / browser:
  *
- *   - MixAI Companion (Win/Mac/Linux installers; local audio server)
- *   - MixAI Native desktop (Win/Mac/Linux Tauri shell)
- *   - MixAI Native mobile (iOS / Android Capacitor shell)
- *   - MixAI Browser Extension (Chrome / Firefox / Edge)
+ *   - MixAI Server (Win/Mac/Linux installers; local audio server; channel id `companion`)
+ *   - MixAI Studio desktop (Win/Mac/Linux Tauri shell; channel id `native`)
+ *   - MixAI Studio mobile (iOS / Android Capacitor shell)
+ *   - MixAI Connector (browser extension for Chrome / Firefox / Edge; channel id `extension`)
  *
  * Detection layers (best-effort, fall back gracefully):
  *   - OS         → User-Agent + UA-Client-Hints when available.
@@ -246,8 +246,8 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                 <DialogHeader>
                     <DialogTitle>Get MixAI everywhere</DialogTitle>
                     <DialogDescription>
-                        Native apps, browser extension, and the local companion
-                        server. Pick what fits your setup; everything works
+                        Native apps, MixAI Connector for your browser, and
+                        MixAI Server. Pick what fits your setup; everything works
                         against the same mixai.ro account.
                     </DialogDescription>
                 </DialogHeader>
@@ -262,13 +262,13 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                             {env.browser}
                         </Badge>
                         <PresenceBadge
-                            label="Companion"
+                            label="MixAI Server"
                             present={companionPresent}
                             okText="Running"
                             missingText="Not detected"
                         />
                         <PresenceBadge
-                            label="Extension"
+                            label="MixAI Connector"
                             present={
                                 extensionPresent === "checking"
                                     ? "checking"
@@ -327,11 +327,11 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                             </TabsTrigger>
                             <TabsTrigger value="extension">
                                 <Globe className="h-3.5 w-3.5 mr-1.5" />
-                                Extension
+                                Connector
                             </TabsTrigger>
                             <TabsTrigger value="companion">
                                 <Cpu className="h-3.5 w-3.5 mr-1.5" />
-                                Companion
+                                Server
                             </TabsTrigger>
                         </TabsList>
 
@@ -374,7 +374,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                                 osFilter={(o) =>
                                     o === "win" || o === "mac" || o === "linux"
                                 }
-                                emptyHint="No companion release available yet."
+                                emptyHint="No MixAI Server release available yet."
                                 running={companionPresent === true}
                             />
                         </TabsContent>
@@ -452,7 +452,7 @@ function ChannelSection({
             {running && (
                 <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400 flex items-center gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    The companion is already running on this machine. You only
+                    MixAI Server is already running on this machine. You only
                     need to reinstall to update.
                 </div>
             )}
@@ -580,7 +580,7 @@ function ExtensionSection({
             {installed && (
                 <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400 flex items-center gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Extension v{installed} is already installed in this browser.
+                    MixAI Connector v{installed} is already installed in this browser.
                 </div>
             )}
             <p className="text-xs text-muted-foreground">

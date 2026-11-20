@@ -70,7 +70,7 @@ export async function scanAndIngestFolder(
             return { success: false, deviceId, folder: folderPath, inserted: 0, skipped: 0, total: 0, error: e instanceof Error ? e.message : String(e) };
         }
         if (job.status === "error") {
-            return { success: false, deviceId, folder: folderPath, inserted: 0, skipped: 0, total: 0, error: job.error ?? "Scan failed on companion" };
+            return { success: false, deviceId, folder: folderPath, inserted: 0, skipped: 0, total: 0, error: job.error ?? "Scan failed on the server" };
         }
         if (job.status === "complete") {
             const ing = await ingestCompanionScanJob(deviceId, jobId);

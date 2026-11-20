@@ -117,7 +117,7 @@ export function CinemaSettingsPanel() {
 
             <Row
                 label="Detectare intro cu chromaprint"
-                hint="Folosește fpcalc (dacă e instalat pe companion) pentru o detectare mai precisă a intro-ului. Cade pe silence-detect dacă lipsește."
+                hint="Folosește fpcalc (dacă e instalat pe server) pentru o detectare mai precisă a intro-ului. Cade pe silence-detect dacă lipsește."
             >
                 <input
                     type="checkbox"
@@ -128,7 +128,7 @@ export function CinemaSettingsPanel() {
 
             <Row
                 label="Normalizare volum (EBU R128)"
-                hint="Aliniază nivelul percepției la −23 LUFS pentru toate filmele. Necesită analiza pe companion (rulează automat la prima redare)."
+                hint="Aliniază nivelul percepției la −23 LUFS pentru toate filmele. Necesită analiza pe server (rulează automat la prima redare)."
             >
                 <input
                     type="checkbox"

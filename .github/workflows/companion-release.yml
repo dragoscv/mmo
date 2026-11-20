@@ -35,7 +35,7 @@ on:
           - "true"
 
 permissions:
-  contents: write   # needed to publish releases
+  contents: write # needed to publish releases
   id-token: write
 
 jobs:

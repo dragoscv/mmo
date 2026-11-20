@@ -582,7 +582,7 @@ export function AnalysisClient() {
                             Library Analysis
                         </h1>
                         <p className="text-xs text-[var(--muted-foreground)]">
-                            Real-time view of the Companion DSP / Stems / AcoustID pipeline.
+                            Real-time view of the MixAI Server DSP / Stems / AcoustID pipeline.
                         </p>
                     </div>
                     <HealthPill health={health} />
@@ -728,7 +728,7 @@ function HealthPill({ health }: { health: AnalyzerHealth | null }) {
                 )}
             </span>
             <span className="font-medium">
-                {ok ? "Companion online" : "Companion offline"}
+                {ok ? "Server online" : "Server offline"}
             </span>
             {ok && health?.pythonVersion && (
                 <span className="text-emerald-300/70">

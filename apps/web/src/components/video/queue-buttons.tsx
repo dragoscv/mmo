@@ -19,7 +19,7 @@ function Btn({ fileId, mode, label, icon }: { fileId: number; mode: Mode; label:
             disabled={pending}
             onClick={() => start(async () => {
                 const media = await resolveVideoForPlayback(fileId);
-                if (!media) { toast.error("Companion offline or file unreachable."); return; }
+                if (!media) { toast.error("Server offline or file unreachable."); return; }
                 if (mode === "next") {
                     player.playVideoNext(media);
                     toast.success(t("playNext"));

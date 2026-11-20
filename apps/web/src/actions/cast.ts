@@ -68,7 +68,7 @@ export async function getRendererMediaUrls(input: z.input<typeof RendererUrlsSch
     if (!parsed.success) return { ok: false, error: "Invalid input" };
     try {
         const urls = await buildRendererMediaUrls(parsed.data.media, parsed.data.kind as RendererKind);
-        if (!urls) return { ok: false, error: "Media not available on a LAN companion" };
+        if (!urls) return { ok: false, error: "Media not available on a LAN server" };
         return { ok: true, data: urls };
     } catch (e) {
         return fail(e);
@@ -83,7 +83,7 @@ export async function castToDevice(input: z.input<typeof CastToDeviceSchema>): P
     const kind: RendererKind = deviceId.startsWith("dlna:") ? "dlna" : "home-assistant";
     try {
         const urls = await buildRendererMediaUrls(media, kind);
-        if (!urls) return { ok: false, error: "Media not available on a LAN companion" };
+        if (!urls) return { ok: false, error: "Media not available on a LAN server" };
         const sub = subtitleIndex != null ? urls.subtitles[subtitleIndex] : urls.subtitles[0];
         await companionCast.play({
             deviceId,

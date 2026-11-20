@@ -28,7 +28,7 @@ export function PlayHereMenu({ fileId }: { fileId: number }) {
         start(async () => {
             const media = await resolveVideoForPlayback(fileId, mode);
             if (!media) {
-                toast.error("Could not resolve this video for playback. Is the companion online?");
+                toast.error("Could not resolve this video for playback. Is the server online?");
                 return;
             }
             player.playVideo(media);
@@ -70,7 +70,7 @@ export function PlayHereMenu({ fileId }: { fileId: number }) {
                     <DropdownMenuItem onSelect={() => play("auto")}>
                         <div className="flex flex-col">
                             <span className="font-medium">Auto</span>
-                            <span className="text-xs text-muted-foreground">Companion picks the cheapest path based on your browser.</span>
+                            <span className="text-xs text-muted-foreground">The server picks the cheapest path based on your browser.</span>
                         </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => play("remux")}>

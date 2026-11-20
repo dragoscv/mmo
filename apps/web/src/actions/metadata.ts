@@ -127,7 +127,7 @@ export async function reanalyzeSingleTrack(trackId: number): Promise<{
     errors: string[];
 }> {
     const link = await getCompanionLink();
-    if (!link) return { fields: [], errors: ["Companion not connected"] };
+    if (!link) return { fields: [], errors: ["Server not connected"] };
 
     const track = await companionLibrary.getTrackById(link, trackId);
     if (!track) return { fields: [], errors: ["Track not found"] };

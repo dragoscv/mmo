@@ -106,7 +106,7 @@ function HomeBody() {
                 tone="error"
                 icon={<Clapperboard aria-hidden />}
                 title={t("home.error")}
-                description={t("offline.title", { server: server?.name || "MMO Server" })}
+                description={t("offline.title", { server: server?.name || "MixAI Server" })}
                 actions={<Button onClick={() => location.reload()}><RefreshCw aria-hidden className="size-4" /> {t("home.retry")}</Button>}
             />
         );

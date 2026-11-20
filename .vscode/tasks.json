@@ -1,461 +1,641 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "MIXAI: Dev Prod-like (Companion + Tauri)",
-      "detail": "Starts the Companion server (music library + /mixai-profile cloud sync on :17899) and the MIXAI Tauri desktop shell together. The Tauri shell loads the native Rust audio core and proxies the companion + muzicai.ro cloud — the same path the shipped app takes.",
-      "dependsOn": [
-        "Companion: Dev",
-        "MIXAI: Dev (Tauri desktop)"
-      ],
-      "dependsOrder": "parallel",
-      "problemMatcher": []
-    },
-    {
-      "label": "MIXAI: Dev (Tauri desktop)",
-      "detail": "Runs `pnpm tauri:dev` for apps/mixai: builds the Rust audio core, starts Vite on :14420, and opens the native MIXAI window with the companion proxy + cloud profile sync wired up.",
-      "type": "shell",
-      "command": "pnpm tauri:dev",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}/apps/mixai"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "mixai-prod-like",
-        "clear": true
-      }
-    },
-    {
-      "label": "Dev: Prod-like (Web + Tunnel + Companion)",
-      "detail": "Local Next.js dev + cloudflared quick tunnel + local companion talking through the tunnel — same loop as production, but on local code.",
-      "dependsOn": [
-        "Dev: Web (local 13789)",
-        "Dev: Tunnel (cloudflared quick)",
-        "Dev: Companion (against tunnel)"
-      ],
-      "dependsOrder": "parallel",
-      "problemMatcher": []
-    },
-    {
-      "label": "Dev: Prod-like + Native (Web + Tunnel + Companion + Tauri + Mobile)",
-      "detail": "Everything from the Prod-like loop, plus the Tauri desktop shell and the Capacitor Android shell (opens Android Studio so you can pick an emulator / device).",
-      "dependsOn": [
-        "Dev: Web (local 13789)",
-        "Dev: Tunnel (cloudflared quick)",
-        "Dev: Companion (against tunnel)",
-        "Dev: Native Tauri (desktop)",
-        "Dev: Native Mobile (Android)"
-      ],
-      "dependsOrder": "parallel",
-      "problemMatcher": []
-    },
-    {
-      "label": "Dev: Native Tauri (desktop)",
-      "detail": "Waits for the cloudflared quick tunnel URL, exports it as MMO_WEB_APP_URL, then runs `pnpm tauri:dev`. The Tauri WebView loads the local Next.js dev server via the tunnel — same path the production app takes.",
-      "type": "shell",
-      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-native-tauri.ps1",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "dev-prod-like",
-        "clear": true
-      }
-    },
-    {
-      "label": "Dev: Native Mobile (Android)",
-      "detail": "Bootstraps the Capacitor Android platform on first run, points the WebView at the cloudflared tunnel (CAP_SERVER_URL), syncs the web assets, and runs the app on the first available emulator/device.",
-      "type": "shell",
-      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-native-mobile.ps1 -UseTunnel",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "dev-prod-like",
-        "clear": true
-      }
-    },
-    {
-      "label": "Dev: Web (local 13789)",
-      "type": "shell",
-      "command": "pnpm dev",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "dev-prod-like",
-        "clear": true
-      }
-    },
-    {
-      "label": "Dev: Tunnel (cloudflared quick)",
-      "type": "shell",
-      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-tunnel.ps1",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "dev-prod-like",
-        "clear": true
-      }
-    },
-    {
-      "label": "Dev: Companion (against tunnel)",
-      "type": "shell",
-      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-companion.ps1",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "dev-prod-like",
-        "clear": true
-      }
-    },
-    {
-      "label": "Dev Server",
-      "type": "shell",
-      "command": "pnpm dev",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "isBackground": true,
-      "problemMatcher": {
-        "pattern": {
-          "regexp": "^(?!\\s*(✓|○|▲|⚠|●|✗))(.*)$",
-          "file": 1,
-          "line": 2,
-          "message": 3
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "Starting...",
-          "endsPattern": "Ready in"
-        }
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev",
-      "type": "shell",
-      "command": "pnpm dev",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}/server"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev (Inspect)",
-      "type": "shell",
-      "command": "pnpm dev:inspect",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}/server"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev on macOS VM",
-      "type": "shell",
-      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-mac.ps1",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev on macOS VM (Watch)",
-      "type": "shell",
-      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-mac.ps1 -Watch",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev on Linux VM",
-      "type": "shell",
-      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-linux.ps1",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev on Linux VM (Watch)",
-      "type": "shell",
-      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-linux.ps1 -Watch",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev on Windows VM",
-      "type": "shell",
-      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-win.ps1",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Dev on Windows VM (Watch)",
-      "type": "shell",
-      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-win.ps1 -Watch",
-      "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Companion: Install Dependencies",
-      "type": "shell",
-      "command": "pnpm install",
-      "options": {
-        "cwd": "${workspaceFolder}/server"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "Companion: Build",
-      "type": "shell",
-      "command": "pnpm build",
-      "options": {
-        "cwd": "${workspaceFolder}/server"
-      },
-      "group": "build",
-      "problemMatcher": "$tsc",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "Companion: Dist (Windows)",
-      "type": "shell",
-      "command": "pnpm dist:win",
-      "options": {
-        "cwd": "${workspaceFolder}/server"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "Install Dependencies",
-      "type": "shell",
-      "command": "pnpm install",
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "Build",
-      "type": "shell",
-      "command": "pnpm build",
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web"
-      },
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "DB Studio",
-      "type": "shell",
-      "command": "pnpm db:studio",
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web"
-      },
-      "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      }
-    },
-    {
-      "label": "DB: Status (local)",
-      "type": "shell",
-      "command": "pnpm db:status",
-      "options": { "cwd": "${workspaceFolder}/apps/web" },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
-      "label": "DB: Status (production)",
-      "type": "shell",
-      "command": "pnpm db:status:prod",
-      "options": { "cwd": "${workspaceFolder}/apps/web" },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
-      "label": "DB: Migrate (local)",
-      "type": "shell",
-      "command": "pnpm db:migrate",
-      "options": { "cwd": "${workspaceFolder}/apps/web" },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
-      "label": "DB: Migrate (production)",
-      "type": "shell",
-      "command": "pnpm db:migrate:prod",
-      "options": { "cwd": "${workspaceFolder}/apps/web" },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
-      "label": "DB: Mark Pending Migrations Applied (production)",
-      "detail": "Records all pending migrations as applied on prod WITHOUT running them. Use once when adopting the runner on a DB that already has the schema.",
-      "type": "shell",
-      "command": "pnpm db:mark-applied:prod -- --yes",
-      "options": { "cwd": "${workspaceFolder}/apps/web" },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
-      "label": "DB: Generate Migration (from schema diff)",
-      "type": "shell",
-      "command": "pnpm db:generate",
-      "options": { "cwd": "${workspaceFolder}/apps/web" },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
-      "label": "Type Check",
-      "type": "shell",
-      "command": "pnpm exec tsc --noEmit",
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web"
-      },
-      "group": "test",
-      "problemMatcher": "$tsc",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "Clean .next Cache",
-      "type": "shell",
-      "command": "Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host '.next cache removed.'",
-      "options": {
-        "cwd": "${workspaceFolder}/apps/web",
-        "shell": { "executable": "pwsh", "args": ["-NoProfile", "-Command"] }
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
-    }
-  ],
-  "statusbar.list.hiddenTasks": [
-    "Companion: Dev (Inspect)",
-    "Companion: Dev on macOS VM",
-    "Companion: Dev on macOS VM (Watch)",
-    "Companion: Dev on Linux VM",
-    "Companion: Dev on Linux VM (Watch)",
-    "Companion: Dev on Windows VM",
-    "Companion: Dev on Windows VM (Watch)",
-    "Companion: Install Dependencies",
-    "Companion: Build",
-    "Companion: Dist (Windows)",
-    "Install Dependencies",
-    "Build",
-    "DB Studio",
-    "Type Check"
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "MIXAI: Dev Prod-like (Companion + Tauri)",
+			"detail": "Starts the Companion server (music library + /mixai-profile cloud sync on :17899) and the MIXAI Tauri desktop shell together. The Tauri shell loads the native Rust audio core and proxies the companion + muzicai.ro cloud — the same path the shipped app takes.",
+			"dependsOn": [
+				"Companion: Dev",
+				"MIXAI: Dev (Tauri desktop)"
+			],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+		{
+			"label": "MIXAI: Dev (Tauri desktop)",
+			"detail": "Runs `pnpm tauri:dev` for apps/mixai: builds the Rust audio core, starts Vite on :14420, and opens the native MIXAI window with the companion proxy + cloud profile sync wired up.",
+			"type": "shell",
+			"command": "pnpm tauri:dev",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}/apps/mixai"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "mixai-prod-like",
+				"clear": true
+			}
+		},
+		{
+			"label": "Dev: Prod-like (Web + Tunnel + Companion)",
+			"detail": "Local Next.js dev + cloudflared quick tunnel + local companion talking through the tunnel — same loop as production, but on local code.",
+			"dependsOn": [
+				"Dev: Web (local 13789)",
+				"Dev: Tunnel (cloudflared quick)",
+				"Dev: Companion (against tunnel)"
+			],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+		{
+			"label": "Dev: Prod-like + Native (Web + Tunnel + Companion + Tauri + Mobile)",
+			"detail": "Everything from the Prod-like loop, plus the Tauri desktop shell and the Capacitor Android shell (opens Android Studio so you can pick an emulator / device).",
+			"dependsOn": [
+				"Dev: Web (local 13789)",
+				"Dev: Tunnel (cloudflared quick)",
+				"Dev: Companion (against tunnel)",
+				"Dev: Native Tauri (desktop)",
+				"Dev: Native Mobile (Android)"
+			],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+		{
+			"label": "Dev: Native Tauri (desktop)",
+			"detail": "Waits for the cloudflared quick tunnel URL, exports it as MMO_WEB_APP_URL, then runs `pnpm tauri:dev`. The Tauri WebView loads the local Next.js dev server via the tunnel — same path the production app takes.",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-native-tauri.ps1",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "dev-prod-like",
+				"clear": true
+			}
+		},
+		{
+			"label": "Dev: Native Mobile (Android)",
+			"detail": "Bootstraps the Capacitor Android platform on first run, points the WebView at the cloudflared tunnel (CAP_SERVER_URL), syncs the web assets, and runs the app on the first available emulator/device.",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-native-mobile.ps1 -UseTunnel",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "dev-prod-like",
+				"clear": true
+			}
+		},
+		{
+			"label": "Dev: Web (local 13789)",
+			"type": "shell",
+			"command": "pnpm dev",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "dev-prod-like",
+				"clear": true
+			}
+		},
+		{
+			"label": "Dev: Tunnel (cloudflared quick)",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-tunnel.ps1",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "dev-prod-like",
+				"clear": true
+			}
+		},
+		{
+			"label": "Dev: Companion (against tunnel)",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-companion.ps1",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "dev-prod-like",
+				"clear": true
+			}
+		},
+		{
+			"label": "Dev Server",
+			"type": "shell",
+			"command": "pnpm dev",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"isBackground": true,
+			"problemMatcher": {
+				"pattern": {
+					"regexp": "^(?!\\s*(✓|○|▲|⚠|●|✗))(.*)$",
+					"file": 1,
+					"line": 2,
+					"message": 3
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "Starting...",
+					"endsPattern": "Ready in"
+				}
+			},
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev",
+			"type": "shell",
+			"command": "pnpm dev",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}/server"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev (Inspect)",
+			"type": "shell",
+			"command": "pnpm dev:inspect",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}/server"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev on macOS VM",
+			"type": "shell",
+			"command": "pwsh -NoProfile -File ./server/scripts/dev-on-mac.ps1",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev on macOS VM (Watch)",
+			"type": "shell",
+			"command": "pwsh -NoProfile -File ./server/scripts/dev-on-mac.ps1 -Watch",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev on Linux VM",
+			"type": "shell",
+			"command": "pwsh -NoProfile -File ./server/scripts/dev-on-linux.ps1",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev on Linux VM (Watch)",
+			"type": "shell",
+			"command": "pwsh -NoProfile -File ./server/scripts/dev-on-linux.ps1 -Watch",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev on Windows VM",
+			"type": "shell",
+			"command": "pwsh -NoProfile -File ./server/scripts/dev-on-win.ps1",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Dev on Windows VM (Watch)",
+			"type": "shell",
+			"command": "pwsh -NoProfile -File ./server/scripts/dev-on-win.ps1 -Watch",
+			"isBackground": true,
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Companion: Install Dependencies",
+			"type": "shell",
+			"command": "pnpm install",
+			"options": {
+				"cwd": "${workspaceFolder}/server"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Companion: Build",
+			"type": "shell",
+			"command": "pnpm build",
+			"options": {
+				"cwd": "${workspaceFolder}/server"
+			},
+			"group": "build",
+			"problemMatcher": "$tsc",
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Companion: Dist (Windows)",
+			"type": "shell",
+			"command": "pnpm dist:win",
+			"options": {
+				"cwd": "${workspaceFolder}/server"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Install Dependencies",
+			"type": "shell",
+			"command": "pnpm install",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Build",
+			"type": "shell",
+			"command": "pnpm build",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "DB Studio",
+			"type": "shell",
+			"command": "pnpm db:studio",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "DB: Status (local)",
+			"type": "shell",
+			"command": "pnpm db:status",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "DB: Status (production)",
+			"type": "shell",
+			"command": "pnpm db:status:prod",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "DB: Migrate (local)",
+			"type": "shell",
+			"command": "pnpm db:migrate",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "DB: Migrate (production)",
+			"type": "shell",
+			"command": "pnpm db:migrate:prod",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "DB: Mark Pending Migrations Applied (production)",
+			"detail": "Records all pending migrations as applied on prod WITHOUT running them. Use once when adopting the runner on a DB that already has the schema.",
+			"type": "shell",
+			"command": "pnpm db:mark-applied:prod -- --yes",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "DB: Generate Migration (from schema diff)",
+			"type": "shell",
+			"command": "pnpm db:generate",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "Type Check",
+			"type": "shell",
+			"command": "pnpm exec tsc --noEmit",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web"
+			},
+			"group": "test",
+			"problemMatcher": "$tsc",
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Clean .next Cache",
+			"type": "shell",
+			"command": "Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host '.next cache removed.'",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/web",
+				"shell": {
+					"executable": "pwsh",
+					"args": [
+						"-NoProfile",
+						"-Command"
+					]
+				}
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared",
+				"clear": true
+			}
+		},
+		{
+			"label": "tmp: tizen device probe",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\tizen-device-probe.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\tizen-device-probe.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: tizen device probe2",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\tizen-device-probe2.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\tizen-device-probe2.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: commit wp12-02",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\commit-wp1202.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\commit-wp1202.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: tracker diff",
+			"type": "shell",
+			"command": "git --no-pager show HEAD -- docs/mixai-design-tracker.md *> E:\\gh\\mmo\\.copilot-tmp\\tracker-diff.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 server",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-server.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-server.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 offers",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-offers.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-offers.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 offers2",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-offers.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-offers.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 find",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-find.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-find.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 android",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-android.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-android.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 resolve",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-resolve.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-resolve.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 android2",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-android2.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-android2.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 android3",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-android3.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-android3.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 progress",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-progress.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-progress.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 tizen",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-tizen.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-tizen.log",
+			"isBackground": true
+		},
+		{
+			"label": "tmp: wp12-03 profiles",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-profiles.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-profiles.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 web",
+			"type": "shell",
+			"command": "node E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.mjs movie/1339713 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 web2",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 web3",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 users",
+			"type": "shell",
+			"command": "node E:\\gh\\mmo\\.copilot-tmp\\wp12-03-users.mjs *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-users.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 web4",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 web-b",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web-b.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-web-b.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 devices",
+			"type": "shell",
+			"command": "node E:\\gh\\mmo\\.copilot-tmp\\wp12-03-devices.mjs *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-devices.log",
+			"isBackground": false
+		},
+		{
+			"label": "tmp: wp12-03 commit",
+			"type": "shell",
+			"command": "pwsh -NoProfile -ExecutionPolicy Bypass -File E:\\gh\\mmo\\.copilot-tmp\\wp12-03-commit.ps1 *> E:\\gh\\mmo\\.copilot-tmp\\wp12-03-commit.log",
+			"isBackground": false
+		}
+	],
+	"statusbar.list.hiddenTasks": [
+		"Companion: Dev (Inspect)",
+		"Companion: Dev on macOS VM",
+		"Companion: Dev on macOS VM (Watch)",
+		"Companion: Dev on Linux VM",
+		"Companion: Dev on Linux VM (Watch)",
+		"Companion: Dev on Windows VM",
+		"Companion: Dev on Windows VM (Watch)",
+		"Companion: Install Dependencies",
+		"Companion: Build",
+		"Companion: Dist (Windows)",
+		"Install Dependencies",
+		"Build",
+		"DB Studio",
+		"Type Check"
+	]
 }

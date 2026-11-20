@@ -54,7 +54,7 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
 
     const links = (await getAllCompanionLinks()).filter((l) => l.online);
     if (links.length === 0) {
-        return { results: [], totalPruned: 0, backfilled: 0, deduped: 0, error: "No online companion to reconcile against" };
+        return { results: [], totalPruned: 0, backfilled: 0, deduped: 0, error: "No online server to reconcile against" };
     }
 
     const results: ReconcileResult[] = [];
@@ -87,7 +87,7 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
             results.push({
                 deviceId: link.deviceId, name: link.name,
                 companionTrackCount: 0, cloudTrackCount: 0, pruned: 0,
-                skipped: `Could not read companion library: ${e instanceof Error ? e.message : String(e)}`,
+                skipped: `Could not read the server library: ${e instanceof Error ? e.message : String(e)}`,
             });
             continue;
         }
@@ -99,7 +99,7 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
             results.push({
                 deviceId: link.deviceId, name: link.name,
                 companionTrackCount: 0, cloudTrackCount: 0, pruned: 0,
-                skipped: "Companion reports 0 tracks — refusing to prune (scan first)",
+                skipped: "Server reports 0 tracks — refusing to prune (scan first)",
             });
             continue;
         }
@@ -115,7 +115,7 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
     // If NO online companion produced a usable filepath set, bail without
     // touching cloud data (avoids mass-delete on a transient empty read).
     if (ownerByPath.size === 0) {
-        return { results, totalPruned: 0, backfilled: 0, deduped: 0, error: "No companion filepaths read — nothing reconciled" };
+        return { results, totalPruned: 0, backfilled: 0, deduped: 0, error: "No server filepaths read — nothing reconciled" };
     }
 
     // ── Global pass over ALL the user's cloud tracks ────────────────────

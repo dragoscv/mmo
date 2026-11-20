@@ -66,7 +66,7 @@ export async function getMyVoice(voiceId: string): Promise<VoiceMeta | null> {
 export async function stageVoiceSample(audio: ArrayBuffer, filename?: string): Promise<{ stagedId: string; bytes: number }> {
     await uid();
     const res = await stageSample(audio, filename);
-    if (!res) throw new Error("Companion not reachable. Open the companion app and pair this browser.");
+    if (!res) throw new Error("Server not reachable. Open MixAI Server and pair this browser.");
     return res;
 }
 
@@ -83,7 +83,7 @@ export async function finalizeClonedVoice(raw: FinalizeClonedVoiceInput): Promis
     await uid();
     const input = finalizeSchema.parse(raw);
     const meta = await createOnCompanion(input);
-    if (!meta) throw new Error("Companion not reachable.");
+    if (!meta) throw new Error("Server not reachable.");
     return meta;
 }
 
@@ -128,7 +128,7 @@ export interface VoicePreviewResult {
 function buildPlayUrl(voiceId: string, streamUrl: string): string {
     // streamUrl is `/voice/<id>/render/<renderId>` per the companion router.
     const m = /\/voice\/([^/]+)\/render\/([^/?#]+)/.exec(streamUrl);
-    if (!m) throw new Error("Unexpected streamUrl from companion: " + streamUrl);
+    if (!m) throw new Error("Unexpected streamUrl from the server: " + streamUrl);
     const renderId = m[2];
     return `/api/voice-render?voiceId=${encodeURIComponent(voiceId)}&renderId=${encodeURIComponent(renderId)}`;
 }
@@ -141,7 +141,7 @@ export async function previewClonedVoice(raw: PreviewClonedVoiceInput): Promise<
     await uid();
     const input = previewSchema.parse(raw);
     const r = await synthesizeWithVoice(input);
-    if (!r) throw new Error("Companion not reachable.");
+    if (!r) throw new Error("Server not reachable.");
     return {
         playUrl: buildPlayUrl(input.voiceId, r.streamUrl),
         durationSec: r.durationSec,
@@ -176,7 +176,7 @@ export async function previewClonedVoiceSinging(raw: z.infer<typeof previewSingS
     await uid();
     const input = previewSingSchema.parse(raw);
     const r = await singWithVoice(input);
-    if (!r) throw new Error("Companion not reachable.");
+    if (!r) throw new Error("Server not reachable.");
     return {
         playUrl: buildPlayUrl(input.voiceId, r.streamUrl),
         durationSec: r.durationSec,

@@ -430,7 +430,7 @@ function DisclosureSection() {
                 </AccordionItem>
                 <AccordionItem value="2">
                     <AccordionTrigger>Does it run offline?</AccordionTrigger>
-                    <AccordionPanel>Yes, via the companion and the PWA.</AccordionPanel>
+                    <AccordionPanel>Yes, via MixAI Server and the PWA.</AccordionPanel>
                 </AccordionItem>
             </Accordion>
             <Collapsible>
@@ -481,7 +481,7 @@ function EmptyStatesSection() {
             <div className="grid gap-4 lg:grid-cols-2">
                 <EmptyState variant="inline" icon={<Music aria-hidden />} title="No tracks yet" description="Import a folder to get started." actions={<Button size="sm">Import</Button>} />
                 <NotSignedInState variant="inline" action={<Button size="sm">Sign in</Button>} />
-                <NoCompanionState variant="inline" actions={<Button size="sm" variant="outline">Install companion</Button>} />
+                <NoCompanionState variant="inline" actions={<Button size="sm" variant="outline">Install MixAI Server</Button>} />
                 <ErrorState variant="inline" onRetry={() => {}} />
                 <NoResultsState variant="inline" />
             </div>
@@ -505,7 +505,7 @@ function ToastSection() {
                 <Button variant="outline" onClick={() => toast.add({ title: "Saved", description: "Playlist exported.", type: "success" })}>
                     Success toast
                 </Button>
-                <Button variant="outline" onClick={() => toast.add({ title: "Failed", description: "Companion unreachable.", type: "error" })}>
+                <Button variant="outline" onClick={() => toast.add({ title: "Failed", description: "Server unreachable.", type: "error" })}>
                     Error toast
                 </Button>
                 <Button variant="outline" onClick={() => toast.add({ title: "Heads up", type: "warning" })}>

@@ -183,7 +183,7 @@ export async function suggestTrackTags(
         return { success: false, error: "No AI provider key configured. Add one in Settings → AI." };
     }
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     const track = await companionLibrary.getTrackById(link, idCheck.data);
     if (!track) return { success: false, error: "Track not found" };
     return runSuggest(track, picked);
@@ -303,7 +303,7 @@ export async function bulkSuggestAndApplyTags(
         return { success: false, error: "No AI provider key configured. Add one in Settings → AI.", ...empty };
     }
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected", ...empty };
+    if (!link) return { success: false, error: "Server not connected", ...empty };
 
     const perTrack: Array<{ id: number; status: "filled" | "skipped" | "failed"; fields?: string[]; error?: string }> = [];
     let filled = 0, skipped = 0, failed = 0;

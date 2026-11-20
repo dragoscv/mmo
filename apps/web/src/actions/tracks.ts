@@ -163,7 +163,7 @@ export async function updateTrack(
     const dataCheck = trackUpdateSchema.safeParse(data);
     if (!dataCheck.success) return failedValidation(dataCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.updateTrack(link, idCheck.data, dataCheck.data as Partial<CompanionTrack>);
         revalidatePath("/library");
@@ -181,7 +181,7 @@ export async function toggleFavorite(
     const idCheck = trackIdSchema.safeParse(id);
     if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         const r = await companionLibrary.toggleFavorite(link, idCheck.data);
         revalidatePath("/library");
@@ -200,7 +200,7 @@ export async function setTrackRating(
     const ratingCheck = ratingSchema.safeParse(rating);
     if (!ratingCheck.success) return failedValidation(ratingCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.setRating(link, idCheck.data, ratingCheck.data);
         revalidatePath("/library");
@@ -219,7 +219,7 @@ export async function updateTrackTags(
     const tagsCheck = z.array(tagSchema).max(100).safeParse(tags);
     if (!tagsCheck.success) return failedValidation(tagsCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.setTags(link, idCheck.data, tagsCheck.data);
         revalidatePath("/library");
@@ -235,7 +235,7 @@ export async function deleteTrack(
     const idCheck = trackIdSchema.safeParse(id);
     if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.deleteTrack(link, idCheck.data);
         revalidatePath("/library");
@@ -256,7 +256,7 @@ export async function hideTracks(
     if (!check.success) return { success: false, count: 0, error: failedValidation(check.error).error };
     if (check.data.length === 0) return { success: true, count: 0 };
     const link = await getCompanionLink();
-    if (!link) return { success: false, count: 0, error: "Companion not connected" };
+    if (!link) return { success: false, count: 0, error: "Server not connected" };
     try {
         const r = await companionLibrary.setHidden(link, check.data, true);
         revalidatePath("/library");
@@ -275,7 +275,7 @@ export async function unhideTracks(
     if (!check.success) return { success: false, count: 0, error: failedValidation(check.error).error };
     if (check.data.length === 0) return { success: true, count: 0 };
     const link = await getCompanionLink();
-    if (!link) return { success: false, count: 0, error: "Companion not connected" };
+    if (!link) return { success: false, count: 0, error: "Server not connected" };
     try {
         const r = await companionLibrary.setHidden(link, check.data, false);
         revalidatePath("/library");

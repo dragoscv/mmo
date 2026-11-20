@@ -1,4 +1,4 @@
-# @mmo/gateway — MixAI Companion Gateway
+# @mmo/gateway — MixAI Server Gateway
 
 Hono service on **GCP Cloud Run** that owns the companion **control plane**,
 keeping the chatty device heartbeat + command channel off the Vercel (web app)

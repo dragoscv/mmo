@@ -94,7 +94,7 @@ async function call<T>(
         let detail = "";
         try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
         throw new Error(
-            `Companion ${method} /plugins${pathAndQuery} failed (${res.status})${detail ? ": " + detail : ""}`,
+            `Server ${method} /plugins${pathAndQuery} failed (${res.status})${detail ? ": " + detail : ""}`,
         );
     }
     return await res.json() as T;

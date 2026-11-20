@@ -76,14 +76,14 @@ export function CompanionAnalyzerPanel() {
         <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">
-                    Companion DSP / Stems analyzer
+                    MixAI Server DSP / Stems analyzer
                 </h3>
                 <HealthDot health={health} />
             </div>
 
             {!health?.ok && (
                 <div className="text-xs text-amber-300/90">
-                    {health?.reason || "Probing companion…"}
+                    {health?.reason || "Probing the server…"}
                     {health && !health.ok && (
                         <div className="mt-1 text-white/60">
                             Install with: <code className="text-amber-200">pip install audio-separator[cpu] librosa pyloudnorm pyacoustid soundfile numpy</code>
@@ -188,7 +188,7 @@ export function CompanionAnalyzerPanel() {
 
 function HealthDot({ health }: { health: AnalyzerHealth | null }) {
     if (!health) return <span className="h-2 w-2 rounded-full bg-white/30" />;
-    if (health.ok) return <span title="Companion ready" className="h-2 w-2 rounded-full bg-emerald-500" />;
+    if (health.ok) return <span title="Server ready" className="h-2 w-2 rounded-full bg-emerald-500" />;
     return <span title={health.reason} className="h-2 w-2 rounded-full bg-amber-500" />;
 }
 

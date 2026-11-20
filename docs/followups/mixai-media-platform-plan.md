@@ -12,12 +12,12 @@
 | Brand / platform / account / domain | **MixAI** | `mixai.ro`, `api.mixai.ro`, `device-<id>.mixai.ro` |
 | Self-hosted server (Pi / PC / Docker) | **MMO Server** — *MixAI Media Organizer* | image `ghcr.io/dragoscv/mmo-server`, mDNS `_mmo-server._tcp`, pkg scopes `@mmo/*` |
 | Web app (Next.js, Vercel) | **MixAI** | `apps/web`, PWA id `ro.mixai.app` |
-| Desktop companion (Electron shell around MMO Server) | **MixAI Companion** | `ro.mixai.companion`, userData `mixai-companion` |
+| Desktop companion (Electron shell around MMO Server) | **MixAI Server** | `ro.mixai.companion`, userData `mixai-companion` |
 | Native DJ app (Tauri) | **MixAI DJ** | `apps/mixai`, `ro.mixai.dj` |
 | Android TV / Google TV app | **MixAI TV** | `apps/tv-android`, `ro.mixai.tv` |
 | Samsung Tizen app (.wgt) | **MixAI TV** (Tizen) | `apps/tv-tizen`, id `http://mixai.ro/tv` |
 | Mobile (Android now, iOS later) | **MixAI** | `apps/native`, `ro.mixai.app` |
-| Browser extension | **MixAI Downloader** | `mixai-downloader@mixai.ro` |
+| Browser extension | **MixAI Connector** | `mixai-downloader@mixai.ro` |
 
 Rule: user-facing copy always says *MixAI*; the word *MMO* appears only when we mean
 the server ("MMO Server", "run MMO Server on your Raspberry Pi").
@@ -43,7 +43,7 @@ Evidence in `/memories/repo/media-server-research-2026-09.md` and the ADRs.
 
 ### Phase A — Rebrand (this session)
 - [x] All user-facing strings MuzicAI → MixAI (i18n ro/en, JSX, manifests, metadata)
-- [x] Server naming → "MMO Server" / "MixAI Companion" (package.json, productName, appId, artifactName)
+- [x] Server naming → "MMO Server" / "MixAI Server" (package.json, productName, appId, artifactName)
 - [x] Bundle IDs `ro.muzicai.*` → `ro.mixai.*` (tauri ×2, capacitor, electron, Play packageName)
 - [x] Storage-key migration: `muzicai-*` localStorage/IndexedDB/userData → `mixai-*` with one-time copy (`lib/storage-migration.ts`, `server/src/store.ts`)
 - [x] Domains → `mixai.ro` (layout metadataBase, extension DEFAULT_BASE_URL, server defaults, CORS allowlists, terraform, assetlinks, AASA, tunnel docs, tests)

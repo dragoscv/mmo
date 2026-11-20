@@ -12,7 +12,9 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

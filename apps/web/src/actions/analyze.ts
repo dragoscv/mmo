@@ -340,7 +340,7 @@ function isTransientCompanionError(msg: string): boolean {
 
 export async function getAnalyzerHealth(): Promise<AnalyzerHealth> {
     const link = await getCompanionLink();
-    if (!link) return { ok: false, reason: "Companion not connected" };
+    if (!link) return { ok: false, reason: "Server not connected" };
     // The per-device Cloudflare tunnel occasionally drops/reconnects, which
     // surfaces as a 530. Retry a couple of times before giving up so a blip
     // doesn't masquerade as "analyzer offline — pip install …".
@@ -359,7 +359,7 @@ export async function getAnalyzerHealth(): Promise<AnalyzerHealth> {
         ok: false,
         transient,
         reason: transient
-            ? "Couldn't reach the companion (connection dropped). It may be reconnecting — try again in a moment."
+            ? "Couldn't reach the server (connection dropped). It may be reconnecting — try again in a moment."
             : lastErr,
     };
 }
@@ -377,14 +377,14 @@ export async function startDspAnalysis(
         .slice(0, MAX_DSP_TRACKS);
     if (safeIds.length === 0) return { jobs: [] };
     const link = await getCompanionLink();
-    if (!link) return { jobs: [], error: "Companion not connected" };
+    if (!link) return { jobs: [], error: "Server not connected" };
     try { return await companionAnalyzer.start(link, safeIds, options); }
     catch (e) { return { jobs: [], error: e instanceof Error ? e.message : String(e) }; }
 }
 
 export async function getAnalyzerStatus(sinceMs?: number): Promise<AnalyzerStatus | { error: string }> {
     const link = await getCompanionLink();
-    if (!link) return { error: "Companion not connected" };
+    if (!link) return { error: "Server not connected" };
     try { return await companionAnalyzer.status(link, sinceMs); }
     catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
@@ -397,7 +397,7 @@ export async function getAnalyzerBatches(limit = 50): Promise<{ batches: Analyze
     const targets = links.filter((l) => l.online);
     if (targets.length === 0) {
         const single = await getCompanionLink();
-        if (!single) return { batches: [], error: "Companion not connected" };
+        if (!single) return { batches: [], error: "Server not connected" };
         targets.push({ ...single, name: "companion", online: true, lastSeenAt: new Date() });
     }
     const all: AnalyzerBatch[] = [];
@@ -417,7 +417,7 @@ export async function cancelAnalyzerBatch(batchId: string): Promise<{ canceled: 
     const targets = links.filter((l) => l.online);
     if (targets.length === 0) {
         const single = await getCompanionLink();
-        if (!single) return { canceled: 0, error: "Companion not connected" };
+        if (!single) return { canceled: 0, error: "Server not connected" };
         targets.push({ ...single, name: "companion", online: true, lastSeenAt: new Date() });
     }
     let canceled = 0;
@@ -436,7 +436,7 @@ export async function resyncAnalyzedTracks(): Promise<{ queued: number; total: n
     const targets = links.filter((l) => l.online);
     if (targets.length === 0) {
         const single = await getCompanionLink();
-        if (!single) return { queued: 0, total: 0, error: "Companion not connected" };
+        if (!single) return { queued: 0, total: 0, error: "Server not connected" };
         try { return await companionAnalyzer.resync(single); }
         catch (e) { return { queued: 0, total: 0, error: e instanceof Error ? e.message : String(e) }; }
     }
@@ -451,14 +451,14 @@ export async function resyncAnalyzedTracks(): Promise<{ queued: number; total: n
 
 export async function cancelAnalyzerJob(jobId: string): Promise<{ canceled: boolean; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { canceled: false, error: "Companion not connected" };
+    if (!link) return { canceled: false, error: "Server not connected" };
     try { return await companionAnalyzer.cancel(link, jobId); }
     catch (e) { return { canceled: false, error: e instanceof Error ? e.message : String(e) }; }
 }
 
 export async function retryAnalyzerJob(jobId: string): Promise<{ jobId?: string; trackId?: number; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { error: "Companion not connected" };
+    if (!link) return { error: "Server not connected" };
     try {
         const r = await companionAnalyzer.retry(link, jobId);
         return { jobId: r.job.id, trackId: r.job.trackId };
@@ -468,7 +468,7 @@ export async function retryAnalyzerJob(jobId: string): Promise<{ jobId?: string;
 
 export async function clearAnalyzerQueue(category: Category | "all" = "all"): Promise<{ removed: number; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { removed: 0, error: "Companion not connected" };
+    if (!link) return { removed: 0, error: "Server not connected" };
     try {
         const r = await companionAnalyzer.clearQueue(link, category);
         return { removed: r.removed };
@@ -480,7 +480,7 @@ export async function clearAnalyzerQueue(category: Category | "all" = "all"): Pr
  *  in that lane finishes; new work is held until {@link resumeAnalyzerLane}. */
 export async function pauseAnalyzerLane(category: Category | "all" = "all"): Promise<{ paused: boolean; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { paused: false, error: "Companion not connected" };
+    if (!link) return { paused: false, error: "Server not connected" };
     try {
         const r = await companionAnalyzer.pauseLane(link, category);
         return { paused: r.paused };
@@ -490,7 +490,7 @@ export async function pauseAnalyzerLane(category: Category | "all" = "all"): Pro
 
 export async function resumeAnalyzerLane(category: Category | "all" = "all"): Promise<{ paused: boolean; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { paused: true, error: "Companion not connected" };
+    if (!link) return { paused: true, error: "Server not connected" };
     try {
         const r = await companionAnalyzer.resumeLane(link, category);
         return { paused: r.paused };
@@ -500,7 +500,7 @@ export async function resumeAnalyzerLane(category: Category | "all" = "all"): Pr
 
 export async function removeCompletedJob(jobId: string): Promise<{ removed: boolean; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { removed: false, error: "Companion not connected" };
+    if (!link) return { removed: false, error: "Server not connected" };
     try { return await companionAnalyzer.removeCompleted(link, jobId); }
     catch (e) { return { removed: false, error: e instanceof Error ? e.message : String(e) }; }
 }
@@ -509,7 +509,7 @@ export async function clearCompletedJobs(
     filter: "all" | "errored" | "done" = "all",
 ): Promise<{ removed: number; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { removed: 0, error: "Companion not connected" };
+    if (!link) return { removed: 0, error: "Server not connected" };
     try {
         const r = await companionAnalyzer.clearCompleted(link, filter);
         return { removed: r.removed };
@@ -519,7 +519,7 @@ export async function clearCompletedJobs(
 
 export async function retryFailedJobs(): Promise<{ enqueued: number; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { enqueued: 0, error: "Companion not connected" };
+    if (!link) return { enqueued: 0, error: "Server not connected" };
     try {
         // Prefer the durable retry that re-enqueues EVERY persisted failure
         // (not just the last ~128 in the in-memory buffer). Falls back to the
@@ -541,7 +541,7 @@ export async function installGpuSupport(
     target: "onnx" | "torch" | "all" = "onnx",
 ): Promise<{ installed?: string; gpu?: GpuInfo; log?: string; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { error: "Companion not connected" };
+    if (!link) return { error: "Server not connected" };
     try {
         const r = await companionAnalyzer.installGpu(link, target);
         return { installed: r.installed, gpu: r.gpu, log: r.log };
@@ -555,7 +555,7 @@ export async function restartAnalyzerSidecar(
     force = false,
 ): Promise<{ ok: boolean; health?: AnalyzerHealth; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { ok: false, error: "Companion not connected" };
+    if (!link) return { ok: false, error: "Server not connected" };
     try {
         const r = await companionAnalyzer.restartSidecar(link, force);
         return { ok: r.ok, health: r.health };
@@ -575,7 +575,7 @@ export async function getAnalyzerLogs(
     limit = 500,
 ): Promise<{ logs: AnalyzerLogEntry[]; error?: string }> {
     const link = await getCompanionLink();
-    if (!link) return { logs: [], error: "Companion not connected" };
+    if (!link) return { logs: [], error: "Server not connected" };
     try { return await companionAnalyzer.logs(link, since, limit); }
     catch (e) { return { logs: [], error: e instanceof Error ? e.message : String(e) }; }
 }
@@ -596,7 +596,7 @@ export async function startBulkDspAnalysis(
     const targets = links.filter((l) => l.online);
     if (targets.length === 0) {
         const single = await getCompanionLink();
-        if (!single) return { enqueued: 0, skipped: 0, tracksTouched: 0, error: "Companion not connected" };
+        if (!single) return { enqueued: 0, skipped: 0, tracksTouched: 0, error: "Server not connected" };
         targets.push({ ...single, name: "companion", online: true, lastSeenAt: new Date() });
     }
 
@@ -690,7 +690,7 @@ export async function getCompanionStemsAccess(trackId: number): Promise<
     | { available: false; reason: string }
 > {
     const link = await getCompanionLink();
-    if (!link) return { available: false, reason: "Companion not connected" };
+    if (!link) return { available: false, reason: "Server not connected" };
 
     // Cheap availability probe — the companion's track row tells us
     // whether at least one stem WAV actually exists on disk.

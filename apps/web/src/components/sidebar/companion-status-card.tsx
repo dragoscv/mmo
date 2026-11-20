@@ -112,7 +112,7 @@ export function CompanionStatusCard({
                     type="button"
                     onClick={() => setOpen(true)}
                     className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-500 hover:bg-muted transition-colors relative"
-                    title={`Companion v${version}${running ? ` · ${backendLabel(metrics?.backend)} · ${latencyMs.toFixed(1)} ms` : " · idle"}`}
+                    title={`MixAI Server v${version}${running ? ` · ${backendLabel(metrics?.backend)} · ${latencyMs.toFixed(1)} ms` : " · idle"}`}
                 >
                     <Server className="h-4 w-4" />
                     <span className={cn(
@@ -145,7 +145,7 @@ export function CompanionStatusCard({
                         ? "border-emerald-500/25 bg-emerald-500/[0.06] hover:bg-emerald-500/[0.10]"
                         : "border-sidebar-border bg-sidebar hover:bg-muted",
                 )}
-                title="Open companion details"
+                title="Open MixAI Server details"
             >
                 {/* Top row: name + version + status dot */}
                 <div className="flex items-center gap-1.5">
@@ -154,7 +154,7 @@ export function CompanionStatusCard({
                         "text-[11px] font-medium flex-1",
                         running ? "text-emerald-300" : "text-foreground/80",
                     )}>
-                        Companion
+                        MixAI Server
                     </span>
                     <span className="text-[9px] font-mono text-muted-foreground/70">v{version}</span>
                     <span className={cn(

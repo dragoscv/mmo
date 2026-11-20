@@ -14,7 +14,7 @@ export default async function LibraryImportPage() {
                 <h1 className="text-3xl font-bold">Import library</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                     Bootstrap your cloud library from a rekordbox export. Tracks land in the cloud
-                    Postgres mirror; the companion will pick them up and reconcile against the
+                    Postgres mirror; MixAI Server will pick them up and reconcile against the
                     on-disk files when you next launch it.
                 </p>
             </header>

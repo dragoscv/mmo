@@ -47,7 +47,7 @@ export async function scanFolderAction(folderPath: string): Promise<ScanResult> 
     if (!link) {
         return {
             totalFiles: 0, audioFiles: 0, inserted: 0, skipped: 0,
-            errors: ["No companion connected. Sign in and link a companion to scan folders."],
+            errors: ["No server connected. Sign in and pair MixAI Server to scan folders."],
         };
     }
 
@@ -63,7 +63,7 @@ export async function scanFolderAction(folderPath: string): Promise<ScanResult> 
             inserted = r.inserted;
             skipped = r.skipped;
         } catch (err) {
-            errors.push(`Companion ingest failed: ${err instanceof Error ? err.message : "unknown"}`);
+            errors.push(`Server ingest failed: ${err instanceof Error ? err.message : "unknown"}`);
         }
     }
 

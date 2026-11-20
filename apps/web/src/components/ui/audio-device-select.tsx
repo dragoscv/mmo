@@ -151,7 +151,7 @@ export function AudioDeviceSelect({
 
     const browserList = kind === "input" ? devices.browserInputs : devices.browserOutputs;
     const nativeList = kind === "input" ? devices.nativeInputs : devices.nativeOutputs;
-    const backend = devices.companionGroup?.backend ?? "Companion";
+    const backend = devices.companionGroup?.backend ?? "Server";
 
     const items = useMemo<FlatItem[]>(() => {
         const list: FlatItem[] = [];
@@ -192,7 +192,7 @@ export function AudioDeviceSelect({
                     source: "native",
                     accent: "purple",
                     disabled: !!nativeDisabled,
-                    searchHaystack: `${backend} native companion ${d.name}`.toLowerCase(),
+                    searchHaystack: `${backend} native server companion ${d.name}`.toLowerCase(),
                 });
             }
         }
@@ -419,7 +419,7 @@ export function AudioDeviceSelect({
                                                 <div className="mt-1 border-t border-white/[0.06] px-2 pb-1 pt-2 text-[9px] font-bold uppercase tracking-wider">
                                                     <span className="inline-flex items-center gap-1.5 text-purple-300/80">
                                                         <Sparkles className="w-2.5 h-2.5" />
-                                                        Companion · {backend} ({nativeCount})
+                                                        Server · {backend} ({nativeCount})
                                                     </span>
                                                     {nativeDisabled && (
                                                         <span className="ml-2 text-[8px] normal-case text-white/30">{nativeDisabledHint ?? "Available in Live's native mode"}</span>
@@ -447,7 +447,7 @@ export function AudioDeviceSelect({
 
                     {!devices.nativeAvailable && (
                         <div className="border-t border-white/[0.06] px-3 py-2 text-[9px] uppercase tracking-wider text-white/30">
-                            Companion not detected · install the desktop app for native low-latency devices
+                            MixAI Server not detected · install the desktop app for native low-latency devices
                         </div>
                     )}
                 </div>,

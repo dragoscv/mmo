@@ -25,7 +25,7 @@ export function PlayHereButton({ fileId, label = "Play here", className }: {
                 start(async () => {
                     const media = await resolveVideoForPlayback(fileId);
                     if (!media) {
-                        toast.error("Could not resolve this video for playback. Is the companion online?");
+                        toast.error("Could not resolve this video for playback. Is the server online?");
                         return;
                     }
                     player.playVideo(media);

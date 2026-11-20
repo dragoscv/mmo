@@ -89,15 +89,15 @@ export async function enqueueDeviceCommand<T = unknown>(
         }
         if (r.status === "error") {
             console.warn(`[cmd] error kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls} — ${r.error}`);
-            return { ok: false, error: r.error ?? "Unknown companion error" };
+            return { ok: false, error: r.error ?? "Unknown server error" };
         }
         if (r.status === "expired") {
             console.warn(`[cmd] expired kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls}`);
-            return { ok: false, error: "Command expired before companion picked it up" };
+            return { ok: false, error: "Command expired before the server picked it up" };
         }
     }
     console.warn(`[cmd] timeout kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls}`);
-    return { ok: false, error: "Companion did not respond in time (device offline?)" };
+    return { ok: false, error: "Server did not respond in time (device offline?)" };
 }
 
 /**

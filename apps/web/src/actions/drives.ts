@@ -67,7 +67,7 @@ export async function cleanRekordboxDrive(data: {
         return { success: false, error: check.error.issues[0]?.message ?? "Invalid input" };
     }
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         const r = await companionLibrary.cleanRekordboxDrive(link, check.data);
         return { success: true, removed: r.removed.length };
@@ -125,7 +125,7 @@ export async function addDrive(data: {
         return { success: false, error: check.error.issues[0]?.message ?? "Invalid input" };
     }
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.addSavedDrive(link, check.data);
         return { success: true };
@@ -137,7 +137,7 @@ export async function addDrive(data: {
 export async function removeDrive(id: number): Promise<{ success: boolean; error?: string }> {
     if (!Number.isInteger(id)) return { success: false, error: "Invalid id" };
     const link = await getCompanionLink();
-    if (!link) return { success: false, error: "Companion not connected" };
+    if (!link) return { success: false, error: "Server not connected" };
     try {
         await companionLibrary.removeSavedDrive(link, id);
         return { success: true };

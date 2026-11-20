@@ -887,7 +887,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                         <div className="text-xs">
                             <p className="font-medium text-amber-300">You&apos;re viewing the cloud build</p>
                             <p className="mt-0.5 text-muted-foreground">
-                                Audio device authorization is saved on the companion, but the in-browser
+                                Audio device authorization is saved on the server, but the in-browser
                                 low-latency engine only runs when the web app is opened from <code className="rounded bg-background px-1">localhost:13789</code>.
                                 For 3–5 ms live performance latency, run the web app locally.
                             </p>
@@ -902,7 +902,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                         <Server className="mb-4 h-12 w-12 text-muted-foreground/30" />
                         <h3 className="mb-1 font-semibold">No devices connected</h3>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Install the MixAI Companion app on your computers and sign in with your Google account.
+                            Install MixAI Server on your computers and sign in with your Google account.
                             Devices appear here automatically.
                         </p>
                     </CardContent>
@@ -1022,7 +1022,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                         <DialogTitle>Add a library folder</DialogTitle>
                         <DialogDescription>
                             Choose what kind of content lives in this folder, then browse the
-                            companion&apos;s drives to pick one. Nothing opens on the desktop.
+                            server&apos;s drives to pick one. Nothing opens on the desktop.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1410,7 +1410,7 @@ function FolderSection({
                     size="xs"
                     onClick={onPick}
                     disabled={!isOnline || isPicking}
-                    title={isOnline ? "Choose a folder purpose, then open the picker on the companion" : "Device offline"}
+                    title={isOnline ? "Choose a folder purpose, then open the picker on the server" : "Device offline"}
                 >
                     {isPicking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderPlus className="mr-1 h-3 w-3" />}
                     Pick Folder…
@@ -1421,7 +1421,7 @@ function FolderSection({
                 <div className="rounded-lg border border-dashed border-border py-6 text-center">
                     <FolderSearch className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
                     <p className="text-xs text-muted-foreground">
-                        No folders configured. Click <span className="font-medium">Pick Folder…</span> to open the OS picker on the companion.
+                        No folders configured. Click <span className="font-medium">Pick Folder…</span> to open the OS picker on the server.
                     </p>
                 </div>
             ) : (
@@ -1516,7 +1516,7 @@ function FolderRow({
                 <div className="min-w-0 flex-1">
                     <p className="truncate font-mono text-sm">{folder.path}</p>
                     {!folder.exists && (
-                        <p className="text-[11px] text-amber-400">Folder no longer exists on the companion</p>
+                        <p className="text-[11px] text-amber-400">Folder no longer exists on the server</p>
                     )}
                 </div>
 
@@ -1793,8 +1793,8 @@ function ConsoleSection({ entries, live, hasTunnel, onClear }: ConsoleSectionPro
                         {live
                             ? "Waiting for activity…"
                             : hasTunnel
-                                ? "Connecting to companion…"
-                                : "This device has no tunnel — open the companion to enable remote streaming."}
+                                ? "Connecting to the server…"
+                                : "This device has no tunnel — open MixAI Server to enable remote streaming."}
                     </div>
                 ) : (
                     filtered.map((e, i) => (
@@ -1868,7 +1868,7 @@ function AudioSection({
 
             {!isOnline && (
                 <p className="rounded-md border border-dashed border-border py-4 text-center text-xs text-muted-foreground">
-                    Companion offline — audio devices unavailable.
+                    Server offline — audio devices unavailable.
                 </p>
             )}
 
@@ -1964,7 +1964,7 @@ function BackendGroup({
                     >
                         {!group.available ? (
                             <p className="px-3 py-3 text-center text-[11px] text-muted-foreground">
-                                Backend not available on this companion (driver missing or no devices).
+                                Backend not available on this server (driver missing or no devices).
                             </p>
                         ) : group.devices.length === 0 ? (
                             <p className="px-3 py-3 text-center text-[11px] text-muted-foreground">No devices.</p>

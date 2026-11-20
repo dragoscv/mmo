@@ -1450,7 +1450,7 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                             showPermissionHint={audioPermission === "prompt"}
                                         />
                                         <p className="text-[9px] text-white/20 mt-1.5">
-                                            Select the audio output device for playback. Browser devices set the playback sink; native devices appear when the MixAI Companion is running and route through Live's engine.
+                                            Select the audio output device for playback. Browser devices set the playback sink; native devices appear when MixAI Server is running and route through Live's engine.
                                         </p>
                                     </>
                                 )}

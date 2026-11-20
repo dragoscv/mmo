@@ -318,10 +318,10 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
                 inserted = r.inserted;
                 skipped = r.skipped;
             } catch (e) {
-                return { error: `Companion ingest failed: ${e instanceof Error ? e.message : String(e)}` };
+                return { error: `Server ingest failed: ${e instanceof Error ? e.message : String(e)}` };
             }
         } else {
-            return { error: "Companion not connected — cannot persist scanned tracks." };
+            return { error: "Server not connected — cannot persist scanned tracks." };
         }
 
         // Update folder stats
@@ -775,7 +775,7 @@ export async function ingestCompanionScanJob(
         // Per-device lookup (not getCompanionLink) so this works for
         // LAN/Tailscale companions whose api_url isn't on localhost.
         const link = await getCompanionLinkForDevice(deviceId);
-        if (!link) return { error: "Companion not connected — cannot persist scanned tracks." };
+        if (!link) return { error: "Server not connected — cannot persist scanned tracks." };
         const r = await companionLibrary.ingestTracks(link, job.tracks.map((t) => ({
             filepath: t.filepath,
             filename: t.filename,
@@ -836,7 +836,7 @@ export async function pollCompanionWatchEvents(
         const adds = events.filter((e) => (e.kind === "add" || e.kind === "change") && e.payload);
         if (adds.length === 0) return { success: true, processed: 0, highWatermark };
         const link = await getCompanionLinkForDevice(deviceId);
-        if (!link) return { error: "Companion not connected" };
+        if (!link) return { error: "Server not connected" };
         await companionLibrary.ingestTracks(link, adds.map((e) => {
             const t = e.payload!;
             return {
@@ -1049,7 +1049,7 @@ export async function ingestCompanionVideoScanJob(
             console.warn(`[ingest-video] getScanJob threw: ${e instanceof Error ? e.message : String(e)}`);
             return null;
         });
-        if (!job) return { error: "Scan job not found on companion" };
+        if (!job) return { error: "Scan job not found on the server" };
         console.log(`[ingest-video] job folder="${job.folder}" kind=${job.kind} status=${job.status} videos=${job.videos?.length ?? 0}`);
         if (job.status !== "complete") return { error: `Scan job is ${job.status}` };
         if (job.kind !== "video" || !job.videos) return { error: "Not a video scan job" };

@@ -103,7 +103,7 @@ async function call<T>(
         cache: "no-store",
     });
     if (!res.ok) {
-        let err = `companion-voice ${method} ${pathAndQuery} → ${res.status}`;
+        let err = `Server voice ${method} ${pathAndQuery} → ${res.status}`;
         try {
             const j = await res.json() as { error?: string };
             if (j?.error) err += `: ${j.error}`;

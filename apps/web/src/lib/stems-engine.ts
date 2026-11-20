@@ -154,7 +154,7 @@ export async function loadCompanionStems(
     // Reference any non-null buffer for shape info.
     const ref = fetched.vocals ?? fetched.drums ?? fetched.bass ?? fetched.other;
     if (!ref) {
-        throw new Error("No companion stems were available to load.");
+        throw new Error("No stems from the server were available to load.");
     }
     opts.onProgress?.({ stage: "complete", progress: 1, message: "Stems loaded." });
     return {

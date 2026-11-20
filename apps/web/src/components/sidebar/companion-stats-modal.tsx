@@ -321,7 +321,7 @@ export function CompanionStatsModal({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Server className="h-4 w-4 text-emerald-400" />
-                        MixAI Companion
+                        MixAI Server
                         <span className="text-[10px] font-mono text-white/40">v{version}</span>
                     </DialogTitle>
                     <DialogDescription className="text-[11px]">
@@ -338,7 +338,7 @@ export function CompanionStatsModal({
                     <div className="rounded-md bg-rose-500/10 border border-rose-500/20 p-2 text-[11px] text-rose-300 flex items-start gap-2">
                         <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                         <div>
-                            <div className="font-medium">Companion unreachable</div>
+                            <div className="font-medium">Server unreachable</div>
                             <div className="text-[10px] text-rose-300/70 mt-0.5 font-mono">{error}</div>
                         </div>
                     </div>

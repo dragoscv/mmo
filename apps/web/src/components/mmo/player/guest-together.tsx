@@ -8,7 +8,8 @@
  */
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { Clapperboard, Loader2, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
+import { BrandMark } from "@mmo/ui";
 import { HubClient } from "@/lib/mmo/hub";
 import type { HubMedia, HubRoomPhase } from "@/lib/mmo/media-types";
 import { tmdbImg } from "@/lib/media/normalize";
@@ -87,7 +88,7 @@ export function GuestTogether({ server: rawServer, invite }: { server: string | 
         return (
             <main className="mxg-page">
                 <section className="mxg-card" aria-labelledby="mxg-title">
-                    <Clapperboard aria-hidden className="mxg-logo size-8" />
+                    <BrandMark product="tv" size={32} decorative className="mxg-logo" />
                     <h1 id="mxg-title" className="mxg-title">{t("joinTitle")}</h1>
                     {load.s === "loading" && <p className="mxp-muted" role="status"><Loader2 aria-hidden className="mxp-spin size-4" /> {t("loading")}</p>}
                     {info && (
@@ -122,7 +123,7 @@ function GuestMessage({ title, body, action }: { title: string; body: string; ac
     return (
         <main className="mxg-page">
             <section className="mxg-card" role="alert">
-                <Clapperboard aria-hidden className="mxg-logo size-8" />
+                <BrandMark product="tv" size={32} decorative className="mxg-logo" />
                 <h1 className="mxg-title">{title}</h1>
                 <p className="mxp-muted">{body}</p>
                 {action && <button type="button" className="mxp-btn mxp-btn-primary" onClick={action.run}>{action.label}</button>}

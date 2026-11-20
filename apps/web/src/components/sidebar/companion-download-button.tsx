@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Sidebar button for downloading the MMO Companion desktop app.
+ * Sidebar button for downloading MixAI Server (the desktop app; code names keep "companion").
  *
  * Behaviour:
  *  - On mount, tries to probe a running companion at `localhost:17899`.
@@ -120,7 +120,7 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
                     target="_blank"
                     rel="noreferrer"
                     className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    title={`Download Companion ${status.info.version} for ${osLabel(status.info.os)}`}
+                    title={`Download MixAI Server ${status.info.version} for ${osLabel(status.info.os)}`}
                 >
                     <Download className="h-4 w-4" />
                 </a>
@@ -141,7 +141,7 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
         return (
             <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground/60">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Checking companion…
+                Checking server…
             </div>
         );
     }
@@ -170,7 +170,7 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
                 >
                     <Download className="h-3.5 w-3.5" />
                     <span className="flex-1 truncate">
-                        Download Companion
+                        Download MixAI Server
                         <span className="text-muted-foreground/60"> · {osLabel(status.info.os)}</span>
                     </span>
                     <span className="text-muted-foreground/40">{formatMB(status.info.size)}</span>
@@ -194,6 +194,9 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
                             <p className="text-[9px] text-amber-200/50">
                                 Or run this in Terminal:
                             </p>
+                            {/* Path on disk, not a product name: released builds install as "MixAI Companion.app"
+                                (electron-builder `productName`). Change it together with the first server release
+                                whose productName is "MixAI Server" (WP22-10). */}
                             <code className="block break-all rounded bg-black/30 p-1 text-[9px] text-amber-100">
                                 xattr -dr com.apple.quarantine &quot;/Applications/MixAI Companion.app&quot;
                             </code>
@@ -207,7 +210,7 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
     if (status.kind === "no-release") {
         return (
             <div className="px-2 py-1.5 text-[10px] text-muted-foreground/40">
-                Companion build pending…
+                Server build pending…
             </div>
         );
     }

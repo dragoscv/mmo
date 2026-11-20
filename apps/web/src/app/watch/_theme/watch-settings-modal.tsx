@@ -138,7 +138,7 @@ export function WatchSettingsModal({ open, onClose }: Props) {
                 {tab === "advanced" && (
                     <section className="watch-modal-section">
                         <h3 className="watch-modal-section-title">Advanced</h3>
-                        <p className="watch-settings-blurb">Companion status, cache, telemetry.</p>
+                        <p className="watch-settings-blurb">Server status, cache, telemetry.</p>
                         <p style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                             <a href="/settings" className="watch-btn watch-btn-ghost" onClick={onClose}>Global settings →</a>
                             <a href="/watch/settings" className="watch-btn watch-btn-ghost" onClick={onClose}>Full watch settings →</a>

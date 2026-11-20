@@ -68,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     const writeAnlz = typeof body.writeAnlz === "boolean" ? body.writeAnlz : undefined;
 
     const link = await getCompanionLink();
-    if (!link) return json({ error: "companion not linked" }, 400);
+    if (!link) return json({ error: "server not connected" }, 400);
 
     const encoder = new TextEncoder();
     const abortCtrl = new AbortController();

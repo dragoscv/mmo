@@ -378,7 +378,7 @@ export function buildTrainingTools(ctx: ToolContext): Record<string, Tool> {
         buildDatasetFromLibrary: tool({
             description:
                 "Bundle real tracks from the user's music library (the `tracks` table — songs added/scanned by the " +
-                "companion) into a training dataset. Optional filters: genre, BPM range, Camelot key, limit. " +
+                "MixAI Server) into a training dataset. Optional filters: genre, BPM range, Camelot key, limit. " +
                 "If the library is empty in the current environment, gracefully falls back to the user's ready " +
                 "generated assets so the pipeline always has audio. Captions are auto-built from track metadata " +
                 "(title, artist, genre, BPM, key, mood). Returns dataset in 'draft' — next call materializeDataset " +

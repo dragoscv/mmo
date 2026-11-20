@@ -72,12 +72,12 @@
 | BPM distribution chart | 🟢 Medium | Medie | v0.4 |
 | Energy distribution chart | 🟢 Medium | Medie | v0.4 |
 
-### 🎬 Media Home (web 2.2 · MMO Server 3.1 · TV 1.1)
+### 🎬 Media Home (web 2.2 · MixAI Server 3.1 · TV 1.1)
 
 | Feature | Prioritate | Complexitate | Versiune |
 |---------|-----------|-------------|----------|
 | Media Home la `/` (hero + rânduri Watch/Listen; dashboard-ul vechi la `/dashboard`) | 🔴 Critical | Medie | web 2.2 |
-| Multi-server: agregare peste toate MMO Server-ele împerecheate, dedupe TMDB, chip-uri per server | 🔴 Critical | Grea | web 2.2 |
+| Multi-server: agregare peste toate MixAI Server-ele împerecheate, dedupe TMDB, chip-uri per server | 🔴 Critical | Grea | web 2.2 |
 | Deep links furnizori (Movie of the Night → TMDB providers → registry) cu atribuire | 🟡 High | Medie | server 3.1 |
 | Pagină titlu unificată `/media/[kind]/[tmdbId]` (Play pe <server> / Unde vezi) | 🔴 Critical | Medie | web 2.2 |
 | Progres partajat web ↔ TV prin server (`/media/progress`, `/api/media/sync`) | 🟡 High | Medie | server 3.1 · TV 1.1 |

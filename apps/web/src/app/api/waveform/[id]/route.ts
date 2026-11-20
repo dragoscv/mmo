@@ -83,7 +83,7 @@ export async function GET(
     }
 
     const link = await getCompanionLink();
-    if (!link) return NextResponse.json({ error: "Companion not connected" }, { status: 503 });
+    if (!link) return NextResponse.json({ error: "Server not connected" }, { status: 503 });
     const track = await companionLibrary.getTrackById(link, trackId);
     if (!track) {
         return NextResponse.json({ error: "Track not found" }, { status: 404 });

@@ -46,7 +46,7 @@ export interface CastStatus {
 
 async function castCall<T>(method: "GET" | "POST", path: string, body?: unknown, timeoutMs = 15_000): Promise<T> {
     const link = await getCompanionLink();
-    if (!link) throw new Error("No companion online");
+    if (!link) throw new Error("No server online");
     const res = await fetch(`${link.apiUrl}/cast${path}`, {
         method,
         headers: {
@@ -61,7 +61,7 @@ async function castCall<T>(method: "GET" | "POST", path: string, body?: unknown,
     if (!res.ok) {
         let detail = "";
         try { detail = ((await res.json()) as { error?: string }).error ?? ""; } catch { /* ignore */ }
-        throw new Error(`Companion ${method} /cast${path} failed (${res.status})${detail ? ": " + detail : ""}`);
+        throw new Error(`Server ${method} /cast${path} failed (${res.status})${detail ? ": " + detail : ""}`);
     }
     return (await res.json()) as T;
 }

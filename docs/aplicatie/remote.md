@@ -48,12 +48,12 @@
 ## 🚀 Setup (host + client)
 
 ### Pe HOST (computer-ul principal)
-1. Pornește MMO Web App (cu Companion ideal)
+1. Pornește MixAI (cu MMO Server / Companion ideal)
 2. Mergi la pagina pe care vrei să o expui (mixer, daw, etc.)
 3. Click "Share Remote" în sidebar → primești **invite code** sau **QR**
 
 ### Pe CLIENT (telefon / tabletă)
-1. Deschide MMO Web App pe telefon
+1. Deschide MixAI pe telefon
 2. Mergi la `/remote`
 3. Scanează QR sau introdu invite code
 4. ✓ Connected — controlezi acum host-ul

@@ -115,7 +115,7 @@ export async function convertVocalOnCloud(_input: {
     if (!cloudRvcEnabled()) {
         return { ok: false, error: "GCP_RVC_URL not set", via: "cloud-rvc" };
     }
-    return { ok: false, error: "voice-not-in-cloud-storage: RVC voice models live on the companion only. Cloud voice migration not yet implemented.", via: "cloud-rvc" };
+    return { ok: false, error: "voice-not-in-cloud-storage: RVC voice models live on the server only. Cloud voice migration not yet implemented.", via: "cloud-rvc" };
 }
 
 /** Cloned-voice TTS (XTTS/F5/Fish) in the cloud.
@@ -131,5 +131,5 @@ export async function synthesizeClonedOnCloud(_input: {
     if (!cloudVoiceTtsEnabled()) {
         return { ok: false, error: "GCP_VOICE_TTS_URL not set", via: "cloud-voice-tts" };
     }
-    return { ok: false, error: "voice-not-in-cloud-storage: cloned voices live on the companion only. Cloud voice migration not yet implemented.", via: "cloud-voice-tts" };
+    return { ok: false, error: "voice-not-in-cloud-storage: cloned voices live on the server only. Cloud voice migration not yet implemented.", via: "cloud-voice-tts" };
 }
