@@ -1,21 +1,21 @@
 # Version catalog — the single place where every version lives (WP1-14).
 # Verified latest stable on 2026-09-18 (Google Maven / Maven Central).
 [versions]
-agp = "9.4.0"
-kotlin = "2.4.20"
-composeBom = "2026.09.00"
+agp = "9.5.2"
+kotlin = "2.4.21"
+composeBom = "2026.11.01"
 coreKtx = "1.19.0"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"
 tvMaterial = "1.1.0"
 media3 = "1.11.1"
-datastore = "1.2.1"
-serialization = "1.11.0"
+datastore = "1.3.0"
+serialization = "1.13.0"
 coroutines = "1.11.0"
-coil = "3.6.2"
+coil = "3.6.3"
 zxing = "3.5.4"
 tvprovider = "1.1.0"
-okhttp = "5.5.0"
+okhttp = "5.5.1"
 materialIcons = "1.7.8"
 junit = "4.13.2"
 # Phone app (WP16-46), verified latest stable on Google Maven 2026-11-05.
@@ -28,9 +28,9 @@ browser = "1.10.0"
 work = "2.12.0"
 credentials = "1.6.0"
 googleid = "1.2.1"
-firebaseBom = "35.1.0"
-googleServices = "4.5.0"
-sentryAndroid = "8.63.0"
+firebaseBom = "35.2.0"
+googleServices = "4.6.0"
+sentryAndroid = "8.65.0"
 # Instrumented tests (MixAI Music browse tree on device, WP17-41c), latest stable on Google Maven 2026-11-07.
 androidxTestRunner = "1.7.0"
 androidxTestExtJunit = "1.3.0"
@@ -44,7 +44,7 @@ wearRemoteInteractions = "1.2.0"
 wearInput = "1.2.0"
 playServicesWearable = "20.0.1"
 # MixAI Music output picker (WP17-41h): same MediaRouter media3-cast 1.11.1 pulls in at runtime.
-mediarouter = "1.8.1"
+mediarouter = "1.9.0"
 # MixAI Key & BPM (WP18-02): UniFFI Kotlin bindings run on JNA; latest on Maven Central 2026-11-08.
 jna = "5.19.1"
 # MixAI Key & BPM for Wear OS (WP18-04): tile (Material3TileService), complication, ongoing activity.
@@ -61,7 +61,7 @@ fragment = "1.9.1"
 composeMultiplatform = "1.12.2"
 # MixAI Live controller (WP21-08): QR pairing scanner (CameraX + zxing core decode), latest stable on Google Maven
 # 2026-11-09 (1.7 is rc).
-camerax = "1.6.2"
+camerax = "1.7.0"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
