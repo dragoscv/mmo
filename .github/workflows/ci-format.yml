@@ -1,0 +1,40 @@
+name: ci-format
+
+# The pre-commit formatter must format ONLY the files a commit changes. These tests pin that: a path
+# whose index blob equals the blob at the upstream base is never handed to prettier. Pure Node, no
+# install (WP13-04 follow-up).
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "scripts/ci/**"
+            - ".husky/pre-commit"
+            - ".prettierrc.json"
+            - ".github/workflows/ci-format.yml"
+    pull_request:
+        paths:
+            - "scripts/ci/**"
+            - ".husky/pre-commit"
+            - ".prettierrc.json"
+            - ".github/workflows/ci-format.yml"
+
+concurrency:
+    group: ci-format-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    precommit-format:
+        name: changed-files-only formatter tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v5
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+            - name: Selection, base resolution and runner tests
+              run: node --test scripts/ci/precommit-format-staged.test.mjs

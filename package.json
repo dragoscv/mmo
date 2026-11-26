@@ -13,6 +13,7 @@
         "brand:build": "node brand/scripts/build.mjs",
         "brand:check": "node scripts/brand-drift.mjs",
         "brand:test": "node --test brand/scripts/build.test.mjs",
+        "test:precommit-format": "node --test scripts/ci/precommit-format-staged.test.mjs",
         "brand:contrast": "node brand/scripts/contrast-gate.mjs brand/contrast-pairs.json",
         "hex:check": "node scripts/hex-gate.mjs",
         "i18n:check": "pnpm -C apps/web i18n:check && pnpm -C apps/extension i18n:check",
@@ -38,7 +39,8 @@
         "@commitlint/cli": "21.2.2",
         "@commitlint/config-conventional": "21.2.2",
         "husky": "^9.1.7",
-        "lint-staged": "17.5.1"
+        "lint-staged": "17.5.1",
+        "prettier": "3.10.1"
     },
     "lint-staged": {
         "apps/web/messages/*.json": "node apps/web/scripts/i18n-parity.mjs",
