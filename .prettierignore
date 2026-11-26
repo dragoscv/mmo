@@ -1,0 +1,18 @@
+# Never reformat generated, vendored or build output.
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/playwright-report
+**/test-results
+**/.vercel
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+# Tailwind build output and synced content (see apps/web/scripts/sync-*.mjs).
+public/globals.css
+learn-content
+data
+sqlite.db
+*.db
+*.sqlite

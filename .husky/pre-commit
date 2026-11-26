@@ -1,3 +1,8 @@
+# Format ONLY the files this commit changes (index blob vs the blob at the upstream base), so a
+# checkout whose HEAD trails upstream never reformats and re-stages another agent's work.
+# The path-scoped gates below are unchanged: they still read the index.
+node scripts/ci/precommit-format-staged.mjs || exit 1
+
 # Only runs when files under apps/extension/ are staged.
 node apps/extension/scripts/check-version.mjs --staged
 
