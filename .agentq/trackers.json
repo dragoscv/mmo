@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "repo": "mmo",
+  "trackers": [
+    {
+      "id": "mixai-design",
+      "file": "docs/mixai-design-tracker.csv",
+      "format": "csv",
+      "columns": {
+        "id": "id",
+        "title": "title",
+        "status": "status",
+        "group": "surface",
+        "notes": "decision_or_notes"
+      },
+      "status": {
+        "map": {
+          "done": "done",
+          "blocked": "blocked",
+          "doing": "in-progress",
+          "todo": "todo"
+        }
+      },
+      "index": {
+        "kind": "plan",
+        "order": 1
+      }
+    }
+  ]
+}

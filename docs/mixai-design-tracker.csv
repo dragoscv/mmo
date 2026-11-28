@@ -419,7 +419,6 @@ id,type,surface,title,status,owner,decision_or_notes
 "WP22-47","","","Ask-to-watch: a child requests a title, a parent approves from the phone (push)","todo","agent",""
 "WP22-48","","","Move playback between phone, TV and desktop in one action, resuming at the same second","todo","agent",""
 "WP22-49","","","Idea backlog not selected yet (kept for a later round): dialogue boost, one skip preference, time-stamped family reactions, pass-it-on shelf, phone as voice channel, watch budget, bedtime mode, lyrics view on TV, who-is-this on pause, automatic chapters for home videos, easy-reader captions, spoken subtitles, private listening, auto-pause on doorbell","todo","agent",""
-
 D1,decision,all,Surfaces in scope,done,user,"all six: web, mixai, native, server/ui, tv-tizen+tv-android, extension"
 D2,decision,all,Design system location,done,user,"packages/design-tokens + packages/ui"
 D3,decision,all,Dependency upgrade policy,done,user,"every stable major; one verified slice each"
@@ -434,4 +433,4 @@ D11,decision,all,Risky majors,done,user,"TS7, vitest5, electron44, ai7, express5
 D12,decision,all,Delivery order,done,user,"WP0→WP1→WP2→WP3-7 parallel→WP8"
 D13,decision,all,Extra recommendations,done,user,"all 7 in (WP9)"
 D14,decision,all,Versioning,done,user,"major bump everywhere"
-,done,agent,ee81854n-critic pass,todo,agent,
+WP8-06,done,agent,ee81854n-critic pass,todo,agent,
