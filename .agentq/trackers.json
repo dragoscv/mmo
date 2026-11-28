@@ -13,6 +13,7 @@
         "group": "surface",
         "notes": "decision_or_notes"
       },
+      "idPattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,40}$",
       "status": {
         "map": {
           "done": "done",
